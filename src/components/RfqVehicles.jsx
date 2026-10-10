@@ -3492,7 +3492,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
               {/* Fitment count — click to view in shop */}
               <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",flexShrink:0,
                 cursor:onViewInShop?"pointer":"default"}}
-                onClick={()=>onViewInShop&&onViewInShop(v.make,v.model)}
+                onClick={()=>onViewInShop&&onViewInShop(v.make,v.model,search)}
                 title="View linked parts in shop">
                 🔗 {fitCount(v.id)} parts
               </span>
@@ -3506,7 +3506,7 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
               {/* Actions */}
               <div style={{display:"flex",gap:6,flexShrink:0}}>
                 {onViewInShop&&<button className="btn btn-ghost btn-xs" style={{color:"var(--green)",borderColor:"var(--green)"}}
-                  onClick={()=>onViewInShop(v.make,v.model)}>🛒 Shop</button>}
+                  onClick={()=>onViewInShop(v.make,v.model,search)}>🛒 Shop</button>}
                 {onAddPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--accent)",borderColor:"var(--accent)"}}
                   onClick={()=>onAddPart(v)} title={`Add new part with SKU ${v.code}-`}>+ Part</button>}
                 {onLinkPart&&<button className="btn btn-ghost btn-xs" style={{color:"var(--blue)",borderColor:"var(--blue)"}}

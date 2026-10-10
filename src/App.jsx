@@ -354,6 +354,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [filterOS,setFilterOS]=useState(role==="shipper"?"__active__":"__all__");
   const [vehicleFilterIds,setVehicleFilterIds]=useState(null);
   const [shopVehicleFilter,setShopVehicleFilter]=useState({make:"",model:""});
+  const [shopReturnTo,setShopReturnTo]=useState(null); // {make,model,search} when the Shop was opened from Vehicle Management — drives the "Back to Vehicles" button
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
   const [headerBookInTrigger,setHeaderBookInTrigger]=useState(0); // bumped by the header-strip "Book In Car" button (desktop) to open Workshop's modal
   const [rfqJumpSessionId,setRfqJumpSessionId]=useState(null); // one-shot nav — jump straight into an RFQ session's quotes from a Branch Transfer Request card
@@ -1406,6 +1407,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Track current tab — pause refresh during stock count
   const tabRef = useRef(tab);
   useEffect(()=>{ tabRef.current = tab; },[tab]);
+  useEffect(()=>{ if(tab!=="shop") setShopReturnTo(null); },[tab]); // the "Back to Vehicle Management" button only lives while the Shop it was opened into is showing
 
   const isBusy = () =>
     modalOpenRef.current ||
@@ -6911,6 +6913,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 }
               </div>
             </div>
+            {shopReturnTo&&(role==="admin"||role==="demo")&&(
+              <button className="btn btn-ghost btn-sm" style={{marginBottom:10,color:"var(--blue)",borderColor:"var(--blue)"}}
+                onClick={()=>{setVehiclesJumpMake(shopReturnTo.make);setVehiclesJumpModel(shopReturnTo.model||null);setVehiclesJumpSearch(shopReturnTo.search||"");setShopReturnTo(null);setTab("vehicles");}}>
+                ← Back to Vehicle Management · {shopReturnTo.make}{shopReturnTo.search?` · "${shopReturnTo.search}"`:""}
+              </button>
+            )}
             {/* 🚗 Vehicle Search Bar */}
             <VehicleSearchBar
               key={shopVehicleFilter.make+"|"+shopVehicleFilter.model}
@@ -8822,7 +8830,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
         {tab==="vehicles"&&(role==="admin"||role==="demo")&&(
           <VehiclesPage vehicles={vehicles} partFitments={partFitments} parts={parts} workshopJobs={workshopJobs} onSave={saveVehicle} onDelete={deleteVehicle}
-            onViewInShop={(make,model)=>{setShopVehicleFilter({make,model});setTab("shop");}}
+            onViewInShop={(make,model,searchKw)=>{setShopVehicleFilter({make,model});setShopReturnTo({make,model,search:searchKw||""});setTab("shop");}}
             onViewJobs={(label,jobIds,make,model,searchKw)=>{setWorkshopJobFilter({label,jobIds,returnMake:make,returnModel:model,returnSearch:searchKw});setTab("workshop");}}
             onAddPart={(v)=>openM("editPart",{_initialF:{sku:(v.code||"")+(v.code?"-":"")},_tab:"fitment",_fitSearch:(v.make||"")+" "+(v.model||"")})}
             onLinkPart={saveFitment} onLinkPartsBulk={saveFitmentsBulk}

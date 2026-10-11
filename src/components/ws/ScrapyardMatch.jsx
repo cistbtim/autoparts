@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Overlay, MHead } from "../shared.jsx";
+import { WsPhotoCompare } from "./PhotoCompare.jsx";
 import { api } from "../../lib/api.js";
 import { toImgUrl } from "../../lib/helpers.js";
 import { marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, matchTier, TIER_LABEL, maskVin, pointsBalance, isListable } from "../../lib/marketplace.js";
@@ -17,9 +18,11 @@ const SETUP_SQL_HINT = "Scrapyard Match isn't set up yet — ask the admin to ru
 // The job's own vehicle photos (workshop_vehicles), in viewing order.
 const VEH_ANGLES = [["photo_front", "Front"], ["photo_front_left", "Front-Left"], ["photo_front_right", "Front-Right"], ["photo_left", "Left"], ["photo_right", "Right"],
   ["photo_rear", "Rear"], ["photo_rear_left", "Rear-Left"], ["photo_rear_right", "Rear-Right"], ["photo_side", "Side"]];
-const bigImg = (u) => (toImgUrl(u) || u || "").replace(/sz=w\d+/, "sz=w600");
+const bigImg = (u, w = 600) => (toImgUrl(u) || u || "").replace(/sz=w\d+/, `sz=w${w}`);
+const YARD_ANGLES = [["photo_front", "Front"], ["photo_rear", "Rear"], ["photo_left", "Left"], ["photo_right", "Right"], ["photo_interior", "Interior"], ["photo_engine", "Engine"], ["photo_url", "Photo"]];
 
 export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicles = [], initialJobId = null, onInitialJobConsumed, resolveModel }) {
+  const [compareId, setCompareId] = useState(null);  // result whose photos are open in the side-by-side compare window
   const [chosenJob, setChosenJob] = useState(null);  // the job whose car is being matched — its photos are shown for comparison
   const [query, setQuery] = useState("");       // the one search box: a VIN, or type a plate / customer / car to find your job
   const [showSug, setShowSug] = useState(false);
@@ -126,7 +129,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
         year: y.year || yearFromVin(y.vin),
         city: cityBy.get(String(y.scrapyard_id))?.city || "",
         maskedVin: maskVin(y.vin),
-        photos: [y.photo_front, y.photo_rear, y.photo_left, y.photo_right, y.photo_interior, y.photo_engine, y.photo_url].filter(Boolean).slice(0, 6),
+        photos: YARD_ANGLES.map(([f, label]) => (y[f] ? { label, url: y[f] } : null)).filter(Boolean).slice(0, 8),
         parts: (Array.isArray(parts) ? parts : []).filter(p => p.vehicle_id === y.id && (+p.quantity || 0) > 0),
       }));
       setResults(out);
@@ -244,9 +247,9 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
           </div>
           {r.photos.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-              {r.photos.map((u, i) => (
-                <div key={i} style={{ position: "relative", width: 96, height: 72, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => setLightbox(toImgUrl(u))}>
-                  <img src={toImgUrl(u)} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
+              {r.photos.map((ph, i) => (
+                <div key={i} style={{ position: "relative", width: 96, height: 72, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => setLightbox(bigImg(ph.url, 1000))}>
+                  <img src={toImgUrl(ph.url)} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
                   <span style={{ position: "absolute", right: 3, bottom: 2, fontSize: 8, fontWeight: 800, color: "rgba(255,255,255,.85)", textShadow: "0 0 3px #000" }}>VELGENIUS</span>
                 </div>
               ))}
@@ -264,6 +267,11 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
               ))}
               {r.parts.length > 12 && <div style={{ fontSize: 11, color: "var(--text3)" }}>+ {r.parts.length - 12} more</div>}
             </div>
+          )}
+          {r.photos.length > 0 && (
+            <button className="btn btn-ghost btn-sm" style={{ marginRight: 8, color: "#14b8a6", borderColor: "rgba(20,184,166,.5)" }} onClick={() => setCompareId(r.id)}>
+              🔍 Compare photos{chosenJob ? " with my car" : ""}
+            </button>
           )}
           {alreadyAsked(r.id)
             ? <div style={{ fontSize: 12, color: "var(--green)", fontWeight: 700 }}>✓ You requested this one — see "My requests" below.</div>
@@ -309,6 +317,16 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
           </button>
         </Overlay>
       )}
+      {compareId && (() => {
+        const r = (results || []).find(x => x.id === compareId);
+        if (!r) return null;
+        const vr = chosenJob ? wsVehicles.find(v => v.id === chosenJob.workshop_vehicle_id) : null;
+        const mine = VEH_ANGLES.map(([f, label]) => (vr?.[f] ? { label, url: bigImg(vr[f], 1600), thumb: bigImg(vr[f], 200) } : null)).filter(Boolean);
+        const theirs = r.photos.map(p => ({ label: p.label, url: bigImg(p.url, 1600), thumb: bigImg(p.url, 200) }));
+        return <WsPhotoCompare onClose={() => setCompareId(null)}
+          left={{ sub: chosenJob ? `${chosenJob.vehicle_reg || ""} · ${carName(chosenJob)}` : "pick one of your jobs to compare", photos: mine }}
+          right={{ sub: `${[r.year, r.make, r.model].filter(Boolean).join(" ")}${r.city ? ` · ${r.city}` : ""}`, photos: theirs }} />;
+      })()}
       {lightbox && (
         <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
           <img src={lightbox} alt="" style={{ maxWidth: "94vw", maxHeight: "90vh", objectFit: "contain" }} />

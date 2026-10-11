@@ -1898,14 +1898,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       return srcUrl;
     }catch(e){console.warn("Flip upload error:",e);showToast("Photo flip upload error — upload manually","warn");return srcUrl;}
   };
-  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF,flipPhoto,copyFits=true,copyVehicleInfo=true})=>{
+  const createOpposite=async({sku,name,chineseDesc,originalPart,originalF,flipPhoto,skipPhoto=false,copyFits=true,copyVehicleInfo=true})=>{
     if(parts.find(p=>p.sku?.trim().toLowerCase()===sku.trim().toLowerCase())){
       showToast(`SKU "${sku}" already exists`,"err"); return;
     }
     setBusyMsg(`Creating ${sku}…`);
     try{
-      let finalImageUrl=toSaveUrl(originalF.image_url||"");
-      if(flipPhoto&&originalF.image_url){
+      // skipPhoto (similar part): the new part starts with NO photo — its own is added afterwards
+      let finalImageUrl=skipPhoto?"":toSaveUrl(originalF.image_url||"");
+      if(!skipPhoto&&flipPhoto&&originalF.image_url){
         setBusyMsg(`Flipping photo for ${sku}…`);
         const srcUrl=toImgUrl(originalF.image_url)||originalF.image_url;
         finalImageUrl=await _flipAndUpload(srcUrl,sku.trim());
@@ -1940,7 +1941,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       setSearchPart(newPart.sku);
       setSearchDebounced(newPart.sku);
       showToast(`✅ ${sku} created`);
-      setTimeout(()=>openM("editPart",{...newPart,_tab:"info"}),300);
+      setTimeout(()=>openM("editPart",{...newPart,_tab:skipPhoto?"photo":"info"}),300);
     }finally{setBusyMsg(null);}
   };
   // ── Workshop ──

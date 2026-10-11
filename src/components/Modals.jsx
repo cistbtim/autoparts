@@ -4920,7 +4920,27 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               </span>
             </label>
           </div>
-          {oppConfirm.originalF?.image_url&&(()=>{
+          {oppConfirm.editableSku && (
+            // A similar part is a different part, so by default it does NOT inherit the original's photo — tick to copy it.
+            <div style={{marginBottom:10,padding:"8px 10px",background:"rgba(139,92,246,.06)",borderRadius:7,border:`1px ${oppConfirm.skipPhoto?"dashed":"solid"} rgba(139,92,246,.4)`}}>
+              <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
+                <input type="checkbox" checked={!oppConfirm.skipPhoto} onChange={e=>setOppConfirm(p=>({...p,skipPhoto:!e.target.checked}))}
+                  style={{width:15,height:15,accentColor:"var(--purple)",cursor:"pointer",flexShrink:0}}/>
+                {oppConfirm.originalF?.image_url
+                  ? <img src={toImgUrl(oppConfirm.originalF.image_url)} referrerPolicy="no-referrer" alt=""
+                      style={{width:44,height:44,objectFit:"cover",borderRadius:5,border:"1px solid var(--border)",flexShrink:0,opacity:oppConfirm.skipPhoto?.35:1,transition:"opacity .15s"}}
+                      onError={e=>e.target.style.display="none"}/>
+                  : <span style={{fontSize:22}}>📷</span>}
+                <span style={{fontWeight:600,fontSize:13}}>Copy the original's photo too</span>
+              </label>
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:6,lineHeight:1.5}}>
+                {oppConfirm.skipPhoto
+                  ? "Not copied — after creating, the Photo tab opens so you can add this part's own photo."
+                  : "The same photo is used for the new part (you can replace it later on the Photo tab)."}
+              </div>
+            </div>
+          )}
+          {!oppConfirm.editableSku&&oppConfirm.originalF?.image_url&&(()=>{
             // Google Drive's thumbnail/uc endpoints send no Access-Control-Allow-Origin
             // header, so the browser can never read those pixels into a canvas to flip
             // them (a hard browser security limit, not something we can code around
@@ -5050,7 +5070,7 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
               <button className="btn btn-ghost" style={{flex:"1 1 auto",order:1,borderColor:"rgba(139,92,246,.5)",color:"var(--purple)"}}
                 title="用一個新號碼建立同一個零件的相似版本（複製名稱/價格/圖片等，SKU 自己輸入）"
                 onClick={()=>{
-                  setOppConfirm({sku:"",name:f.name,chineseDesc:f.chinese_desc,editableSku:true,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:false,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
+                  setOppConfirm({sku:"",name:f.name,chineseDesc:f.chinese_desc,editableSku:true,skipPhoto:true,fitCount:myFitments.length,originalPart:part,originalF:f,flipPhoto:false,copyFits:myFitments.length>0,copyVehicleInfo:!!(f.make||f.model||f.year_range)});
                 }}>
                 🔗 相似零件
               </button>

@@ -86,3 +86,29 @@ export const angleOf = (label) => {
   if (/engine|bay|bonnet|hood/.test(l)) return "engine";
   return "";
 };
+
+// Compare two VINs field by field and say how likely the scrapyard vehicle is the same model as the workshop's car.
+// Only the maker code (1-3), model/body/engine code (4-8) and model year (10) are used — the same characters the
+// workshop is already shown. A different 4-8 code can mean a different GENERATION (Audi Q5 "8R" vs "FY") or only
+// a different engine/trim (common on BMW), so the verdict leans on the year gap too.
+//   level: "good" | "warn" | "bad"
+export function compareVins(wsVin, yardVin) {
+  const a = cleanVin(wsVin), b = cleanVin(yardVin);
+  if (a.length < 10 || b.length < 10) return null;
+  const ya = yearFromVin(a), yb = yearFromVin(b);
+  const gap = ya && yb ? Math.abs(ya - yb) : null;
+  const sameWmi = a.slice(0, 3) === b.slice(0, 3);
+  const sameVds = a.slice(3, 8) === b.slice(3, 8);
+  const rows = [
+    { label: "Maker code (VIN 1–3)", mine: a.slice(0, 3), theirs: b.slice(0, 3), ok: sameWmi },
+    { label: "Model / body / engine code (VIN 4–8)", mine: a.slice(3, 8), theirs: b.slice(3, 8), ok: sameVds },
+    { label: "Model year (VIN 10)", mine: ya || "?", theirs: yb || "?", ok: gap === null ? null : gap <= 2, warn: gap !== null && gap > 2 && gap <= 4 },
+  ];
+  let level, message;
+  if (!sameWmi) { level = "bad"; message = "Different maker/market code — unlikely to be the same model."; }
+  else if (sameVds && (gap === null || gap <= 4)) { level = "good"; message = "Same model code and a similar year — parts should fit (always confirm the part number)."; }
+  else if (sameVds) { level = "warn"; message = `Same model code but ${gap} years apart — check for facelift changes before buying.`; }
+  else if (gap !== null && gap >= 4) { level = "bad"; message = `Different model code (${a.slice(3, 8)} vs ${b.slice(3, 8)}) and ${gap} years apart — most likely a different generation. Parts probably will NOT fit.`; }
+  else { level = "warn"; message = `Different model code (${a.slice(3, 8)} vs ${b.slice(3, 8)}) — could be another generation or just another engine/trim. Compare the photos and part numbers carefully.`; }
+  return { level, message, rows, yearMine: ya, yearTheirs: yb };
+}

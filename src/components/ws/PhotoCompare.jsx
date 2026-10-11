@@ -87,7 +87,7 @@ function Pane({ title, sub, photos, idx, setIdx, view, setView, empty, accent })
 }
 
 /** left / right: { title, sub, photos: [{label, url, thumb?}] } */
-export function WsPhotoCompare({ left, right, onClose, startL = 0, startR = 0 }) {
+export function WsPhotoCompare({ left, right, onClose, startL = 0, startR = 0, check = null }) {
   const [li, setLi] = useState(startL), [ri, setRi] = useState(startR);
   const [lv, setLv] = useState(START), [rv, setRv] = useState(START);
   const [link, setLink] = useState(false);
@@ -107,6 +107,24 @@ export function WsPhotoCompare({ left, right, onClose, startL = 0, startR = 0 })
     <Overlay onClose={onClose} wide maxWidth={1180}>
       <MHead title="🔍 Compare photos" sub="Drag to move · wheel / pinch to zoom · double-click to reset" onClose={onClose}
         actions={<label style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}><input type="checkbox" checked={link} onChange={e => { setLink(e.target.checked); if (e.target.checked) setRv(lv); }} /> Move both together</label>} />
+      {check && (
+        <div style={{ marginBottom: 10, border: "1px solid var(--border)", borderRadius: 10, padding: "8px 12px", background: "var(--surface2)" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: { good: "var(--green)", warn: "var(--yellow)", bad: "var(--red)" }[check.level] }}>
+            {{ good: "✅", warn: "⚠️", bad: "✖️" }[check.level]} {check.message}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 22px", gap: "2px 12px", fontSize: 12, alignItems: "center" }}>
+            <span style={{ color: "var(--text3)", fontSize: 10, fontWeight: 700 }}>CHECK</span><span style={{ color: "#14b8a6", fontSize: 10, fontWeight: 700 }}>YOUR CAR</span><span style={{ color: "#ff7a2e", fontSize: 10, fontWeight: 700 }}>SCRAPYARD</span><span />
+            {check.rows.map(r => (
+              <div key={r.label} style={{ display: "contents" }}>
+                <span style={{ color: "var(--text2)" }}>{r.label}</span>
+                <span style={{ fontFamily: "DM Mono,monospace", fontWeight: 700 }}>{r.mine}</span>
+                <span style={{ fontFamily: "DM Mono,monospace", fontWeight: 700 }}>{r.theirs}</span>
+                <span>{r.ok === null ? "" : r.ok ? "✅" : r.warn ? "⚠️" : "✖️"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         <Pane title="YOUR CAR" sub={left.sub} photos={left.photos} idx={li} setIdx={i => pick("l", i)} view={lv} setView={setL} accent="#14b8a6"
           empty="No photos of this car on the job yet — add them on the job card." />

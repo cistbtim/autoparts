@@ -3,7 +3,7 @@ import { Overlay, MHead } from "../shared.jsx";
 import { WsPhotoCompare } from "./PhotoCompare.jsx";
 import { api } from "../../lib/api.js";
 import { toImgUrl } from "../../lib/helpers.js";
-import { angleOf, marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, matchTier, TIER_LABEL, maskVin, pointsBalance, isListable } from "../../lib/marketplace.js";
+import { angleOf, compareVins, marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, matchTier, TIER_LABEL, maskVin, pointsBalance, isListable } from "../../lib/marketplace.js";
 
 // Workshop side of Scrapyard Match: search scrapyard stock by VIN for free. The result shows what the
 // vehicle is, where (city only) and which parts are in stock — never WHO holds it. Getting the
@@ -19,9 +19,14 @@ const SETUP_SQL_HINT = "Scrapyard Match isn't set up yet — ask the admin to ru
 const VEH_ANGLES = [["photo_front", "Front"], ["photo_front_left", "Front-Left"], ["photo_front_right", "Front-Right"], ["photo_left", "Left"], ["photo_right", "Right"],
   ["photo_rear", "Rear"], ["photo_rear_left", "Rear-Left"], ["photo_rear_right", "Rear-Right"], ["photo_side", "Side"]];
 const bigImg = (u, w = 600) => (toImgUrl(u) || u || "").replace(/sz=w\d+/, `sz=w${w}`);
+const LEVEL_STYLE = {
+  good: { icon: "✅", color: "var(--green)", bg: "rgba(34,197,94,.08)" },
+  warn: { icon: "⚠️", color: "var(--yellow)", bg: "rgba(251,191,36,.08)" },
+  bad: { icon: "✖️", color: "var(--red)", bg: "rgba(239,68,68,.08)" },
+};
 const YARD_ANGLES = [["photo_front", "Front"], ["photo_rear", "Rear"], ["photo_left", "Left"], ["photo_right", "Right"], ["photo_interior", "Interior"], ["photo_engine", "Engine"], ["photo_url", "Photo"]];
 
-export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicles = [], initialJobId = null, onInitialJobConsumed, resolveModel }) {
+export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicles = [], initialJobId = null, onInitialJobConsumed, onOpenJob, resolveModel }) {
   const [compare, setCompare] = useState(null);  // {id, li, ri} — result + starting photos for the side-by-side compare window
   const [chosenJob, setChosenJob] = useState(null);  // the job whose car is being matched — its photos are shown for comparison
   const [query, setQuery] = useState("");       // the one search box: a VIN, or type a plate / customer / car to find your job
@@ -142,9 +147,12 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
         year: y.year || yearFromVin(y.vin),
         city: cityBy.get(String(y.scrapyard_id))?.city || "",
         maskedVin: maskVin(y.vin),
+        check: compareVins(v, y.vin),
         photos: YARD_ANGLES.map(([f, label]) => (y[f] ? { label, url: y[f] } : null)).filter(Boolean).slice(0, 8),
         parts: (Array.isArray(parts) ? parts : []).filter(p => p.vehicle_id === y.id && (+p.quantity || 0) > 0),
       }));
+      const rank = (r) => ({ good: 0, warn: 1, bad: 2 }[r.check?.level] ?? 1);
+      out.sort((a, b) => a.tier - b.tier || rank(a) - rank(b));   // within a tier, likely-compatible first
       setResults(out);
       api.insert("ms_search_log", { workshop_id: String(wsId), workshop_name: wsProfile.name || "", vin: v, make: mk, model: md, match_count: out.length }).catch(() => {});
     } finally { setBusy(false); }
@@ -173,6 +181,11 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
     <div className="fu">
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>🔎 Scrapyard Match</div>
+        {chosenJob && onOpenJob && (
+          <button className="btn btn-ghost btn-sm" style={{ color: "#14b8a6", borderColor: "rgba(20,184,166,.5)", fontWeight: 700 }} onClick={() => onOpenJob(chosenJob.id)}>
+            ← Back to job card · {chosenJob.vehicle_reg}
+          </button>
+        )}
         <span className="badge" style={{ background: "rgba(255,122,46,.15)", color: "var(--accent)", fontWeight: 700 }}>⭐ {balance} point{balance !== 1 ? "s" : ""}{pendingCost > 0 ? ` (${pendingCost} pending)` : ""}</span>
       </div>
       <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 14, lineHeight: 1.6 }}>
@@ -260,6 +273,13 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
               <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 2 }}>📍 {r.city || "Location on request"}</div>
             </div>
           </div>
+          {r.check && (
+            <div style={{ fontSize: 12, fontWeight: 600, padding: "6px 10px", borderRadius: 8, marginBottom: 8, lineHeight: 1.5,
+              background: LEVEL_STYLE[r.check.level].bg, color: LEVEL_STYLE[r.check.level].color, border: `1px solid ${LEVEL_STYLE[r.check.level].color}` }}>
+              {LEVEL_STYLE[r.check.level].icon} {r.check.message}
+              <span style={{ fontWeight: 400, opacity: .85 }}> · VIN model code {r.check.rows[1].mine} (you) vs {r.check.rows[1].theirs} · year {r.check.yearMine || "?"} vs {r.check.yearTheirs || "?"}</span>
+            </div>
+          )}
           {r.photos.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
               {r.photos.map((ph, i) => (
@@ -338,7 +358,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
         const vr = chosenJob ? wsVehicles.find(v => v.id === chosenJob.workshop_vehicle_id) : null;
         const mine = VEH_ANGLES.map(([f, label]) => (vr?.[f] ? { label, url: bigImg(vr[f], 1600), thumb: bigImg(vr[f], 200) } : null)).filter(Boolean);
         const theirs = r.photos.map(p => ({ label: p.label, url: bigImg(p.url, 1600), thumb: bigImg(p.url, 200) }));
-        return <WsPhotoCompare onClose={() => setCompare(null)} startL={compare.li} startR={compare.ri}
+        return <WsPhotoCompare onClose={() => setCompare(null)} startL={compare.li} startR={compare.ri} check={r.check}
           left={{ sub: chosenJob ? `${chosenJob.vehicle_reg || ""} · ${carName(chosenJob)}` : "pick one of your jobs to compare", photos: mine }}
           right={{ sub: `${[r.year, r.make, r.model].filter(Boolean).join(" ")}${r.city ? ` · ${r.city}` : ""}`, photos: theirs }} />;
       })()}

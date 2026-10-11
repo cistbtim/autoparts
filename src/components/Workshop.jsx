@@ -41,7 +41,7 @@ const resolveCarModel = (vehicles, make, model) => {
   return v ? v.model : model;
 };
 
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed,onOpenJobFromMatch,initialOpenJobId=null,onOpenJobConsumed}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -208,6 +208,13 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     return ()=>clearInterval(id);
   },[wsTab,view,onRefreshJobsBoard]);
 
+  // Arriving from Scrapyard Match's "Back to job card": open that job's card straight away.
+  useEffect(()=>{
+    if(!initialOpenJobId||!jobs.length) return;
+    const j=jobs.find(x=>String(x.id)===String(initialOpenJobId));
+    if(j){ setActiveJob(j); setView("job"); }
+    onOpenJobConsumed&&onOpenJobConsumed();
+  },[initialOpenJobId,jobs]); // eslint-disable-line react-hooks/exhaustive-deps
   // Keep activeJob in sync when jobs array refreshes
   useEffect(()=>{
     if(activeJob){
@@ -2295,7 +2302,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
-      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsVehicles={wsVehicles} initialJobId={scrapMatchJobId} onInitialJobConsumed={onScrapMatchConsumed} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
+      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsVehicles={wsVehicles} initialJobId={scrapMatchJobId} onInitialJobConsumed={onScrapMatchConsumed} onOpenJob={onOpenJobFromMatch} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
 
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}

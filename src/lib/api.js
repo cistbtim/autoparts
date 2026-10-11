@@ -1,3 +1,5 @@
+import { DECOY_IDS } from "./decoys.js";
+
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "";
 
@@ -42,7 +44,12 @@ const _cClearAll = () => {
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
-const fetchAll = async (table, query = "") => {
+// Every read of the parts table leaves the decoy rows out (see src/lib/decoys.js) — staff and customers never see them.
+const _noDecoys = (table, query = "") =>
+  table === "parts" && DECOY_IDS.length ? `${query}${query ? "&" : ""}id=not.in.(${DECOY_IDS.join(",")})` : query;
+
+const fetchAll = async (table, queryIn = "") => {
+  const query = _noDecoys(table, queryIn);
   const PAGE = 1000;
   const sep = query ? "&" : "";
   const urlFor = (offset) => `${SUPABASE_URL}/rest/v1/${table}?${query}${sep}limit=${PAGE}&offset=${offset}`;
@@ -110,6 +117,7 @@ export const api = {
 
   // Single-page fetch — no loop, no cache. Used for first-paint of large tables.
   getFirst: async (t, q = "", limit = 200) => {
+    q = _noDecoys(t, q);
     const sep = q ? "&" : "";
     const url = `${SUPABASE_URL}/rest/v1/${t}?${q}${sep}limit=${limit}&offset=0`;
     const resp = await fetch(url, { headers: H() });
@@ -119,7 +127,7 @@ export const api = {
   // Row count only — no data transferred. Uses HEAD + Prefer:count=exact so
   // polling loops (e.g. "any new bookings?") stay cheap even on a tight interval.
   count: async (t, q = "") => {
-    const url = `${SUPABASE_URL}/rest/v1/${t}?${q}`;
+    const url = `${SUPABASE_URL}/rest/v1/${t}?${_noDecoys(t, q)}`;
     const resp = await fetch(url, { method: "HEAD", headers: H({ Prefer: "count=exact" }) });
     const range = resp.headers.get("content-range") || "";
     const total = parseInt(range.split("/")[1], 10);
@@ -133,6 +141,7 @@ export const api = {
     const PAGE = 1000;
     let offset = startOffset;
     let extra = [];
+    q = _noDecoys(t, q);
     while (true) {
       const sep = q ? "&" : "";
       const url = `${SUPABASE_URL}/rest/v1/${t}?${q}${sep}limit=${PAGE}&offset=${offset}`;

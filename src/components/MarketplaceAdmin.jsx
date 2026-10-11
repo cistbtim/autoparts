@@ -3,6 +3,7 @@ import { api } from "../lib/api.js";
 import { waLink } from "../lib/helpers.js";
 import { marketplaceReady, REVEAL_COST, pointsBalance } from "../lib/marketplace.js";
 import { PhotoReviewPanel } from "./PhotoReviewAdmin.jsx";
+import { DecoyPanel } from "./DecoyPanel.jsx";
 
 // Admin side of Scrapyard Match: approve reveal requests (deducts the points and gives you the
 // scrapyard's contact so you can introduce the two sides), manage each workshop's points, and see usage.
@@ -108,6 +109,7 @@ export function MarketplaceAdminPage({ user, showToast = () => {} }) {
             {tabBtn("searches", `🔎 Searches (${searches.length})`)}
             {tabBtn("yards", `🏭 Scrapyards (${yards.length})`)}
             {tabBtn("photos", "📷 Photo review")}
+            {tabBtn("decoys", "🪤 Decoys")}
           </div>
 
           {tab === "requests" && (reqs.length === 0
@@ -172,6 +174,7 @@ export function MarketplaceAdminPage({ user, showToast = () => {} }) {
           )}
 
           {tab === "photos" && <PhotoReviewPanel user={user} showToast={showToast} />}
+          {tab === "decoys" && <DecoyPanel />}
 
           {tab === "yards" && (
             <div className="card" style={{ overflow: "hidden" }}><div className="tbl-wrap"><table className="tbl">

@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { api } from "../lib/api.js";
+import { guardPhoto } from "../lib/photoGuard.js";
 import { toImgUrl, openLabelWindow, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { getSettings } from "../lib/settings.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
@@ -203,8 +204,13 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
     setUploading(true); setError(null);
     try {
       setStatus("Resizing…");
-      const base64 = await resizeB64(file);
-      setStatus("Uploading…");
+      const resized = await resizeB64(file);
+      // No phone number, web address or company name may stay readable: cover it, re-check, or refuse the photo.
+      setStatus("Checking photo for names / phone numbers…");
+      const guard = await guardPhoto(resized);
+      if(!guard.ok) throw new Error(guard.reason);
+      const base64 = guard.dataUrl;
+      setStatus(guard.hidden?`Hid ${guard.hidden} text area(s) — uploading…`:"Uploading…");
       const pad = n=>String(n).padStart(2,"0");
       const now = new Date();
       const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -306,8 +312,13 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
     setUploading(true); setError(null);
     try {
       setStatus("Resizing…");
-      const base64 = await resizeB64(file);
-      setStatus("Uploading…");
+      const resized = await resizeB64(file);
+      // No phone number, web address or company name may stay readable: cover it, re-check, or refuse the photo.
+      setStatus("Checking photo for names / phone numbers…");
+      const guard = await guardPhoto(resized);
+      if(!guard.ok) throw new Error(guard.reason);
+      const base64 = guard.dataUrl;
+      setStatus(guard.hidden?`Hid ${guard.hidden} text area(s) — uploading…`:"Uploading…");
       const pad = n=>String(n).padStart(2,"0");
       const now = new Date();
       const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;

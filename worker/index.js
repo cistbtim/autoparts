@@ -35,9 +35,32 @@ export default {
     if (url.pathname === "/api/photo-damage-check" && request.method === "POST") {
       return handleDamageCheck(request, env);
     }
+    if (url.pathname === "/api/photo-proxy" && request.method === "GET") {
+      return handlePhotoProxy(url);
+    }
     return json({ ok: false, error: "Not found" }, 404);
   },
 };
+
+// Same-origin image proxy for the admin Photo Review editor: reading a photo's pixels in the browser needs the
+// bytes to come from our own origin (Google Drive / Supabase don't send CORS headers). Hosts are allow-listed
+// and only images up to MAX_IMAGE_BYTES pass, so this cannot be used as an open proxy.
+async function handlePhotoProxy(url) {
+  const target = url.searchParams.get("u") || "";
+  let parsed;
+  try { parsed = new URL(target); } catch { return json({ ok: false, error: "Invalid url" }, 400); }
+  if (parsed.protocol !== "https:" || !isAllowedHost(parsed.hostname)) return json({ ok: false, error: "Host not allowed" }, 400);
+  let resp;
+  try {
+    resp = await fetch(parsed.toString(), { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" }, redirect: "follow" });
+  } catch { return json({ ok: false, error: "Could not reach photo" }, 502); }
+  if (!resp.ok) return json({ ok: false, error: `Photo fetch failed (${resp.status})` }, 502);
+  const contentType = (resp.headers.get("content-type") || "").split(";")[0].trim();
+  if (!SUPPORTED_IMAGE_TYPES.includes(contentType)) return json({ ok: false, error: `Unsupported type: ${contentType || "unknown"}` }, 415);
+  const buf = await resp.arrayBuffer();
+  if (buf.byteLength > MAX_IMAGE_BYTES) return json({ ok: false, error: "Image too large" }, 413);
+  return new Response(buf, { headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=300" } });
+}
 
 async function handleDamageCheck(request, env) {
   const sharedSecret = request.headers.get("X-Shared-Secret");

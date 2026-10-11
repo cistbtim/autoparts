@@ -11,6 +11,7 @@ import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg,
 import { WorkshopProfilePage, ScrapyardProfilePage, ChangePasswordModal, WsLocationSetupModal, WsSubscriptionExpiredPage, WsSubscriptionsPage, OrdersTable, LogoUploader, SettingsPage, LineItemEditor, InvTotals, SupplierInvoiceModal, ViewSupplierInvoiceModal, SupplierReturnModal, CustomerInvoiceModal, ViewCustomerInvoiceModal, CustomerReturnModal, PartActionsMenu, PartModal, AdjustModal, CheckoutModal, SupplierModal, PartSupplierModal, SupplierPartsModal, SupplierCatalogueModal, CustomerQueryModal, CustomerQueryReplyModal, InquiryModal, InquiryDetailModal, CustomerModal, UserModal, CustHistoryModal, PdfInvoiceModal, AddPaymentModal, ReportsPage, SalesmanStatementPage, StockMoveModal, StockTakePage, PartPhotoCapturePage, BranchesPage, PartRequestModal, PartRequestsPage, BranchStockModal, BranchProfilePage, BranchUsersPage, BranchTransferRequestsPage, PrintPartLabelModal, PrintShelfLabelModal, WorkshopRequestsPage, AdContractsPage, CatalogueImportModal, BulkImageImportModal, VehicleRequestsPage, PartOcrScanModal, resolveMarginOptions } from "./components/Modals.jsx";
 import { RfqPage, PickingPage, PartPhotoUploader, VehicleFitmentTab, VehicleSearchBar, VehiclesPage, VehiclePhotoUploader } from "./components/RfqVehicles.jsx";
 import { WorkshopPage, WsShareButtons } from "./components/Workshop.jsx";
+import { MarketplaceAdminPage } from "./components/MarketplaceAdmin.jsx";
 import { WorkshopTour, tourSeenKey } from "./components/WorkshopTour.jsx";
 import { HelpPage } from "./pages/HelpPage.jsx";
 import { HelpIcon } from "./components/HelpIcon.jsx";
@@ -84,7 +85,7 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 // Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
 // the tablet-only compact-header logic (hides the big global brand strip and lets
 // WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
-const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal"];
+const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch"];
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -5068,6 +5069,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"systemMap",icon:"🗺️",label:"System Map",roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
         {id:"wsgrowth",icon:"🤝",label:"Workshop Growth",roles:["admin"]},
+        {id:"marketplace",icon:"💰",label:"Scrapyard Match",roles:["admin"],badge:0},
         {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
         {id:"adcontracts",icon:"📑",label:"Ad Contracts",roles:["admin"]},
       ]
@@ -5187,6 +5189,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
           {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents", roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wsmatch",     icon:"🔎",label:"Scrapyard Match",       roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsstatement", icon:"📄",label:t.wsStatement,    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsreport",    icon:"📊",label:t.wsReport,       roles:["workshop"], wsRoles:["main","manager"]},
@@ -5894,7 +5897,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
               wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
               wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:t.wsSpareShop||"Spare Shop",
-              wsdocs:t.wsDocs||"Documents", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals",
+              wsdocs:t.wsDocs||"Documents", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals", wsmatch:"Scrapyard Match",
             };
             return(<>
               <div className="velg-mainstrip-divider"/>
@@ -8470,6 +8473,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {/* ── WORKSHOP GROWTH ── */}
+        {tab==="marketplace"&&role==="admin"&&<MarketplaceAdminPage user={user} showToast={showToast}/>}
         {tab==="wsgrowth"&&role==="admin"&&(()=>{
           const profiles=wsGrowthProfiles;
           const idToUsername={};
@@ -8729,7 +8733,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":tab==="wsmatch"?"wsmatch":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}

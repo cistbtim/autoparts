@@ -16,6 +16,7 @@ import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWor
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
 import { WsVoiceMessageModal } from "./ws/VoiceMessage.jsx";
+import { WsScrapyardMatchPage } from "./ws/ScrapyardMatch.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
@@ -491,6 +492,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     ["wstransfer",   "🔄 Transfer",    null],
     ...(wsProfile?.linked_branch_id?[["spareshop",spareShopQuotedCount>0?`🏪 Spare Shop 🔔`:"🏪 Spare Shop",spareShopQuotedCount||null]]:[]),
     ["wsdocs",     "📎 Documents",   wsDocs.length],
+    ["wsmatch",    "🔎 Scrapyard Match"],
     ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
     ["statement",  "📋 Statement",   null],
     ["report",     "📊 Report",      null],
@@ -2293,6 +2295,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
+      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsRole={wsRole}/>}
+
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}
           onSave={onSaveWsDoc} onDelete={onDeleteWsDoc} wsLocked={wsLocked}/>

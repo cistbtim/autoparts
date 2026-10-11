@@ -365,6 +365,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     partFitments.forEach(f=>{ if(vids.has(String(f.vehicle_id))) s.add(String(f.part_id)); });
     return s;
   },[shopFilterSel,partFitments]);
+  const [scrapMatchJobId,setScrapMatchJobId]=useState(null); // job whose car Scrapyard Match should open with (set by the job-card button)
   const [shopReturnTo,setShopReturnTo]=useState(null); // {make,model,search} when the Shop was opened from Vehicle Management — drives the "Back to Vehicles" button
   const [workshopJobFilter,setWorkshopJobFilter]=useState(null); // {label,jobIds} — one-shot nav from Vehicle Management's job-card badge
   const [headerBookInTrigger,setHeaderBookInTrigger]=useState(0); // bumped by the header-strip "Book In Car" button (desktop) to open Workshop's modal
@@ -8737,6 +8738,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}
+            onGoToScrapMatch={(jobId)=>{setScrapMatchJobId(jobId);setTab("wsmatch");}} scrapMatchJobId={scrapMatchJobId} onScrapMatchConsumed={()=>setScrapMatchJobId(null)}
             onFitmentsRemoved={(rows)=>setPartFitments(prev=>{const gone=new Set(rows.map(r=>`${r.part_id}|${r.vehicle_id}`));return prev.filter(f=>!gone.has(`${f.part_id}|${f.vehicle_id}`));})}
             onReturnToVehicle={role==="admin"?(make,model,searchKw)=>{setVehiclesJumpMake(make);setVehiclesJumpModel(model||null);setVehiclesJumpSearch(searchKw||"");setTab("vehicles");}:null}
             ads={liveAds}

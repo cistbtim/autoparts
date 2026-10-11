@@ -67,3 +67,9 @@ create table if not exists ms_photo_review (
   reviewed_at  timestamptz not null default now()
 );
 create index if not exists ms_photo_review_row on ms_photo_review (source, row_id);
+
+-- One free-trial grant per workshop, enforced by the database. (Opening the page in two tabs at once could
+-- grant it twice.) First removes any duplicate trial rows, keeping the oldest, then adds the rule.
+delete from ms_credit_ledger a using ms_credit_ledger b
+  where a.reason = 'trial' and b.reason = 'trial' and a.workshop_id = b.workshop_id and a.id > b.id;
+create unique index if not exists ms_credit_ledger_one_trial on ms_credit_ledger (workshop_id) where reason = 'trial';

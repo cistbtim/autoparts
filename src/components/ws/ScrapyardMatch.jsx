@@ -8,9 +8,19 @@ import { marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, mat
 // vehicle is, where (city only) and which parts are in stock — never WHO holds it. Getting the
 // scrapyard's contact costs points via a reveal request that the VelGenius admin approves.
 
+// Workshops whose free trial points are being granted right now — the page can mount twice at once, and both
+// runs would otherwise see "no trial yet" and grant it twice.
+const _trialInFlight = new Set();
+
 const SETUP_SQL_HINT = "Scrapyard Match isn't set up yet — ask the admin to run docs/marketplace.sql in Supabase.";
 
-export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], resolveModel }) {
+// The job's own vehicle photos (workshop_vehicles), in viewing order.
+const VEH_ANGLES = [["photo_front", "Front"], ["photo_front_left", "Front-Left"], ["photo_front_right", "Front-Right"], ["photo_left", "Left"], ["photo_right", "Right"],
+  ["photo_rear", "Rear"], ["photo_rear_left", "Rear-Left"], ["photo_rear_right", "Rear-Right"], ["photo_side", "Side"]];
+const bigImg = (u) => (toImgUrl(u) || u || "").replace(/sz=w\d+/, "sz=w600");
+
+export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicles = [], initialJobId = null, onInitialJobConsumed, resolveModel }) {
+  const [chosenJob, setChosenJob] = useState(null);  // the job whose car is being matched — its photos are shown for comparison
   const [query, setQuery] = useState("");       // the one search box: a VIN, or type a plate / customer / car to find your job
   const [showSug, setShowSug] = useState(false);
   const [vin, setVin] = useState("");
@@ -41,10 +51,17 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], resolveM
     setSetupErr("");
     let rows = l;
     // First visit: hand out the free trial points once.
-    if (!rows.some(x => x.reason === "trial")) {
-      const res = await api.insert("ms_credit_ledger", { workshop_id: String(wsId), workshop_name: wsProfile.name || "", delta: TRIAL_POINTS, reason: "trial", note: "Free trial points", created_by: "system" }).catch(() => null);
-      const row = Array.isArray(res) ? res[0] : null;
-      if (row) rows = [...rows, row];
+    if (!rows.some(x => x.reason === "trial") && !_trialInFlight.has(String(wsId))) {
+      _trialInFlight.add(String(wsId));
+      try {
+        const res = await api.insert("ms_credit_ledger", { workshop_id: String(wsId), workshop_name: wsProfile.name || "", delta: TRIAL_POINTS, reason: "trial", note: "Free trial points", created_by: "system" }).catch(() => null);
+        const row = Array.isArray(res) ? res[0] : null;
+        if (row) rows = [...rows, row];
+        else { // the database refused (a trial row already exists) — show what is really there
+          const again = await api.fresh("ms_credit_ledger", `workshop_id=eq.${wsId}&select=*&order=created_at.asc`).catch(() => null);
+          if (Array.isArray(again)) rows = again;
+        }
+      } finally { _trialInFlight.delete(String(wsId)); }
     }
     setLedger(rows);
     setRequests(r);
@@ -63,10 +80,17 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], resolveM
 
   const chooseJob = (j) => {
     const v = cleanVin(j.vin), mk = j.vehicle_make || "", md = modelName(j);
-    setVin(v); setMake(mk); setModel(md);
+    setVin(v); setMake(mk); setModel(md); setChosenJob(j);
     setQuery(`${j.vehicle_reg || ""} — ${carName(j)}`.trim()); setShowSug(false);
     search({ vin: v, make: mk, model: md });
   };
+  // Opened from a job card ("🔎 Scrapyard" button): load that job's car and search straight away.
+  useEffect(() => {
+    if (!initialJobId) return;
+    const j = jobs.find(x => String(x.id) === String(initialJobId));
+    if (j) chooseJob(j);
+    onInitialJobConsumed && onInitialJobConsumed();
+  }, [initialJobId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Search button / Enter: a full 17-character VIN searches directly; otherwise take the best matching job; otherwise treat what was typed as a VIN start.
   const go = () => {
     const raw = cleanVin(query);
@@ -172,6 +196,31 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], resolveM
         )}
         <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>Pick one of your jobs as you type — its VIN and car are filled in and searched. Make / model help when the VIN differs.</div>
       </div>
+
+      {chosenJob && (() => {
+        const vr = wsVehicles.find(v => v.id === chosenJob.workshop_vehicle_id);
+        const photos = VEH_ANGLES.map(([f, label]) => ({ label, url: vr?.[f] })).filter(p => p.url);
+        return (
+          <div className="card" style={{ padding: 12, marginBottom: 14, borderColor: "rgba(20,184,166,.5)" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 13, color: "#14b8a6" }}>YOUR CAR</span>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{chosenJob.vehicle_reg} · {carName(chosenJob)}</span>
+              <span style={{ fontSize: 11, color: "var(--text3)", fontFamily: "DM Mono,monospace" }}>{cleanVin(chosenJob.vin) ? `VIN ${cleanVin(chosenJob.vin)}` : "no VIN on file"}</span>
+              <button className="btn btn-ghost btn-xs" style={{ marginLeft: "auto" }} onClick={() => setChosenJob(null)}>✕</button>
+            </div>
+            {photos.length > 0
+              ? <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+                  {photos.map(p => (
+                    <div key={p.label} style={{ position: "relative", flex: "0 0 auto", width: 150, height: 112, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => setLightbox(bigImg(p.url))}>
+                      <img src={bigImg(p.url)} alt={p.label} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.opacity = .2; }} />
+                      <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 10, fontWeight: 700, textAlign: "center", padding: "1px 0" }}>{p.label}</span>
+                    </div>
+                  ))}
+                </div>
+              : <div style={{ fontSize: 12, color: "var(--text3)" }}>No photos of this car on the job yet — add them on the job card to compare with the scrapyard vehicles below.</div>}
+          </div>
+        );
+      })()}
 
       {results && results.length === 0 && (
         <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text3)", fontSize: 13, marginBottom: 14 }}>

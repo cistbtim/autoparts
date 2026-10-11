@@ -41,7 +41,7 @@ const resolveCarModel = (vehicles, make, model) => {
   return v ? v.model : model;
 };
 
-export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved}) {
+export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
   const [editJob,        setEditJob]        = useState(null);
@@ -410,7 +410,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       <WorkshopJobDetail
         key={activeJob.id}
         job={activeJob} items={items} invoice={inv} quotes={quotesForJob}
-        jobs={jobs} onChecklistSaved={onChecklistSaved}
+        jobs={jobs} onChecklistSaved={onChecklistSaved} onGoToScrapMatch={onGoToScrapMatch}
         parts={parts} partFitments={partFitments} vehicles={vehicles} onRefreshVehicles={onRefreshVehicles} settings={settings}
         wsVehicles={wsVehicles} wsCustomers={wsCustomers} wsStock={wsStock} wsServices={wsServices}
         suppliers={suppliers} wsSuppliers={wsSuppliers} wsSupplierRequests={wsSupplierRequests}
@@ -2295,7 +2295,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
-      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
+      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsVehicles={wsVehicles} initialJobId={scrapMatchJobId} onInitialJobConsumed={onScrapMatchConsumed} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
 
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}
@@ -4429,7 +4429,7 @@ export function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
   const [msgOpen,setMsgOpen]=useState(false); // customer-message draft window
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
@@ -5702,6 +5702,14 @@ function WorkshopJobDetail({job,items,invoice,quotes=[],jobs=[],onChecklistSaved
             </div>
           );
         })()}
+        {onGoToScrapMatch&&(job.vin||job.vehicle_make)&&(
+          <button onClick={()=>onGoToScrapMatch(job.id)} title="Find a matching scrapyard vehicle for this car"
+            style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+              background:"rgba(20,184,166,.12)",border:"1px solid rgba(20,184,166,.45)",
+              borderRadius:8,cursor:"pointer",color:"#14b8a6",fontSize:11,fontWeight:700}}>
+            🔎 Scrapyard
+          </button>
+        )}
         {job.vin&&(
           <button onClick={()=>setVinPopup(true)}
             style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",

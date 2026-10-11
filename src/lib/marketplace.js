@@ -74,3 +74,15 @@ export const pointsBalance = (ledger) => (ledger || []).reduce((s, r) => s + (+r
 // Statuses that mean the vehicle is no longer a donor candidate.
 const GONE = /sold|crushed|scrapped|gone|removed/i;
 export const isListable = (v) => !GONE.test(v.status || "");
+
+// Photo "angle" keywords, to jump to the matching view on the other side (front ↔ front …).
+export const angleOf = (label) => {
+  const l = (label || "").toLowerCase();
+  if (/rear|back/.test(l)) return "rear";
+  if (/front/.test(l)) return "front";
+  if (/left/.test(l)) return "left";
+  if (/right/.test(l)) return "right";
+  if (/interior|inside|cabin/.test(l)) return "interior";
+  if (/engine|bay|bonnet|hood/.test(l)) return "engine";
+  return "";
+};

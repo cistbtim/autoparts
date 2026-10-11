@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Overlay, MHead } from "../shared.jsx";
+import { angleOf } from "../../lib/marketplace.js";
 
 // Side-by-side photo comparison: YOUR CAR (left) vs the scrapyard vehicle (right). Each side has its own
 // photo choice and its own pan / zoom (drag to move, wheel or pinch to zoom, double-click to reset), so one
@@ -7,18 +8,6 @@ import { Overlay, MHead } from "../shared.jsx";
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const START = { x: 0, y: 0, s: 1 };
-
-// Photo "angle" keywords, to jump to the matching view on the other side (front ↔ front …).
-const angleOf = (label) => {
-  const l = (label || "").toLowerCase();
-  if (/rear|back/.test(l)) return "rear";
-  if (/front/.test(l)) return "front";
-  if (/left/.test(l)) return "left";
-  if (/right/.test(l)) return "right";
-  if (/interior|inside|cabin/.test(l)) return "interior";
-  if (/engine|bay|bonnet|hood/.test(l)) return "engine";
-  return "";
-};
 
 function Pane({ title, sub, photos, idx, setIdx, view, setView, empty, accent }) {
   const boxRef = useRef(null);
@@ -98,8 +87,8 @@ function Pane({ title, sub, photos, idx, setIdx, view, setView, empty, accent })
 }
 
 /** left / right: { title, sub, photos: [{label, url, thumb?}] } */
-export function WsPhotoCompare({ left, right, onClose }) {
-  const [li, setLi] = useState(0), [ri, setRi] = useState(0);
+export function WsPhotoCompare({ left, right, onClose, startL = 0, startR = 0 }) {
+  const [li, setLi] = useState(startL), [ri, setRi] = useState(startR);
   const [lv, setLv] = useState(START), [rv, setRv] = useState(START);
   const [link, setLink] = useState(false);
 

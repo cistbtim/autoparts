@@ -3,7 +3,7 @@ import { Overlay, MHead } from "../shared.jsx";
 import { WsPhotoCompare } from "./PhotoCompare.jsx";
 import { api } from "../../lib/api.js";
 import { toImgUrl } from "../../lib/helpers.js";
-import { marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, matchTier, TIER_LABEL, maskVin, pointsBalance, isListable } from "../../lib/marketplace.js";
+import { angleOf, marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, matchTier, TIER_LABEL, maskVin, pointsBalance, isListable } from "../../lib/marketplace.js";
 
 // Workshop side of Scrapyard Match: search scrapyard stock by VIN for free. The result shows what the
 // vehicle is, where (city only) and which parts are in stock — never WHO holds it. Getting the
@@ -22,7 +22,7 @@ const bigImg = (u, w = 600) => (toImgUrl(u) || u || "").replace(/sz=w\d+/, `sz=w
 const YARD_ANGLES = [["photo_front", "Front"], ["photo_rear", "Rear"], ["photo_left", "Left"], ["photo_right", "Right"], ["photo_interior", "Interior"], ["photo_engine", "Engine"], ["photo_url", "Photo"]];
 
 export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicles = [], initialJobId = null, onInitialJobConsumed, resolveModel }) {
-  const [compareId, setCompareId] = useState(null);  // result whose photos are open in the side-by-side compare window
+  const [compare, setCompare] = useState(null);  // {id, li, ri} — result + starting photos for the side-by-side compare window
   const [chosenJob, setChosenJob] = useState(null);  // the job whose car is being matched — its photos are shown for comparison
   const [query, setQuery] = useState("");       // the one search box: a VIN, or type a plate / customer / car to find your job
   const [showSug, setShowSug] = useState(false);
@@ -94,6 +94,19 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
     if (j) chooseJob(j);
     onInitialJobConsumed && onInitialJobConsumed();
   }, [initialJobId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Open the side-by-side compare window. li = photo index on my car, ri = photo index on the scrapyard vehicle;
+  // whichever side is not given is set to the matching angle (front ↔ front …). With no job chosen there is nothing
+  // of mine to compare with, so a scrapyard photo just enlarges.
+  const openCompare = (r, li, ri) => {
+    const vr = chosenJob ? wsVehicles.find(v => v.id === chosenJob.workshop_vehicle_id) : null;
+    const mine = VEH_ANGLES.map(([f, label]) => (vr?.[f] ? { label } : null)).filter(Boolean);
+    if (!mine.length && ri !== undefined) { setLightbox(bigImg(r.photos[ri].url, 1000)); return; }
+    const pick = (list, label) => { const a = angleOf(label); const j = a ? list.findIndex(p => angleOf(p.label) === a) : -1; return j >= 0 ? j : 0; };
+    let L = li, R = ri;
+    if (L === undefined) L = R !== undefined && mine.length ? pick(mine, r.photos[R].label) : 0;
+    if (R === undefined) R = mine.length ? pick(r.photos, mine[L]?.label) : 0;
+    setCompare({ id: r.id, li: L, ri: R });
+  };
   // Search button / Enter: a full 17-character VIN searches directly; otherwise take the best matching job; otherwise treat what was typed as a VIN start.
   const go = () => {
     const raw = cleanVin(query);
@@ -214,7 +227,9 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
             {photos.length > 0
               ? <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
                   {photos.map(p => (
-                    <div key={p.label} style={{ position: "relative", flex: "0 0 auto", width: 150, height: 112, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => setLightbox(bigImg(p.url))}>
+                    <div key={p.label} style={{ position: "relative", flex: "0 0 auto", width: 150, height: 112, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }}
+                      onClick={() => { const r0 = (results || [])[0]; if (r0) openCompare(r0, photos.indexOf(p)); else setLightbox(bigImg(p.url, 1000)); }}
+                      title={(results || []).length ? "Compare with the scrapyard vehicle" : "Enlarge"}>
                       <img src={bigImg(p.url)} alt={p.label} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.opacity = .2; }} />
                       <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,.55)", color: "#fff", fontSize: 10, fontWeight: 700, textAlign: "center", padding: "1px 0" }}>{p.label}</span>
                     </div>
@@ -248,7 +263,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
           {r.photos.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
               {r.photos.map((ph, i) => (
-                <div key={i} style={{ position: "relative", width: 96, height: 72, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => setLightbox(bigImg(ph.url, 1000))}>
+                <div key={i} style={{ position: "relative", width: 96, height: 72, borderRadius: 8, overflow: "hidden", background: "var(--surface2)", cursor: "zoom-in" }} onClick={() => openCompare(r, undefined, i)}>
                   <img src={toImgUrl(ph.url)} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
                   <span style={{ position: "absolute", right: 3, bottom: 2, fontSize: 8, fontWeight: 800, color: "rgba(255,255,255,.85)", textShadow: "0 0 3px #000" }}>VELGENIUS</span>
                 </div>
@@ -269,7 +284,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
             </div>
           )}
           {r.photos.length > 0 && (
-            <button className="btn btn-ghost btn-sm" style={{ marginRight: 8, color: "#14b8a6", borderColor: "rgba(20,184,166,.5)" }} onClick={() => setCompareId(r.id)}>
+            <button className="btn btn-ghost btn-sm" style={{ marginRight: 8, color: "#14b8a6", borderColor: "rgba(20,184,166,.5)" }} onClick={() => openCompare(r)}>
               🔍 Compare photos{chosenJob ? " with my car" : ""}
             </button>
           )}
@@ -317,13 +332,13 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], wsVehicl
           </button>
         </Overlay>
       )}
-      {compareId && (() => {
-        const r = (results || []).find(x => x.id === compareId);
+      {compare && (() => {
+        const r = (results || []).find(x => x.id === compare.id);
         if (!r) return null;
         const vr = chosenJob ? wsVehicles.find(v => v.id === chosenJob.workshop_vehicle_id) : null;
         const mine = VEH_ANGLES.map(([f, label]) => (vr?.[f] ? { label, url: bigImg(vr[f], 1600), thumb: bigImg(vr[f], 200) } : null)).filter(Boolean);
         const theirs = r.photos.map(p => ({ label: p.label, url: bigImg(p.url, 1600), thumb: bigImg(p.url, 200) }));
-        return <WsPhotoCompare onClose={() => setCompareId(null)}
+        return <WsPhotoCompare onClose={() => setCompare(null)} startL={compare.li} startR={compare.ri}
           left={{ sub: chosenJob ? `${chosenJob.vehicle_reg || ""} · ${carName(chosenJob)}` : "pick one of your jobs to compare", photos: mine }}
           right={{ sub: `${[r.year, r.make, r.model].filter(Boolean).join(" ")}${r.city ? ` · ${r.city}` : ""}`, photos: theirs }} />;
       })()}

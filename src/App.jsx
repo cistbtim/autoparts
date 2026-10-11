@@ -5069,7 +5069,6 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"systemMap",icon:"🗺️",label:"System Map",roles:["admin"]},
         {id:"loginlogs",icon:"🌍",label:t.loginLogs,roles:["admin"]},
         {id:"wsgrowth",icon:"🤝",label:"Workshop Growth",roles:["admin"]},
-        {id:"marketplace",icon:"💰",label:"Scrapyard Match",roles:["admin"],badge:0},
         {id:"adclicks",icon:"📢",label:"Ad Clicks",roles:["admin"]},
         {id:"adcontracts",icon:"📑",label:"Ad Contracts",roles:["admin"]},
       ]
@@ -5266,6 +5265,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"branches",icon:"🏢",label:t.branchMgmt||"Branches",roles:["admin"],badge:branches.filter(b=>b.status==="pending").length||0},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},
         {id:"users",icon:"🔑",label:t.users,roles:["admin"]},
+        {id:"marketplace",icon:"💰",label:"Scrapyard Match",roles:["admin"]},
         {id:"branchProfile",    icon:"🏢",label:"My Branch",        roles:["admin"],branchAdminOnly:true},
         {id:"branch_users",     icon:"👤",label:"Branch Users",     roles:["admin"],branchAdminOnly:true},
         {id:"vehicleRequests",  icon:"🚗",label:"Vehicle Requests", roles:["admin"],branchAdminOnly:true,badge:pendingVehicleRequests},

@@ -33,6 +33,9 @@ export function PhotoReviewPanel({ user, showToast = () => {} }) {
   const [flags, setFlags] = useState({});      // key -> number of sensitive areas found by the scan
   const [scan, setScan] = useState(null);      // {done,total} while scanning
   const [editing, setEditing] = useState(null);
+  // Photos the scan finds NO text in are approved automatically and leave the list — only photos with something
+  // to cover need a person. (Switch off to approve every photo by hand.)
+  const [autoClean, setAutoClean] = useState(() => { try { return localStorage.getItem("ms_autoclean") !== "0"; } catch { return true; } });
   const stopRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -61,8 +64,8 @@ export function PhotoReviewPanel({ user, showToast = () => {} }) {
   const pending = items.filter(i => i.status === "new");
   const shown = (showAll ? items : pending).slice().sort((a, b) => (flags[b.key] || 0) - (flags[a.key] || 0));
 
-  const record = async (item, status, urlOverride) => {
-    const row = { source: item.src, row_id: item.id, field: item.field, url: urlOverride || item.url, status, reviewed_by: user?.username || "admin" };
+  const record = async (item, status, urlOverride, by) => {
+    const row = { source: item.src, row_id: item.id, field: item.field, url: urlOverride || item.url, status, reviewed_by: by || user?.username || "admin" };
     const res = await api.insert("ms_photo_review", row).catch(() => null);
     if (Array.isArray(res)) setReviews(prev => [...prev, res[0]]);
   };
@@ -78,6 +81,7 @@ export function PhotoReviewPanel({ user, showToast = () => {} }) {
     stopRef.current = false;
     const todo = pending.filter(i => flags[i.key] === undefined);
     setScan({ done: 0, total: todo.length });
+    let auto = 0, needs = 0;
     for (let n = 0; n < todo.length; n++) {
       if (stopRef.current) break;
       const it = todo[n];
@@ -87,10 +91,13 @@ export function PhotoReviewPanel({ user, showToast = () => {} }) {
         c.getContext("2d").drawImage(img, 0, 0);
         const boxes = await detectSensitiveBoxes(c);
         setFlags(prev => ({ ...prev, [it.key]: boxes.length }));
-      } catch { setFlags(prev => ({ ...prev, [it.key]: -1 })); }
+        if (boxes.length === 0 && autoClean) { await record(it, "clean", undefined, "auto-scan"); auto++; }
+        else if (boxes.length > 0) needs++;
+      } catch { setFlags(prev => ({ ...prev, [it.key]: -1 })); needs++; }
       setScan({ done: n + 1, total: todo.length });
     }
     setScan(null);
+    showToast(`Scan done — ${auto} clean (approved automatically), ${needs} need a look`);
   };
 
   return (
@@ -104,7 +111,10 @@ export function PhotoReviewPanel({ user, showToast = () => {} }) {
             {scan
               ? <button className="btn btn-ghost btn-sm" onClick={() => { stopRef.current = true; }}>⏹ Stop ({scan.done}/{scan.total})</button>
               : <button className="btn btn-primary btn-sm" disabled={!pending.length || loading} onClick={scanAll}>🔎 Scan new photos for text</button>}
-            <label style={{ marginLeft: "auto", fontSize: 12, display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+            <label style={{ marginLeft: "auto", fontSize: 12, display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }} title="Photos with no text found are approved by the scan and hidden from this list">
+              <input type="checkbox" checked={autoClean} onChange={e => { setAutoClean(e.target.checked); try { localStorage.setItem("ms_autoclean", e.target.checked ? "1" : "0"); } catch { /* storage unavailable */ } }} /> Auto-approve clean photos
+            </label>
+            <label style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
               <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} /> Show reviewed too
             </label>
             <button className="btn btn-ghost btn-sm" disabled={loading} onClick={load}>{loading ? "⏳" : "🔄"}</button>

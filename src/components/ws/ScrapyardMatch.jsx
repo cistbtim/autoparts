@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Overlay, MHead } from "../shared.jsx";
 import { api } from "../../lib/api.js";
 import { toImgUrl } from "../../lib/helpers.js";
@@ -10,7 +10,9 @@ import { marketplaceReady, REVEAL_COST, TRIAL_POINTS, cleanVin, yearFromVin, mat
 
 const SETUP_SQL_HINT = "Scrapyard Match isn't set up yet — ask the admin to run docs/marketplace.sql in Supabase.";
 
-export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [] }) {
+export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [], resolveModel }) {
+  const [query, setQuery] = useState("");       // the one search box: a VIN, or type a plate / customer / car to find your job
+  const [showSug, setShowSug] = useState(false);
   const [vin, setVin] = useState("");
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -49,17 +51,34 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [] }) {
   }, [wsId, wsProfile.name]);
   useEffect(() => { if (wsId) loadMine(); }, [wsId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Jobs that have a VIN — pick one instead of typing it.
-  const vinJobs = useMemo(() => jobs.filter(j => cleanVin(j.vin).length >= 8 && !j.is_cancelled).slice(0, 40), [jobs]);
-  const pickJob = (id) => {
-    const j = jobs.find(x => String(x.id) === id);
-    if (!j) return;
-    setVin(cleanVin(j.vin)); setMake(j.vehicle_make || ""); setModel(j.vehicle_model || "");
+  // Type to find one of your jobs (plate, VIN, customer or car) — shown with the FULL model name, never the catalogue code.
+  const modelName = (j) => (resolveModel ? resolveModel(j.vehicle_make, j.vehicle_model) : j.vehicle_model) || "";
+  const carName = (j) => [j.vehicle_year, j.vehicle_make, modelName(j)].filter(Boolean).join(" ");
+  const q = query.trim().toLowerCase();
+  const suggestions = q.length < 2 ? [] : jobs.filter(j => !j.is_cancelled)
+    .map(j => ({ j, text: `${j.vehicle_reg || ""} ${j.vin || ""} ${j.customer_name || ""} ${carName(j)}`.toLowerCase() }))
+    .filter(x => q.split(/\s+/).every(w => x.text.includes(w)))
+    .sort((a, b) => String(b.j.date_in || b.j.created_at || "").localeCompare(String(a.j.date_in || a.j.created_at || "")))
+    .slice(0, 8).map(x => x.j);
+
+  const chooseJob = (j) => {
+    const v = cleanVin(j.vin), mk = j.vehicle_make || "", md = modelName(j);
+    setVin(v); setMake(mk); setModel(md);
+    setQuery(`${j.vehicle_reg || ""} — ${carName(j)}`.trim()); setShowSug(false);
+    search({ vin: v, make: mk, model: md });
+  };
+  // Search button / Enter: a full 17-character VIN searches directly; otherwise take the best matching job; otherwise treat what was typed as a VIN start.
+  const go = () => {
+    const raw = cleanVin(query);
+    if (raw.length === 17) { setVin(raw); search({ vin: raw }); setShowSug(false); }
+    else if (suggestions.length) chooseJob(suggestions[0]);
+    else if (raw.length >= 8) { setVin(raw); search({ vin: raw }); setShowSug(false); }
+    else alert("Type a VIN, or part of a plate / customer name / car to find one of your jobs.");
   };
 
-  const search = async () => {
-    const v = cleanVin(vin);
-    if (v.length < 8) { alert("Enter the VIN (at least the first 8 characters)."); return; }
+  const search = async (p = {}) => {
+    const v = cleanVin(p.vin ?? vin), mk = p.make ?? make, md = p.model ?? model;
+    if (v.length < 8 && !(mk && md)) { alert("Enter the VIN (at least the first 8 characters)."); return; }
     setBusy(true); setResults(null);
     try {
       const [vehs, yards] = await Promise.all([
@@ -69,7 +88,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [] }) {
       const cityBy = new Map((Array.isArray(yards) ? yards : []).map(y => [String(y.id), y]));
       const hits = (Array.isArray(vehs) ? vehs : [])
         .filter(isListable)
-        .map(y => ({ y, tier: matchTier(v, make, model, y) }))
+        .map(y => ({ y, tier: matchTier(v, mk, md, y) }))
         .filter(x => x.tier !== null)
         .sort((a, b) => a.tier - b.tier);
       // Parts in stock on the matched vehicles (never cost/notes/location — those can identify the yard)
@@ -87,7 +106,7 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [] }) {
         parts: (Array.isArray(parts) ? parts : []).filter(p => p.vehicle_id === y.id && (+p.quantity || 0) > 0),
       }));
       setResults(out);
-      api.insert("ms_search_log", { workshop_id: String(wsId), workshop_name: wsProfile.name || "", vin: v, make, model, match_count: out.length }).catch(() => {});
+      api.insert("ms_search_log", { workshop_id: String(wsId), workshop_name: wsProfile.name || "", vin: v, make: mk, model: md, match_count: out.length }).catch(() => {});
     } finally { setBusy(false); }
   };
 
@@ -122,20 +141,36 @@ export function WsScrapyardMatchPage({ wsId, wsProfile = {}, jobs = [] }) {
       {setupErr && <div className="card" style={{ padding: 14, color: "var(--yellow)", fontSize: 13, marginBottom: 14 }}>{setupErr}</div>}
 
       <div className="card" style={{ padding: 14, marginBottom: 14 }}>
-        {vinJobs.length > 0 && (
-          <select className="inp" style={{ marginBottom: 10 }} defaultValue="" onChange={e => pickJob(e.target.value)}>
-            <option value="">Pick one of your jobs…</option>
-            {vinJobs.map(j => <option key={j.id} value={j.id}>{j.vehicle_reg} — {[j.vehicle_make, j.vehicle_model].filter(Boolean).join(" ")} ({cleanVin(j.vin)})</option>)}
-          </select>
-        )}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input className="inp" style={{ flex: "2 1 220px", fontFamily: "DM Mono,monospace", letterSpacing: ".05em" }} placeholder="VIN — e.g. WBAZV42090L493010" value={vin}
-            onChange={e => setVin(e.target.value.toUpperCase())} onKeyDown={e => e.key === "Enter" && search()} maxLength={20} />
-          <input className="inp" style={{ flex: "1 1 110px" }} placeholder="Make (optional)" value={make} onChange={e => setMake(e.target.value)} />
-          <input className="inp" style={{ flex: "1 1 130px" }} placeholder="Model (optional)" value={model} onChange={e => setModel(e.target.value)} />
-          <button className="btn btn-primary" disabled={busy} onClick={search}>{busy ? "⏳ Searching…" : "🔎 Search"}</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative" }}>
+          <div style={{ flex: "1 1 280px", position: "relative" }}>
+            <input className="inp" style={{ width: "100%" }} autoComplete="off" value={query}
+              placeholder="Type a VIN, or a plate / customer / car to find your job…"
+              onChange={e => { setQuery(e.target.value); setShowSug(true); }}
+              onFocus={() => setShowSug(true)} onBlur={() => setTimeout(() => setShowSug(false), 150)}
+              onKeyDown={e => { if (e.key === "Enter") go(); if (e.key === "Escape") setShowSug(false); }} />
+            {showSug && suggestions.length > 0 && (
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 20, background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.25)", overflow: "hidden" }}>
+                {suggestions.map(j => (
+                  <div key={j.id} onMouseDown={e => { e.preventDefault(); chooseJob(j); }}
+                    style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--border)" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "var(--surface2)"; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{j.vehicle_reg || "—"} <span style={{ fontWeight: 600, color: "var(--text2)" }}>· {carName(j) || "Vehicle"}</span></div>
+                    <div style={{ fontSize: 11, color: "var(--text3)" }}>{[j.customer_name, cleanVin(j.vin) ? `VIN ${cleanVin(j.vin)}` : "no VIN on file"].filter(Boolean).join(" · ")}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button className="btn btn-primary" disabled={busy} onClick={go}>{busy ? "⏳ Searching…" : "🔎 Search"}</button>
         </div>
-        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>Make and model help find matches when the VIN differs (optional).</div>
+        {(vin || make || model) && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <input className="inp" style={{ flex: "1 1 120px", fontSize: 12 }} placeholder="Make" value={make} onChange={e => setMake(e.target.value)} />
+            <input className="inp" style={{ flex: "2 1 200px", fontSize: 12 }} placeholder="Model" value={model} onChange={e => setModel(e.target.value)} />
+            <input className="inp" style={{ flex: "2 1 200px", fontSize: 12, fontFamily: "DM Mono,monospace" }} placeholder="VIN" value={vin} onChange={e => setVin(e.target.value.toUpperCase())} maxLength={20} />
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>Pick one of your jobs as you type — its VIN and car are filled in and searched. Make / model help when the VIN differs.</div>
       </div>
 
       {results && results.length === 0 && (

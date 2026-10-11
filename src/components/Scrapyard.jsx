@@ -222,6 +222,8 @@ function ScrapVehiclePhotoSlot({label, url, vehicleId, vin, photoKey, onSaved}) 
         setStatus("Saving…");
         const dbRes = await api.patch("scrapyard_vehicles","id",vehicleId,{[photoKey]:result.url});
         if(dbRes?.code) throw new Error("DB save failed: "+dbRes.message);
+        // passed the upload guard (names/phones covered or none found) → already reviewed, keep it out of Photo Review
+        api.insert("ms_photo_review",{source:"vehicle",row_id:vehicleId,field:photoKey,url:result.url,status:"clean",reviewed_by:"upload-guard"}).catch(()=>{});
         onSaved(result.url); setStatus(""); setError(null);
       } else {
         throw new Error(result.error||"Upload failed");
@@ -331,6 +333,7 @@ function ScrapPartPhotoSlot({label, url, partId, vin, photoKey, onChange}) {
           setStatus("Saving…");
           const dbRes = await api.patch("scrapyard_parts","id",partId,{[photoKey]:result.url});
           if(dbRes?.code) throw new Error("DB save failed: "+dbRes.message);
+          api.insert("ms_photo_review",{source:"part",row_id:partId,field:photoKey,url:result.url,status:"clean",reviewed_by:"upload-guard"}).catch(()=>{});
         }
         onChange(result.url); setStatus(""); setError(null);
       } else {

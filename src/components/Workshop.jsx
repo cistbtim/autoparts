@@ -2295,7 +2295,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       })()}
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
-      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsRole={wsRole}/>}
+      {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
 
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}

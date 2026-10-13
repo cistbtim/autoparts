@@ -293,7 +293,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
       const accErr=checkAccess(res[0]);
       if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username,company:res[0].name});setLoading(false);return;}
       const userObj = applyPendingSpareShop(res[0]);
-      logLogin(userObj);onLogin(userObj);setLoading(false);return;
+      logLogin(userObj);onLogin(userObj,{coworkMode});setLoading(false);return;
     }
     // Check workshop sub-users
     let suQ = `username=eq.${encodeURIComponent(wsUser)}&password=eq.${encodeURIComponent(wsPass)}&is_active=eq.true&select=*`;
@@ -310,7 +310,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
         const accErr=checkAccess(userObj);
         if(accErr){setErr(accErr);setExpiredInfo({name:wu.name||mainRes[0].name,username:wu.username,company:mainRes[0].name});setLoading(false);return;}
         logLogin({...userObj,username:wu.username});
-        onLogin(userObj);
+        onLogin(userObj,{coworkMode});
         setLoading(false);return;
       }
     }
@@ -660,7 +660,10 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
                   <Field label={t.password||"Password"}>
                     <InpIcon inp={<input style={inpStyle} type="password" value={wsPass} onChange={e=>setWsPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doWorkshopLogin()}/>}><IcLock/></InpIcon>
                   </Field>
-
+                  <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"var(--text2)",cursor:"pointer"}}>
+                    <input type="checkbox" checked={coworkMode} onChange={e=>setCoworkMode(e.target.checked)}/>
+                    🤖 Cowork / automation session (skip 1-hour inactivity logout)
+                  </label>
                   {err&&<ErrBox msg={err}/>}
               {waRenewLink}
                   <button className="btn btn-primary" style={{width:"100%",padding:"13px",fontSize:15,borderRadius:10,marginTop:2}} onClick={doWorkshopLogin} disabled={loading}>

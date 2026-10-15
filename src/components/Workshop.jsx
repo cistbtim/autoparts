@@ -3351,7 +3351,7 @@ function PasteQuoteTextModal({parts=[], onApply, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
-function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, onSave, onClose}) {
+function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, jobItems=null, onSave, onClose}) {
   const vatRate = +(settings?.tax_rate||0) / 100;
   const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
   // Build name→sku map from items_json (present on generated-link and new manual-send requests)
@@ -3362,6 +3362,22 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
     return m;
   })();
   const [prices, setPrices] = useState(() => {
+    // Return Quote: list ALL current part rows of the job (not the snapshot taken when the
+    // request was sent), so parts added later can be priced and removed parts disappear.
+    // Prices already entered for this supplier are carried over (matched by SKU, else name).
+    if (priceOnly && jobItems) {
+      let saved = [];
+      try { saved = JSON.parse(existingQuote?.line_items||"[]"); } catch {}
+      return jobItems
+        .filter(i => i.type !== "labour" && (i.description||"").trim())
+        .map(i => {
+          const name = i.description.trim();
+          const sku  = (i.part_sku||"").trim();
+          const old  = saved.find(l => sku && (l.sku||"").trim()===sku)
+                    || saved.find(l => (l.name||"").toLowerCase().trim()===name.toLowerCase());
+          return {...(old||{}), name, price: old?.price??"", available: old?.available??"", sku: sku||old?.sku||reqSkuMap[name.toLowerCase()]||""};
+        });
+    }
     if (existingQuote?.line_items) {
       try {
         const lines = JSON.parse(existingQuote.line_items);
@@ -3541,7 +3557,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
 
       {showOcr&&(
         <OcrQuoteModal
-          parts={parts}
+          parts={prices.map(r=>r.name)}
           onApply={onOcrApply}
           onClose={()=>setShowOcr(false)}
         />
@@ -3549,7 +3565,7 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
 
       {showPaste&&(
         <PasteQuoteTextModal
-          parts={parts}
+          parts={prices.map(r=>r.name)}
           onApply={(mapped)=>{ onOcrApply(mapped); setShowPaste(false); }}
           onClose={()=>setShowPaste(false)}
         />
@@ -8664,6 +8680,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           request={returnQuoteTarget.request}
           existingQuote={returnQuoteTarget.existingQuote}
           priceOnly
+          jobItems={items}
           settings={settings}
           onSave={async(d)=>{ if(onSaveWsSupplierQuote) await onSaveWsSupplierQuote(d); setReturnQuoteTarget(null); setReturnQuoteOpen(false); }}
           onClose={()=>setReturnQuoteTarget(null)}/>

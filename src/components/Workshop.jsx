@@ -7530,7 +7530,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       onClick={async()=>{
                         const markup=+pricePopup.markup||0;
                         const sellP=+(sc.price*(1+markup/100)).toFixed(2);
-                        await onSaveItem({...pricePopup.item,cost_price:sc.price,markup_pct:markup,unit_price:sellP,total:sellP*(+pricePopup.item.qty||1)});
+                        const lockPick=["highest","lowest"].includes(wsProfile?.quote_price_rule);
+                        await onSaveItem({...pricePopup.item,cost_price:sc.price,markup_pct:markup,unit_price:sellP,total:sellP*(+pricePopup.item.qty||1),...(lockPick?{price_locked:true}:{})});
                         setPricePopup(null);
                       }}
                       style={{width:"100%",padding:"10px",borderRadius:10,border:`1px solid ${isShopSel?"rgba(22,163,74,.4)":"transparent"}`,

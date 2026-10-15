@@ -2380,12 +2380,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   };
   // Apply a chosen supplier price to a job item: cost_price + markup -> unit_price/total.
   // Shared by the auto-apply-on-save-quote path and the interactive picker in the customer quote screen.
-  const applySupplierPriceToItem=async(itemId,price)=>{
+  // auto=true when applied by a Return Quote save; a manual pick (chip tap) also sets price_locked
+  // so later Return Quote saves don't overwrite it — only when a non-default rule is on, so the
+  // price_locked column is never written unless the owner has opted in (and run the SQL).
+  const applySupplierPriceToItem=async(itemId,price,auto=false)=>{
     const match=workshopJobItems.find(i=>i.id===itemId);
     if(!match||!(price>0)) return;
     const mu=+(match.markup_pct||workshopProfile?.default_markup_pct||0);
     const newPrice=+(price*(1+mu/100)).toFixed(2);
     const patch={cost_price:price,unit_price:newPrice,total:+(newPrice*(+match.qty||1)).toFixed(2),markup_pct:mu};
+    if(!auto&&["highest","lowest"].includes(workshopProfile?.quote_price_rule)) patch.price_locked=true;
     await api.patch("workshop_job_items","id",itemId,patch).catch(()=>{});
     setWorkshopJobItems(prev=>prev.map(i=>i.id===itemId?{...i,...patch}:i));
   };
@@ -2398,13 +2402,38 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     if(qt.job_id && qt.line_items){
       const jobItems=workshopJobItems.filter(i=>i.job_id===qt.job_id);
       let lineItems=[]; try{ lineItems=JSON.parse(qt.line_items||"[]"); }catch{}
-      for(const li of lineItems){
-        const price=+(li.price||0);
-        if(!(price>0)) continue;
-        const sku=(li.sku||"").trim();
-        const match=jobItems.find(i=>sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===(li.name||"").toLowerCase().trim());
-        if(!match) continue;
-        await applySupplierPriceToItem(match.id,price);
+      const findItem=li=>{ const sku=(li.sku||"").trim(); return jobItems.find(i=>sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===(li.name||"").toLowerCase().trim()); };
+      const rule=workshopProfile?.quote_price_rule||"latest";
+      if(rule==="highest"||rule==="lowest"){
+        // Pick the highest/lowest supplier price per row across ALL suppliers' quotes for this job.
+        // Compare on the VAT-inclusive basis so ex-VAT and incl-VAT quotes are comparable; the
+        // winning line's own entered price is what gets applied (same as the default behaviour).
+        // Rows the user picked manually (price_locked) are left alone.
+        const otherQuotes=wsSupplierQuotes.filter(q=>q.job_id===qt.job_id&&q.request_id!==qt.request_id);
+        const best={};
+        for(const q of [...otherQuotes,{line_items:qt.line_items}]){
+          let lis=[]; try{ lis=JSON.parse(q.line_items||"[]"); }catch{}
+          for(const li of lis){
+            const price=+(li.price||0); if(!(price>0)) continue;
+            const m=findItem(li); if(!m) continue;
+            const cmp=+(li.vat_incl_price||li.price)||0;
+            const cur=best[m.id];
+            if(!cur||(rule==="highest"?cmp>cur.cmp:cmp<cur.cmp)) best[m.id]={price,cmp};
+          }
+        }
+        for(const [itemId,b] of Object.entries(best)){
+          const it=jobItems.find(i=>String(i.id)===itemId);
+          if(!it||it.price_locked||+it.cost_price===b.price) continue;
+          await applySupplierPriceToItem(it.id,b.price,true);
+        }
+      } else {
+        for(const li of lineItems){
+          const price=+(li.price||0);
+          if(!(price>0)) continue;
+          const match=findItem(li);
+          if(!match) continue;
+          await applySupplierPriceToItem(match.id,price,true);
+        }
       }
     }
     await refreshTables("ws_supplier_quotes","workshop_job_items");

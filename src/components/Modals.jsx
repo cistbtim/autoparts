@@ -332,6 +332,15 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
             <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Auto-applied when a supplier cost is tapped in Parts &amp; Labour</div>
           </div>
           <div>
+            <FL label="Quote using"/>
+            <select className="inp" value={f.quote_price_rule||"latest"} onChange={e=>s("quote_price_rule",e.target.value)}>
+              <option value="latest">Latest supplier price (default)</option>
+              <option value="highest">Highest supplier price</option>
+              <option value="lowest">Lowest supplier price</option>
+            </select>
+            <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Which supplier price each part uses after you save a Return Quote. A price you pick yourself is never overwritten.</div>
+          </div>
+          <div>
             <FL label="🔒 Move Job PIN"/>
             <input className="inp" type="password" value={f.move_pin||""} onChange={e=>s("move_pin",e.target.value)} placeholder="Set a PIN to restrict Move"/>
             <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Only users who enter this PIN can move jobs between workshops. Leave blank to disable.</div>

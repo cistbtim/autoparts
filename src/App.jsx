@@ -2223,6 +2223,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       ws_vat:workshopProfile.vat_number||"",
       deposit_message:depositMessage||null,
     };
+    // Sending the approval link counts as sending the quotation (draft -> sent)
+    if(workshopQuotes.find(q=>q.id===quoteId)?.status==="draft") patchPayload.status="sent";
     let res=await api.patch("workshop_quotes","id",quoteId,patchPayload);
     if(res&&!Array.isArray(res)&&res.message){
       // deposit_message column may not exist yet (SQL migration not run) — a

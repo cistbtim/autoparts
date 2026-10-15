@@ -41,6 +41,20 @@ const resolveCarModel = (vehicles, make, model) => {
   return v ? v.model : model;
 };
 
+// ── Customer quotation sent / expiry helpers (use the existing status + valid_until fields) ──
+const _ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const todayYmd = () => _ymd(new Date());
+const addDaysYmd = (ymd, n) => { const [y,m,d]=String(ymd).slice(0,10).split("-").map(Number); return _ymd(new Date(y,m-1,d+n)); };
+// Returns a badge descriptor when an open (not accepted/declined/converted) quotation is past
+// or on its valid-until date, else null. Compared as local calendar dates, so it flips at midnight.
+function quoteExpiry(q) {
+  if (!q || !q.valid_until || ["accepted","declined","converted"].includes(q.status)) return null;
+  const v = String(q.valid_until).slice(0,10), today = todayYmd();
+  if (v < today) return {label:"⚠️ Expired",       color:"var(--red)", bg:"rgba(248,113,113,.15)"};
+  if (v === today) return {label:"⏰ Expires today", color:"#f59e0b",    bg:"rgba(251,191,36,.18)"};
+  return null;
+}
+
 export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed,onOpenJobFromMatch,initialOpenJobId=null,onOpenJobConsumed}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
@@ -791,7 +805,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                       {j.mechanic&&<span style={{marginLeft:6}}>👷 {j.mechanic}</span>}
                     </div>
                     <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0,marginLeft:6}}>
-                      {jq&&!inv&&<span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>📝 Quoted</span>}
+                      {jq&&!inv&&(()=>{ const ex=quoteExpiry(jq); return ex
+                        ? <span className="badge" style={{background:ex.bg,color:ex.color,fontSize:10}}>{ex.label}</span>
+                        : <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:10}}>{jq.status==="sent"?"📤 Quote sent":"📝 Quoted"}</span>; })()}
                       {inv&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",fontSize:10}}>🧾 Invoiced</span>}
                       {total>0&&wsRole!=="mechanic"&&<span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmt(total)}</span>}
                     </div>
@@ -1246,6 +1262,21 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     )
                   )}
 
+                  {/* quotation sent / expiry badges (open quotes only, before an invoice exists) */}
+                  {!inv&&wsRole!=="mechanic"&&(()=>{
+                    const jq=jobQuote(job.id);
+                    if(!jq||["accepted","declined","converted"].includes(jq.status)) return null;
+                    const ex=quoteExpiry(jq);
+                    return (
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:5}}>
+                        <span className="badge" style={{fontSize:10,background:jq.status==="sent"?"rgba(96,165,250,.15)":"var(--surface2)",color:jq.status==="sent"?"var(--blue)":"var(--text3)"}}>
+                          {jq.status==="sent"?"📤 Quote sent":"📝 Quote draft"}
+                        </span>
+                        {ex&&<span className="badge" style={{fontSize:10,background:ex.bg,color:ex.color,fontWeight:700}}>{ex.label}</span>}
+                      </div>
+                    );
+                  })()}
+
                   {/* invoice total — hidden in Payment Received column (PAID stamp already says it) */}
                   {inv&&wsRole!=="mechanic"&&col.id!=="paid"&&(
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:5,padding:"4px 8px",background:"var(--surface2)",borderRadius:6,border:"1px solid var(--border)"}}>
@@ -1545,7 +1576,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                             <td><div style={{fontWeight:600}}>{q.quote_customer||j?.customer_name||"—"}</div><div style={{fontSize:11,color:"var(--text3)"}}>{q.quote_phone||j?.customer_phone}</div></td>
                             <td><code style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{q.vehicle_reg||j?.vehicle_reg||"—"}</code></td>
                             <td style={{fontSize:12}}>{q.quote_date}</td>
-                            <td style={{fontSize:12,color:q.valid_until&&new Date(q.valid_until)<new Date()?"var(--red)":"var(--text2)"}}>{q.valid_until||"—"}</td>
+                            <td style={{fontSize:12,color:quoteExpiry(q)?.label==="⚠️ Expired"?"var(--red)":"var(--text2)"}}>{q.valid_until||"—"}</td>
                             <td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--accent)"}}>{fmt(q.total)}</td>
                             <td><span className="badge" style={{background:QST_BG[q.status]||QST_BG.draft,color:QST_COLOR[q.status]||"var(--text3)",fontSize:11}}>{q.status}</span></td>
                             <td>
@@ -1567,7 +1598,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                 <div className="show-mobile" style={{display:"flex",flexDirection:"column",gap:10}}>
                   {sorted.map(q=>{
                     const j=jobs.find(jb=>jb.id===q.job_id);
-                    const isExpired=q.valid_until&&new Date(q.valid_until)<new Date();
+                    const isExpired=quoteExpiry(q)?.label==="⚠️ Expired";
                     const stColor=QST_COLOR[q.status]||"var(--text3)";
                     const stBg=QST_BG[q.status]||QST_BG.draft;
                     return (
@@ -8233,6 +8264,16 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           const quoteSendItems = quote.selected_item_ids
             ? (()=>{ try{ const ids=new Set(JSON.parse(quote.selected_item_ids)); const f=items.filter(i=>ids.has(i.id)); return f.length>0?f:items; }catch{ return items; } })()
             : items;
+          // Sending (WA / email / approval link) moves a draft quotation to "sent" automatically;
+          // it can also be set by hand. Never downgrades accepted/declined/converted quotes.
+          const markQuoteSent = () => { if(!wsLocked&&onSaveQuote&&quote.status==="draft") onSaveQuote({...quote,status:"sent"}); };
+          // Extend validity: +7 days from the current valid-until, or from today if already past/unset.
+          const extendQuote = () => {
+            const cur=quote.valid_until?String(quote.valid_until).slice(0,10):"";
+            const base=cur&&cur>todayYmd()?cur:todayYmd();
+            onSaveQuote({...quote,valid_until:addDaysYmd(base,7)});
+          };
+          const qExpiry = quoteExpiry(quote);
           return (
         <div className="card" style={{padding:14,marginBottom:14,borderLeft:`3px solid ${
           quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)"}`}}>
@@ -8253,6 +8294,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   <span style={{display:"inline-block",animation:quoteRefreshing?"spin 0.8s linear infinite":"none",fontSize:14,lineHeight:1}}>🔄</span>
                 </button>
               )}
+              {qExpiry&&<span className="badge" style={{background:qExpiry.bg,color:qExpiry.color,fontSize:12,padding:"4px 10px",fontWeight:700}}>{qExpiry.label}</span>}
               <span className="badge" style={{
                 background:quote.status==="accepted"?"rgba(52,211,153,.15)":quote.status==="declined"?"rgba(248,113,113,.15)":quote.status==="converted"?"rgba(100,116,139,.15)":"rgba(96,165,250,.15)",
                 color:quote.status==="accepted"?"var(--green)":quote.status==="declined"?"var(--red)":quote.status==="converted"?"var(--text3)":"var(--blue)",
@@ -8315,7 +8357,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       `*Parts:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
                       `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
                     window.open(waLink(phone,msg),"_blank");
+                    markQuoteSent();
                   } else if(email){
+                    markQuoteSent();
                     const subj=`Parts Quotation ${quote.id} — ${name}`;
                     const body=`Dear ${name},\n\nPlease find your parts quotation below.\n\n`+
                       `Quotation: ${quote.id}\nDate: ${quote.quote_date}${quote.valid_until?`\nValid Until: ${quote.valid_until}`:""}\n`+
@@ -8343,6 +8387,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   `*Items:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
                   `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
                 window.open(waLink(phone,msg),"_blank");
+                markQuoteSent();
               }}>💬 WA</button>
             )}
             {(quote.quote_email||job.customer_email)&&(
@@ -8358,8 +8403,19 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   `Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n\n`+
                   `Items:\n${lines}\n\nTotal: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n`+
                   `${settings.shop_name||"Workshop"}${settings.phone?`\nPhone: ${settings.phone}`:""}`;
+                markQuoteSent();
                 window.location.href=`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
               }}>✉️ Email</button>
+            )}
+            {!wsLocked&&(quote.status==="draft"||quote.status==="sent")&&(
+              <button className="btn btn-ghost btn-xs"
+                onClick={()=>onSaveQuote({...quote,status:quote.status==="draft"?"sent":"draft"})}>
+                {quote.status==="draft"?"📨 Mark as Sent":"↩ Mark as Draft"}
+              </button>
+            )}
+            {!wsLocked&&(quote.status==="draft"||quote.status==="sent")&&(
+              <button className="btn btn-ghost btn-xs" style={qExpiry?{borderColor:qExpiry.color,color:qExpiry.color}:undefined}
+                onClick={extendQuote} title="Add 7 days to the valid-until date (from today if already expired)">⏳ Extend +7 days</button>
             )}
             {!wsLocked&&quote.status!=="converted"&&quote.status!=="declined"&&(
               <button className={`btn btn-xs ${quote.status==="accepted"?"btn-ghost":"btn-success"}`}

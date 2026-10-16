@@ -55,6 +55,23 @@ function quoteExpiry(q) {
   return null;
 }
 
+// Has the job's parts list changed since this quotation was made? Compares the quotation's saved
+// subtotal + ticked item ids against the live items (no snapshot column needed). Catches removed
+// parts and any qty/price change on ticked ones; "notOn" counts job rows not on the quotation
+// (could be deliberate, so it's only shown as a hint).
+function quoteSync(q, items) {
+  if (!q || ["converted","declined"].includes(q.status)) return null;
+  let ids = null;
+  try { ids = q.selected_item_ids ? JSON.parse(q.selected_item_ids).map(String) : null; } catch { ids = null; }
+  const idSet = ids ? new Set(ids) : null;
+  const live = items.filter(i => !idSet || idSet.has(String(i.id)));
+  const removed = ids ? ids.filter(id => !items.some(i => String(i.id)===id)).length : 0;
+  const nowSub = live.reduce((s,i)=>s+(+i.total||0),0);
+  const subtotalChanged = q.subtotal!=null && Math.abs(nowSub-(+q.subtotal||0))>0.01;
+  const notOn = idSet ? items.filter(i=>(i.description||"").trim() && !idSet.has(String(i.id))).length : 0;
+  return {changed: removed>0 || subtotalChanged, removed, notOn, nowSub, quoteSub:+q.subtotal||0};
+}
+
 export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed,onOpenJobFromMatch,initialOpenJobId=null,onOpenJobConsumed}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
@@ -1267,8 +1284,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                     const jq=jobQuote(job.id);
                     if(!jq||["accepted","declined","converted"].includes(jq.status)) return null;
                     const ex=quoteExpiry(jq);
+                    const sy=quoteSync(jq,jobItems.filter(i=>i.job_id===job.id));
                     return (
                       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:5}}>
+                        {sy?.changed&&<span className="badge" style={{fontSize:10,background:"rgba(248,113,113,.15)",color:"var(--red)",fontWeight:700}}>⚠️ Parts changed</span>}
                         <span className="badge" style={{fontSize:10,background:jq.status==="sent"?"rgba(96,165,250,.15)":"var(--surface2)",color:jq.status==="sent"?"var(--blue)":"var(--text3)"}}>
                           {jq.status==="sent"?"📤 Quote sent":"📝 Quote draft"}
                         </span>
@@ -8330,6 +8349,28 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               ⏳ {t.wsqtAwaitingResponse}
             </div>
           )}
+          {/* Parts list no longer matches this quotation */}
+          {!invoice&&(()=>{
+            const sy=quoteSync(quote,items);
+            if(!sy||(!sy.changed&&!sy.notOn)) return null;
+            const sent=quote.status==="sent"||quote.confirm_status==="pending"||quote.status==="accepted";
+            return (
+              <div style={{marginBottom:10,padding:"8px 12px",borderRadius:8,fontSize:12,
+                background:sy.changed?"rgba(248,113,113,.12)":"rgba(251,191,36,.1)",
+                border:`1px solid ${sy.changed?"rgba(248,113,113,.4)":"rgba(251,191,36,.3)"}`,
+                color:sy.changed?"var(--red)":"var(--yellow)"}}>
+                <div style={{fontWeight:700}}>{sy.changed?"⚠️ Parts changed since this quotation was made":"ℹ️ Some job parts are not on this quotation"}</div>
+                <div style={{marginTop:3,color:"var(--text2)"}}>
+                  {sy.changed&&<>Quotation {fmtAmt(sy.quoteSub)} → parts list now {fmtAmt(sy.nowSub)}{sy.removed>0?` · ${sy.removed} removed part${sy.removed!==1?"s":""}`:""}. </>}
+                  {sy.notOn>0&&<>{sy.notOn} job row{sy.notOn!==1?"s are":" is"} not on it. </>}
+                  {sent&&sy.changed&&<strong>The customer may already have the old version — update and resend.</strong>}
+                </div>
+                {!wsLocked&&quote.status!=="converted"&&(
+                  <button className="btn btn-ghost btn-xs" style={{marginTop:6}} onClick={()=>{setCreatingNewQuote(false);setQuoteModal(true);}}>✏️ Review &amp; update quotation</button>
+                )}
+              </div>
+            );
+          })()}
           {/* Invoice exists warning */}
           {invoice&&(
             <div style={{background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.5)",borderRadius:6,padding:"7px 12px",marginBottom:10,fontSize:12,display:"flex",alignItems:"center",gap:6}}>

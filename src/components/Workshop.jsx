@@ -3464,7 +3464,7 @@ function WorkGroupsModal({items, onApply, onClose}) {
         {items.map(i=>{
           const cur=(i.work_group||"").trim();
           return (
-            <label key={i.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:picked.has(i.id)?"rgba(167,139,250,.12)":"transparent"}}>
+            <label key={i.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:picked.has(i.id)?"rgba(157,23,77,.12)":"transparent"}}>
               <input type="checkbox" checked={picked.has(i.id)} onChange={()=>toggle(i.id)} style={{width:16,height:16,flexShrink:0}}/>
               <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.type==="labour"?"👷":"🔩"} {i.description}</span>
               {cur&&cur!==target&&<span style={{fontSize:10,color:"var(--text3)",background:"var(--surface2)",borderRadius:99,padding:"1px 8px",flexShrink:0}}>in: {cur}</span>}
@@ -7945,7 +7945,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
-              {!itemsLocked&&items.length>0&&<button className="btn btn-sm" onClick={()=>setGrpModal(true)} title="Group items by piece of work" style={{background:"rgba(167,139,250,.28)",color:"#fff",border:"1px solid rgba(167,139,250,.6)",borderRadius:8,fontWeight:700,fontSize:12}}>🗂 Groups</button>}
+              {!itemsLocked&&items.length>0&&<button className="btn btn-sm" onClick={()=>setGrpModal(true)} title="Group items by piece of work" style={{background:"#9d174d",color:"#fff",border:"1px solid #f472b6",borderRadius:8,fontWeight:700,fontSize:12}}>🗂 Groups</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
               {itemsLocked&&!!invoice&&<span title="Delete the invoice to edit these items" style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.85)",background:"rgba(0,0,0,.2)",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:5}}>🔒 Invoiced</span>}
               <button className="btn btn-sm" onClick={toggleHideCosts}
@@ -8231,11 +8231,11 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 {groupNames.flatMap(g=>{
                   const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
                   return [
-                    <div key={"gh-"+g} style={{padding:"8px 16px",background:done?"rgba(52,211,153,.12)":"rgba(167,139,250,.14)",borderLeft:`3px solid ${done?"var(--green)":"#a78bfa"}`,display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:700}}>
+                    <div key={"gh-"+g} style={{padding:"8px 16px",background:done?"#15803d":"#9d174d",color:"#fff",borderLeft:`3px solid ${done?"#4ade80":"#f472b6"}`,display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:700}}>
                       <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:18,height:18,accentColor:"var(--green)",cursor:wsLocked?"default":"pointer",flexShrink:0}}/>
-                      <span style={{flex:1,minWidth:0,textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4,fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span></span>
-                      {done&&<span style={{fontSize:11,color:"var(--green)"}}>✅ Done</span>}
-                      <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(sub)}</span>
+                      <span style={{flex:1,minWidth:0,textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g} <span style={{fontWeight:400,color:"rgba(255,255,255,.8)",marginLeft:4,fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span></span>
+                      {done&&<span style={{fontSize:11,color:"#fff"}}>✅ Done</span>}
+                      <span style={{fontFamily:"Rajdhani,sans-serif",color:"#fff",fontSize:14}}>{fmtAmt(sub)}</span>
                     </div>,
                     ...gi.map((item,idx)=>mobileCard(item,idx,gi.length)),
                     <div key={"gs-"+g} style={{height:6,background:"var(--surface3)"}}/>,
@@ -8273,13 +8273,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   {groupNames.flatMap(g=>{
                     const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
                     return [
-                      <tr key={"gh-"+g} style={{background:done?"rgba(52,211,153,.12)":"rgba(167,139,250,.14)"}}>
-                        <td colSpan={9} style={{padding:"8px 12px",borderBottom:`1px solid ${done?"rgba(52,211,153,.35)":"rgba(167,139,250,.35)"}`,borderLeft:`3px solid ${done?"var(--green)":"#a78bfa"}`}}>
-                          <label style={{display:"flex",alignItems:"center",gap:10,fontWeight:700,fontSize:13,cursor:wsLocked?"default":"pointer"}}>
+                      <tr key={"gh-"+g} style={{background:done?"#15803d":"#9d174d"}}>
+                        <td colSpan={9} style={{padding:"8px 12px",borderBottom:`1px solid ${done?"#4ade80":"#f472b6"}`,borderLeft:`3px solid ${done?"#4ade80":"#f472b6"}`}}>
+                          <label style={{display:"flex",alignItems:"center",gap:10,fontWeight:700,fontSize:13,color:"#fff",cursor:wsLocked?"default":"pointer"}}>
                             <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:16,height:16,accentColor:"var(--green)"}}/>
                             <span style={{textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g}</span>
-                            <span style={{fontWeight:400,color:"var(--text3)",fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span>
-                            {done&&<span style={{fontSize:11,color:"var(--green)"}}>✅ Done</span>}
+                            <span style={{fontWeight:400,color:"rgba(255,255,255,.8)",fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span>
+                            {done&&<span style={{fontSize:11,color:"#fff"}}>✅ Done</span>}
                             <span style={{marginLeft:"auto",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(sub)}</span>
                           </label>
                         </td>

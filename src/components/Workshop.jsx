@@ -3399,6 +3399,90 @@ function PasteQuoteTextModal({parts=[], onApply, onClose}) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// WORK GROUPS — group job items by piece of work (e.g. "Service", "Timing", "Cooling")
+// so each can be checked off and subtotalled. Stored per item in work_group / group_done.
+// ═══════════════════════════════════════════════════════════════
+function WorkGroupsModal({items, onApply, onClose}) {
+  const names = [...new Set(items.map(i=>(i.work_group||"").trim()).filter(Boolean))];
+  const [target, setTarget] = useState(names[0]||"__new__");
+  const [name, setName]     = useState(names[0]||"");
+  const [picked, setPicked] = useState(()=>new Set(names[0]?items.filter(i=>(i.work_group||"").trim()===names[0]).map(i=>i.id):[]));
+  const [err, setErr]       = useState("");
+  const [busy, setBusy]     = useState(false);
+
+  const pickTarget = (v) => {
+    setTarget(v); setErr("");
+    if (v==="__new__") { setName(""); setPicked(new Set()); }
+    else { setName(v); setPicked(new Set(items.filter(i=>(i.work_group||"").trim()===v).map(i=>i.id))); }
+  };
+  const toggle = id => setPicked(p=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
+
+  const save = async () => {
+    const nm = name.trim();
+    if (!nm) { setErr("Give the group a name first."); return; }
+    const changes = [];
+    items.forEach(i=>{
+      const cur = (i.work_group||"").trim();
+      const inTarget = target!=="__new__" && cur===target;
+      if (picked.has(i.id)) { if (cur!==nm) changes.push({id:i.id, work_group:nm, group_done:false}); else if (nm!==target&&inTarget) changes.push({id:i.id, work_group:nm}); }
+      else if (inTarget) changes.push({id:i.id, work_group:null, group_done:false});
+    });
+    // Anyone joining/leaving a group re-opens it (new work was added), so reset its done tick
+    if (changes.some(c=>c.work_group===nm)) items.filter(i=>(i.work_group||"").trim()===nm && !changes.some(c=>c.id===i.id)).forEach(i=>changes.push({id:i.id, group_done:false}));
+    if (changes.length===0) { onClose(); return; }
+    setBusy(true);
+    try { await onApply(changes); onClose(); }
+    catch(e) { setErr(e.message||"Save failed"); setBusy(false); }
+  };
+  const ungroupAll = async () => {
+    setBusy(true);
+    try { await onApply(items.filter(i=>(i.work_group||"").trim()===target).map(i=>({id:i.id, work_group:null, group_done:false}))); onClose(); }
+    catch(e) { setErr(e.message||"Save failed"); setBusy(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose} wide>
+      <MHead title="🗂 Work Groups" onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>
+        Group items by piece of work (e.g. Service, Timing, Cooling). Each group gets its own subtotal and a ✅ done tick.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+        <div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:4}}>Group</div>
+          <select className="inp" value={target} onChange={e=>pickTarget(e.target.value)}>
+            {names.map(n=><option key={n} value={n}>{n}</option>)}
+            <option value="__new__">➕ New group…</option>
+          </select>
+        </div>
+        <div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:4}}>{target==="__new__"?"New group name":"Name (edit to rename)"}</div>
+          <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Timing chain"/>
+        </div>
+      </div>
+      <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:6}}>Items in this group ({picked.size})</div>
+      <div style={{border:"1px solid var(--border)",borderRadius:10,maxHeight:340,overflowY:"auto",marginBottom:10}}>
+        {items.map(i=>{
+          const cur=(i.work_group||"").trim();
+          return (
+            <label key={i.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:picked.has(i.id)?"rgba(167,139,250,.12)":"transparent"}}>
+              <input type="checkbox" checked={picked.has(i.id)} onChange={()=>toggle(i.id)} style={{width:16,height:16,flexShrink:0}}/>
+              <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.type==="labour"?"👷":"🔩"} {i.description}</span>
+              {cur&&cur!==target&&<span style={{fontSize:10,color:"var(--text3)",background:"var(--surface2)",borderRadius:99,padding:"1px 8px",flexShrink:0}}>in: {cur}</span>}
+            </label>
+          );
+        })}
+      </div>
+      {err&&<div style={{color:"var(--red)",fontSize:12,marginBottom:8}}>{err}</div>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose} disabled={busy}>Cancel</button>
+        {target!=="__new__"&&<button className="btn btn-ghost" style={{flex:1,color:"var(--red)"}} onClick={ungroupAll} disabled={busy}>Ungroup all</button>}
+        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={busy}>{busy?"Saving...":"💾 Save group"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
 function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, jobItems=null, onSave, onClose}) {
@@ -4628,6 +4712,31 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [remarkOverrides,   setRemarkOverrides]   = useState({});
   const [sortOverrides,     setSortOverrides]     = useState({}); // optimistic item.id -> sort_order, ahead of the save round-trip
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
+  // Work groups: instant local view of work_group / group_done changes while the PATCH is in flight
+  const [grpOv,         setGrpOv]         = useState({});
+  const [grpModal,      setGrpModal]      = useState(false);
+  // Drop a local override once the refreshed DB row agrees with it (so other devices' changes show up)
+  useEffect(()=>{
+    setGrpOv(o=>{
+      let changed=false; const n={...o};
+      Object.keys(o).forEach(id=>{
+        const it=items.find(i=>String(i.id)===id);
+        if(!it||Object.entries(o[id]).every(([k,v])=>(it[k]??null)===(v??null)||(k==="group_done"&&!it[k]&&!v))){ delete n[id]; changed=true; }
+      });
+      return changed?n:o;
+    });
+  },[items]);
+  const applyGroupChanges = async (changes) => {
+    const prev = {};
+    changes.forEach(c=>{ prev[c.id]=grpOv[c.id]; });
+    setGrpOv(o=>{ const n={...o}; changes.forEach(({id,...rest})=>{ n[id]={...(n[id]||{}),...rest}; }); return n; });
+    const results = await Promise.all(changes.map(({id,...rest})=>api.patch("workshop_job_items","id",id,rest).catch(e=>({message:e.message}))));
+    const bad = results.find(r=>r&&!Array.isArray(r)&&(r.message||r.code));
+    if (bad) {
+      setGrpOv(o=>{ const n={...o}; changes.forEach(c=>{ if(prev[c.id]===undefined) delete n[c.id]; else n[c.id]=prev[c.id]; }); return n; });
+      throw new Error("Could not save the group — run the work_group SQL in Supabase first. ("+(bad.message||bad.code)+")");
+    }
+  };
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup
   const [returnQuoteOpen,  setReturnQuoteOpen]  = useState(false);
@@ -7836,6 +7945,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("part")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtPart}</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("labour")} style={{background:"rgba(255,255,255,.15)",color:"#fff",border:"1px solid rgba(255,255,255,.3)",borderRadius:8,fontWeight:700,fontSize:12}}>+ {t.wsqtLabour}</button>}
+              {!itemsLocked&&items.length>0&&<button className="btn btn-sm" onClick={()=>setGrpModal(true)} title="Group items by piece of work" style={{background:"rgba(167,139,250,.28)",color:"#fff",border:"1px solid rgba(167,139,250,.6)",borderRadius:8,fontWeight:700,fontSize:12}}>🗂 Groups</button>}
               {!itemsLocked&&<button className="btn btn-sm" onClick={()=>setAddingItem("combo")} style={{background:"rgba(251,191,36,.25)",color:"#fff",border:"1px solid rgba(251,191,36,.5)",borderRadius:8,fontWeight:700,fontSize:12}}>⚡ {t.wsqtCombo||"Combo"}</button>}
               {itemsLocked&&!!invoice&&<span title="Delete the invoice to edit these items" style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.85)",background:"rgba(0,0,0,.2)",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:5}}>🔒 Invoiced</span>}
               <button className="btn btn-sm" onClick={toggleHideCosts}
@@ -7854,9 +7964,14 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             // only items the user has actually reordered get a real sort_order value.
             const origIndexOf = new Map(items.map((it,i)=>[it.id,i]));
             const effOrder = it => sortOverrides[it.id] ?? (it.sort_order!=null ? +it.sort_order : origIndexOf.get(it.id));
-            const orderedItems = [...items].sort((a,b)=>effOrder(a)-effOrder(b));
-            const partItems=orderedItems.filter(i=>i.type!=="labour");
-            const labourItems=orderedItems.filter(i=>i.type==="labour");
+            const orderedItems = items.map(i=>grpOv[i.id]?{...i,...grpOv[i.id]}:i).sort((a,b)=>effOrder(a)-effOrder(b));
+            // Work groups (custom "pieces of work"); items without one fall into the Part / Labour sections as before
+            const grpOf = i => (i.work_group||"").trim();
+            const groupNames = [...new Set(orderedItems.map(grpOf).filter(Boolean))];
+            const groupItems = g => orderedItems.filter(i=>grpOf(i)===g);
+            const setGroupDone = (g,done) => applyGroupChanges(groupItems(g).map(i=>({id:i.id,group_done:done}))).catch(e=>alert(e.message));
+            const partItems=orderedItems.filter(i=>i.type!=="labour"&&!grpOf(i));
+            const labourItems=orderedItems.filter(i=>i.type==="labour"&&!grpOf(i));
             const partTotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
             const labourTotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
             // Swap this item with its neighbour within its own group (parts reorder
@@ -7864,7 +7979,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             // and what printing groups into). Only the two swapped rows are persisted.
             const moveItem = (item, dir) => {
               if(itemsLocked) return;
-              const group = item.type==="labour" ? labourItems : partItems;
+              const group = grpOf(item) ? groupItems(grpOf(item)) : item.type==="labour" ? labourItems : partItems;
               const idx = group.findIndex(g=>g.id===item.id);
               const targetIdx = idx+dir;
               if(idx<0||targetIdx<0||targetIdx>=group.length) return;
@@ -8113,6 +8228,19 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             };
             if(isMobile) return (
               <div style={{display:"flex",flexDirection:"column"}}>
+                {groupNames.flatMap(g=>{
+                  const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
+                  return [
+                    <div key={"gh-"+g} style={{padding:"8px 16px",background:done?"rgba(52,211,153,.12)":"rgba(167,139,250,.14)",borderLeft:`3px solid ${done?"var(--green)":"#a78bfa"}`,display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:700}}>
+                      <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:18,height:18,accentColor:"var(--green)",cursor:wsLocked?"default":"pointer",flexShrink:0}}/>
+                      <span style={{flex:1,minWidth:0,textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4,fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span></span>
+                      {done&&<span style={{fontSize:11,color:"var(--green)"}}>✅ Done</span>}
+                      <span style={{fontFamily:"Rajdhani,sans-serif",color:"var(--text)"}}>{fmtAmt(sub)}</span>
+                    </div>,
+                    ...gi.map((item,idx)=>mobileCard(item,idx,gi.length)),
+                    <div key={"gs-"+g} style={{height:6,background:"var(--surface3)"}}/>,
+                  ];
+                })}
                 {partItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(96,165,250,.07)",borderLeft:"3px solid var(--blue)",fontSize:11,fontWeight:700,color:"var(--blue)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{partItems.length} item{partItems.length!==1?"s":""}</span></div>}
                 {partItems.map((item,idx)=>mobileCard(item,idx,partItems.length))}
                 {partItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(96,165,250,.04)",borderLeft:"3px solid rgba(96,165,250,.4)",fontSize:12,fontWeight:700,color:"var(--blue)"}}><span>Parts subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(partTotal)}</span></div>}
@@ -8142,6 +8270,24 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   <th style={{width:32}}></th>
                 </tr></thead>
                 <tbody>
+                  {groupNames.flatMap(g=>{
+                    const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
+                    return [
+                      <tr key={"gh-"+g} style={{background:done?"rgba(52,211,153,.12)":"rgba(167,139,250,.14)"}}>
+                        <td colSpan={9} style={{padding:"8px 12px",borderBottom:`1px solid ${done?"rgba(52,211,153,.35)":"rgba(167,139,250,.35)"}`,borderLeft:`3px solid ${done?"var(--green)":"#a78bfa"}`}}>
+                          <label style={{display:"flex",alignItems:"center",gap:10,fontWeight:700,fontSize:13,cursor:wsLocked?"default":"pointer"}}>
+                            <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:16,height:16,accentColor:"var(--green)"}}/>
+                            <span style={{textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g}</span>
+                            <span style={{fontWeight:400,color:"var(--text3)",fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span>
+                            {done&&<span style={{fontSize:11,color:"var(--green)"}}>✅ Done</span>}
+                            <span style={{marginLeft:"auto",fontFamily:"Rajdhani,sans-serif",fontSize:14}}>{fmtAmt(sub)}</span>
+                          </label>
+                        </td>
+                      </tr>,
+                      ...gi.map((it,idx)=>desktopRow(it,idx,gi.length)),
+                      <tr key={"gs-"+g}><td colSpan={9} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>,
+                    ];
+                  })}
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--blue)",borderBottom:"1px solid rgba(96,165,250,.2)",letterSpacing:".04em"}}>🔩 {t.wsqtPart} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{partItems.length} item{partItems.length!==1?"s":""}</span></td></tr>}
                   {partItems.map((it,idx)=>desktopRow(it,idx,partItems.length))}
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
@@ -8749,6 +8895,12 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         </Overlay>
       )}
 
+      {grpModal&&(
+        <WorkGroupsModal
+          items={items.map(i=>grpOv[i.id]?{...i,...grpOv[i.id]}:i)}
+          onApply={applyGroupChanges}
+          onClose={()=>setGrpModal(false)}/>
+      )}
       {/* Return Quote — supplier picker */}
       {returnQuoteOpen&&!returnQuoteTarget&&(()=>{
         const jobRequests=wsSupplierRequests.filter(r=>r.job_id===job.id);

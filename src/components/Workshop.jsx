@@ -8231,7 +8231,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 {groupNames.flatMap(g=>{
                   const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
                   return [
-                    <div key={"gh-"+g} style={{padding:"8px 16px",background:done?"#15803d":"#9d174d",color:"#fff",borderLeft:`3px solid ${done?"#4ade80":"#f472b6"}`,display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:700}}>
+                    <div key={"gh-"+g} style={{padding:"8px 16px",background:done?"#475569":"#9d174d",color:"#fff",borderLeft:`3px solid ${done?"#94a3b8":"#f472b6"}`,display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:700}}>
                       <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:18,height:18,accentColor:"var(--green)",cursor:wsLocked?"default":"pointer",flexShrink:0}}/>
                       <span style={{flex:1,minWidth:0,textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g} <span style={{fontWeight:400,color:"rgba(255,255,255,.8)",marginLeft:4,fontSize:11}}>{gi.length} item{gi.length!==1?"s":""}</span></span>
                       {done&&<span style={{fontSize:11,color:"#fff"}}>✅ Done</span>}
@@ -8245,7 +8245,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 {partItems.map((item,idx)=>mobileCard(item,idx,partItems.length))}
                 {partItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(96,165,250,.04)",borderLeft:"3px solid rgba(96,165,250,.4)",fontSize:12,fontWeight:700,color:"var(--blue)"}}><span>Parts subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(partTotal)}</span></div>}
                 {partItems.length>0&&labourItems.length>0&&<div style={{height:6,background:"var(--surface3)"}}/>}
-                {labourItems.length>0&&<div style={{padding:"6px 16px",background:"rgba(52,211,153,.07)",borderLeft:"3px solid var(--green)",fontSize:11,fontWeight:700,color:"var(--green)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:4}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></div>}
+                {labourItems.length>0&&<div style={{padding:"6px 16px",background:"#166534",borderLeft:"3px solid #4ade80",fontSize:11,fontWeight:700,color:"#fff",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"rgba(255,255,255,.8)",marginLeft:4}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></div>}
                 {labourItems.map((item,idx)=>mobileCard(item,idx,labourItems.length))}
                 {labourItems.length>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"5px 16px 5px 19px",background:"rgba(52,211,153,.04)",borderLeft:"3px solid rgba(52,211,153,.4)",fontSize:12,fontWeight:700,color:"var(--green)"}}><span>Labour subtotal</span><span style={{fontFamily:"Rajdhani,sans-serif"}}>{fmtAmt(labourTotal)}</span></div>}
                 <div style={{borderTop:"2px solid var(--border2)",padding:"10px 16px",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
@@ -8273,8 +8273,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   {groupNames.flatMap(g=>{
                     const gi=groupItems(g); const sub=gi.reduce((s,i)=>s+(+i.total||0),0); const done=gi.every(i=>i.group_done);
                     return [
-                      <tr key={"gh-"+g} style={{background:done?"#15803d":"#9d174d"}}>
-                        <td colSpan={9} style={{padding:"8px 12px",borderBottom:`1px solid ${done?"#4ade80":"#f472b6"}`,borderLeft:`3px solid ${done?"#4ade80":"#f472b6"}`}}>
+                      <tr key={"gh-"+g} style={{background:done?"#475569":"#9d174d"}}>
+                        <td colSpan={9} style={{padding:"8px 12px",borderBottom:`1px solid ${done?"#94a3b8":"#f472b6"}`,borderLeft:`3px solid ${done?"#94a3b8":"#f472b6"}`}}>
                           <label style={{display:"flex",alignItems:"center",gap:10,fontWeight:700,fontSize:13,color:"#fff",cursor:wsLocked?"default":"pointer"}}>
                             <input type="checkbox" checked={done} disabled={wsLocked} onChange={()=>setGroupDone(g,!done)} title="Mark this work as done" style={{width:16,height:16,accentColor:"var(--green)"}}/>
                             <span style={{textDecoration:done?"line-through":"none",opacity:done?.7:1}}>🗂 {g}</span>
@@ -8292,7 +8292,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   {partItems.map((it,idx)=>desktopRow(it,idx,partItems.length))}
                   {partItems.length>0&&<tr style={{background:"rgba(96,165,250,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Parts subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--blue)",padding:"5px 8px"}}>{fmtAmt(partTotal)}</td><td/></tr>}
                   {partItems.length>0&&labourItems.length>0&&<tr><td colSpan={9} style={{height:6,background:"var(--surface3)",padding:0}}/></tr>}
-                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"var(--green)",borderBottom:"1px solid rgba(52,211,153,.2)",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"var(--text3)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
+                  {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.07)"}}><td colSpan={9} style={{padding:"7px 12px",fontWeight:700,fontSize:11,color:"#fff",background:"#166534",borderBottom:"1px solid #4ade80",letterSpacing:".04em"}}>👷 {t.wsqtLabour} <span style={{fontWeight:400,color:"rgba(255,255,255,.8)",marginLeft:6}}>{labourItems.length} item{labourItems.length!==1?"s":""}</span></td></tr>}
                   {labourItems.map((it,idx)=>desktopRow(it,idx,labourItems.length))}
                   {labourItems.length>0&&<tr style={{background:"rgba(52,211,153,.04)"}}><td colSpan={7} style={{textAlign:"right",fontWeight:600,fontSize:11,color:"var(--text2)",padding:"5px 12px"}}>Labour subtotal</td><td style={{textAlign:"right",fontWeight:700,fontFamily:"Rajdhani,sans-serif",color:"var(--green)",padding:"5px 8px"}}>{fmtAmt(labourTotal)}</td><td/></tr>}
                   <tr style={{borderTop:"2px solid var(--border2)"}}>

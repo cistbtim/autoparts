@@ -3545,10 +3545,23 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         </div>
         {prices.map((row,idx) => (
           <div key={idx} style={{display:"grid",gridTemplateColumns:priceOnly?`1fr 120px`:`1fr 110px${vatExcluded&&vatRate>0?" 100px":""} 100px`,gap:8,padding:"8px 12px",borderBottom:idx<prices.length-1?"1px solid var(--border)":"none",alignItems:"center"}}>
-            <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name}</div>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                textDecoration:row.available==="No stock"?"line-through":"none",color:row.available==="No stock"?"var(--text3)":"inherit"}}>{row.name}</div>
+              {priceOnly&&(
+                <button type="button" onClick={()=>setPrices(p=>p.map((r,i)=>i!==idx?r:r.available==="No stock"?{...r,available:""}:{...r,available:"No stock",price:""}))}
+                  style={{marginTop:3,padding:"2px 8px",fontSize:11,fontWeight:700,borderRadius:99,cursor:"pointer",
+                    border:`1px solid ${row.available==="No stock"?"var(--red)":"var(--border)"}`,
+                    background:row.available==="No stock"?"rgba(248,113,113,.15)":"transparent",
+                    color:row.available==="No stock"?"var(--red)":"var(--text3)"}}>
+                  {row.available==="No stock"?"🚫 No stock — tap to undo":"🚫 No stock"}
+                </button>
+              )}
+            </div>
             <input className="inp" type="number" min="0" step="0.01"
               value={row.price} onChange={e=>setLine(idx,"price",e.target.value)}
-              placeholder="0.00"
+              placeholder={row.available==="No stock"?"No stock":"0.00"}
+              disabled={row.available==="No stock"}
               style={{textAlign:"right",padding:"4px 8px",fontSize:13,fontWeight:700}}/>
             {!priceOnly&&vatExcluded&&vatRate>0&&(
               <div style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#f59e0b",fontFamily:"Rajdhani,sans-serif"}}>
@@ -7475,6 +7488,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             });
           });
           const getSupCosts = (desc) => supCostMap[(desc||"").toLowerCase().trim()] || [];
+          // Suppliers who answered "No stock" on a Return Quote row (recorded, no price) — shown as a grey note, never as a price chip
+          const noStockMap = {};
+          jobSupQts.forEach(sq=>{
+            let lines=[]; try{ lines=JSON.parse(sq.line_items||"[]"); }catch{}
+            lines.forEach(l=>{ if(l.available==="No stock"){ const k=(l.name||"").toLowerCase().trim(); (noStockMap[k]=noStockMap[k]||[]).push(sq.supplier_name||"Supplier"); } });
+          });
+          const getNoStock = (desc) => noStockMap[(desc||"").toLowerCase().trim()] || [];
 
           // ── Order from spare shop (Option A + B) ────────────────────
           const orderFromSpareShop = async (item, sc, markupPct) => {
@@ -7895,6 +7915,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)",fontSize:16}} onClick={()=>onDeleteItem(item.id)}>🗑</button>
                     </div>}
                   </div>
+                  {!hideCosts&&getNoStock(item.description).length>0&&(<div style={{fontSize:11,fontWeight:700,color:"var(--red)",marginTop:4,marginBottom:4}}>🚫 No stock: {getNoStock(item.description).join(", ")}</div>)}
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                       {supCosts.map((sc,i)=>{
@@ -8017,6 +8038,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       }}
                       style={{marginLeft:4,background:"none",border:"none",cursor:"pointer",fontSize:12,padding:2,verticalAlign:"middle"}}>🚚</button>
                   )}
+                  {!hideCosts&&getNoStock(item.description).length>0&&(<div style={{fontSize:11,fontWeight:700,color:"var(--red)",marginTop:4,marginBottom:4}}>🚫 No stock: {getNoStock(item.description).join(", ")}</div>)}
                   {!hideCosts&&supCosts.length>0&&(
                     <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:4}}>
                       {supCosts.map((sc,i)=>{

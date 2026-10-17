@@ -9592,6 +9592,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       {createPoOpen&&onSaveWsPurchaseOrder&&(
         <WsCreatePoFromJobModal
           job={job}
+          jobItems={items}
           wsSupplierQuotes={wsSupplierQuotes.filter(q=>q.job_id===job.id)}
           wsSupplierRequests={wsSupplierRequests}
           sqReplies={sqReplies.filter(r=>wsSupplierRequests.some(req=>req.id===r.request_id&&req.job_id===job.id))}

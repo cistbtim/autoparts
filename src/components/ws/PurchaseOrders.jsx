@@ -3,7 +3,7 @@ import { getSettings, curSym } from "../../lib/settings.js";
 import { waLink } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG } from "../shared.jsx";
 
-export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],wsSuppliers=[],settings,onSave,onViewPOs,onClose}) {
+export function WsCreatePoFromJobModal({job,jobItems=[],wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],wsSuppliers=[],settings,onSave,onViewPOs,onClose}) {
   const C=curSym(settings?.currency||getSettings().currency);
 
   // Build groups: one entry per supplier, merging manual quotes + digital replies
@@ -32,6 +32,7 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
         qty:+l.qty||1,
         unit_price:+(l.vat_incl_price||l.price)||0,
         condition:"in_stock",
+        noStock:l.available==="No stock",
       })),
       sq.quote_ref||""
     );
@@ -59,28 +60,55 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
 
   const groups=Object.values(groupMap);
 
-  // Deduplicate items within each group by description (keep highest price)
+  // Deduplicate items within each group by description. A priced, in-stock line always beats a
+  // "No stock" / unpriced one for the same part; otherwise the first one seen is kept.
+  const usable=it=>!it.noStock&&+it.unit_price>0;
   groups.forEach(g=>{
-    const seen={};
-    g.items=g.items.filter(it=>{
+    const byKey={};
+    g.items.forEach(it=>{
       const k=it.description.toLowerCase().trim();
-      if(seen[k]) return false;
-      seen[k]=true; return true;
+      if(!byKey[k]||(!usable(byKey[k])&&usable(it))) byKey[k]=it;
     });
+    g.items=Object.values(byKey);
   });
 
+  // Quantities: supplier quotes don't store qty, so take it from the job's own part rows (by SKU, else name)
+  groups.forEach(g=>g.items.forEach(it=>{
+    const sku=(it.sku||"").trim().toLowerCase();
+    const ji=jobItems.find(j=>j.type!=="labour"&&(sku&&(j.part_sku||"").trim().toLowerCase()===sku||(j.description||"").toLowerCase().trim()===it.description.toLowerCase().trim()));
+    if(ji&&+ji.qty>0) it.qty=+ji.qty;
+  }));
+
+  // Compare view: one entry per part, with every supplier's offer side by side
+  const partMap={};
+  groups.forEach(g=>g.items.forEach(it=>{
+    const k=it.description.toLowerCase().trim();
+    if(!partMap[k]) partMap[k]={key:k,description:it.description,qty:it.qty,options:[]};
+    partMap[k].options.push({...it,supplierName:g.supplierName});
+  }));
+  const compareParts=Object.values(partMap);
+  const [view,setView]=useState("compare"); // "compare" | "supplier"
+
+  // Default: only the CHEAPEST usable offer of each part is ticked (not every supplier's line)
   const [selected,setSelected]=useState(()=>{
     const init={};
-    groups.forEach(g=>g.items.forEach(it=>{ init[it.id]=true; }));
+    compareParts.forEach(p=>{
+      p.options.forEach(o=>{ init[o.id]=false; });
+      const best=p.options.filter(usable).sort((a,b)=>+a.unit_price-+b.unit_price)[0];
+      if(best) init[best.id]=true;
+    });
     return init;
+  });
+  const pickOption=(part,id)=>setSelected(prev=>{
+    const n={...prev}; part.options.forEach(o=>{ n[o.id]=false; }); if(id) n[id]=true; return n;
   });
   const [saving,setSaving]=useState(false);
   const [createdPos,setCreatedPos]=useState(null); // null | [{poId,group,supplier}]
 
   const toggle=(id)=>setSelected(p=>({...p,[id]:!p[id]}));
   const toggleGroup=(g)=>{
-    const allOn=g.items.every(it=>selected[it.id]);
-    setSelected(p=>{const n={...p}; g.items.forEach(it=>{n[it.id]=!allOn;}); return n;});
+    const ok=g.items.filter(usable); const allOn=ok.every(it=>selected[it.id]);
+    setSelected(p=>{const n={...p}; ok.forEach(it=>{n[it.id]=!allOn;}); return n;});
   };
 
   const totalSelected=groups.reduce((s,g)=>s+g.items.filter(it=>selected[it.id]).reduce((ss,it)=>ss+(+it.qty||0)*(+it.unit_price||0),0),0);
@@ -201,7 +229,56 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
             <div style={{fontWeight:600}}>No supplier quotes for this job yet</div>
             <div style={{fontSize:12,marginTop:4}}>Send Quote to a supplier first, then come back here to place the order.</div>
           </div>
-        :<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+        :<>
+        <div style={{display:"flex",gap:6,marginBottom:12}}>
+          {[["compare","⚖️ Compare by part"],["supplier","🏪 By supplier"]].map(([k,label])=>(
+            <button key={k} className={`btn btn-sm ${view===k?"btn-primary":"btn-ghost"}`} style={{flex:1}} onClick={()=>setView(k)}>{label}</button>
+          ))}
+        </div>
+        {view==="compare"?(
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
+            <div style={{fontSize:11,color:"var(--text3)"}}>Pick one supplier for each part — the cheapest is ticked for you. Prices include VAT. Orders are created per supplier.</div>
+            {compareParts.map(p=>{
+              const priced=p.options.filter(usable);
+              const cheapest=priced.length?Math.min(...priced.map(o=>+o.unit_price)):0;
+              const pickedCount=p.options.filter(o=>selected[o.id]).length;
+              return (
+                <div key={p.key} className="card" style={{padding:"10px 12px",border:`1px solid ${pickedCount>1?"var(--yellow)":"var(--border)"}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:8,marginBottom:6}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{p.description}</div>
+                    <div style={{fontSize:12,color:"var(--text2)",fontWeight:700,flexShrink:0}}>Qty {p.qty}</div>
+                  </div>
+                  {pickedCount>1&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:4}}>⚠️ Ticked from {pickedCount} suppliers — this part would be ordered more than once</div>}
+                  {p.options.map(o=>{
+                    const ok=usable(o);
+                    const diff=ok?(+o.unit_price-cheapest):0;
+                    const isBest=ok&&priced.length>1&&diff<0.005;
+                    return (
+                      <label key={o.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 8px",marginTop:4,borderRadius:8,cursor:ok?"pointer":"not-allowed",opacity:ok?1:.5,
+                        background:selected[o.id]?"rgba(52,211,153,.12)":"var(--surface2)",border:`1px solid ${selected[o.id]?"var(--green)":"transparent"}`}}>
+                        <input type="radio" checked={!!selected[o.id]} disabled={!ok} onChange={()=>pickOption(p,o.id)} style={{flexShrink:0}}/>
+                        <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:600}}>{o.supplierName}
+                          {o.condition==="to_order"&&<span style={{marginLeft:6,fontSize:10,color:"#fbbf24"}}>📦 To order</span>}
+                        </span>
+                        {ok?(<>
+                          {isBest&&<span style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.15)",borderRadius:99,padding:"1px 8px"}}>Cheapest</span>}
+                          {!isBest&&diff>0.005&&priced.length>1&&<span style={{fontSize:11,color:"var(--red)"}}>+{C}{diff.toFixed(2)}</span>}
+                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:14,color:"var(--accent)",textAlign:"right",minWidth:78}}>
+                            {C}{(+o.unit_price).toFixed(2)}{p.qty>1&&<div style={{fontSize:10,fontWeight:600,color:"var(--text3)"}}>= {C}{(+o.unit_price*p.qty).toFixed(2)}</div>}
+                          </span>
+                        </>):<span style={{fontSize:11,fontWeight:700,color:"var(--red)"}}>{o.noStock?"🚫 No stock":"No price"}</span>}
+                      </label>
+                    );
+                  })}
+                  <label style={{display:"flex",alignItems:"center",gap:10,padding:"5px 8px",marginTop:4,cursor:"pointer",fontSize:12,color:"var(--text3)"}}>
+                    <input type="radio" checked={pickedCount===0} onChange={()=>pickOption(p,null)}/> Don't order this part now
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        ):(
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14}}>
           {groups.map(g=>{
             const groupChecked=g.items.filter(it=>selected[it.id]).length;
             const groupTotal=g.items.filter(it=>selected[it.id]).reduce((s,it)=>s+(+it.qty||0)*(+it.unit_price||0),0);
@@ -219,7 +296,7 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
                 </div>
                 {g.items.map(it=>(
                   <label key={it.id} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"6px 0",borderTop:"1px solid var(--border)",cursor:"pointer"}}>
-                    <input type="checkbox" checked={!!selected[it.id]} onChange={()=>toggle(it.id)} style={{marginTop:2,flexShrink:0}}/>
+                    <input type="checkbox" checked={!!selected[it.id]} disabled={!!it.noStock} onChange={()=>toggle(it.id)} style={{marginTop:2,flexShrink:0}}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:13}}>{it.description}
                         {it.sku&&<span style={{fontSize:10,color:"var(--text3)",fontFamily:"monospace",marginLeft:6}}>{it.sku}</span>}
@@ -228,6 +305,7 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
                         Qty: {it.qty}
                         {+it.unit_price>0&&<span style={{marginLeft:8,color:"var(--text2)"}}>@ {C}{(+it.unit_price).toFixed(2)}</span>}
                         {it.condition==="to_order"&&<span style={{marginLeft:8,color:"#fbbf24"}}>📦 To Order</span>}
+                        {it.noStock&&<span style={{marginLeft:8,color:"var(--red)",fontWeight:700}}>🚫 No stock</span>}
                       </div>
                     </div>
                     {+it.unit_price>0&&<div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:13,color:"var(--accent)",flexShrink:0}}>{C}{((+it.qty||0)*(+it.unit_price||0)).toFixed(2)}</div>}
@@ -237,14 +315,34 @@ export function WsCreatePoFromJobModal({job,wsSupplierQuotes=[],wsSupplierReques
             );
           })}
         </div>
+        )}
+        </>
       }
 
-      {groups.length>0&&(
-        <div style={{padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontSize:13,color:"var(--text2)"}}>{countSelected} item{countSelected!==1?"s":""} selected</span>
-          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:15,color:"var(--accent)"}}>{C}{totalSelected.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
-        </div>
-      )}
+      {groups.length>0&&(()=>{
+        // What the current ticks cost, per supplier, and how much the picks save vs the dearest offer
+        const perSupplier={};
+        groups.forEach(g=>g.items.filter(it=>selected[it.id]).forEach(it=>{
+          perSupplier[g.supplierName]=(perSupplier[g.supplierName]||0)+(+it.qty||0)*(+it.unit_price||0);
+        }));
+        const saving=compareParts.reduce((s,p)=>{
+          const picked=p.options.find(o=>selected[o.id]&&usable(o));
+          const prices=p.options.filter(usable).map(o=>+o.unit_price);
+          return picked&&prices.length>1?s+(Math.max(...prices)-+picked.unit_price)*(+p.qty||1):s;
+        },0);
+        return (
+          <div style={{padding:"8px 12px",background:"var(--surface2)",borderRadius:8,marginBottom:14}}>
+            {Object.entries(perSupplier).map(([n,v])=>(
+              <div key={n} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text2)"}}><span>🏪 {n}</span><span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700}}>{C}{v.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:Object.keys(perSupplier).length?6:0,paddingTop:Object.keys(perSupplier).length?6:0,borderTop:Object.keys(perSupplier).length?"1px solid var(--border)":"none"}}>
+              <span style={{fontSize:13,color:"var(--text2)"}}>{countSelected} item{countSelected!==1?"s":""} selected</span>
+              <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:15,color:"var(--accent)"}}>{C}{totalSelected.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+            </div>
+            {saving>0.005&&<div style={{fontSize:11,color:"var(--green)",textAlign:"right",marginTop:3}}>💡 Saves {C}{saving.toFixed(2)} vs the most expensive quotes</div>}
+          </div>
+        );
+      })()}
 
       <div style={{display:"flex",gap:8}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>

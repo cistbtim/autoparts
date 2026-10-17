@@ -405,8 +405,9 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
-  const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
-  const total    = subtotal + taxAmt;
+  const discount = Math.min(subtotal, Math.max(0, +invoice?.discount_amount||0)); // set when converted from a discounted quote
+  const taxAmt   = settings.vat_number ? (subtotal-discount)*(settings.tax_rate||0)/100 : 0;
+  const total    = subtotal - discount + taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
   const logoSrc = settings.logo_data || settings.logo_url || "";
   const logoHtml = logoSrc ? `<img src="${logoSrc}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-bottom:8px"/>` : "";
@@ -553,6 +554,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
 
   <div class="totals">
     <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+    ${discount>0?`<div class="t-row" style="color:#b91c1c"><span>Discount</span><span>- ${fmt(discount)}</span></div>`:""}
     ${settings.vat_number&&(settings.tax_rate||0)>0?`<div class="t-row"><span>VAT (${settings.tax_rate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
     <div class="t-total"><span>TOTAL</span><span>${fmt(total)}</span></div>
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}
@@ -592,8 +594,9 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   const C = curSym(settings.currency||getSettings().currency);
   const fmt = v => `${C} ${(+v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   const subtotal = items.reduce((s,i)=>s+(+i.total||0),0);
-  const taxAmt   = settings.vat_number ? subtotal*(settings.tax_rate||0)/100 : 0;
-  const total    = subtotal+taxAmt;
+  const discount = Math.min(subtotal, Math.max(0, +quote.discount_amount||0));
+  const taxAmt   = settings.vat_number ? (subtotal-discount)*(settings.tax_rate||0)/100 : 0;
+  const total    = subtotal-discount+taxAmt;
   const shopName = settings.shop_name||"Auto Workshop";
   const phone = quote.quote_phone||job.customer_phone||"";
   const waMsg = `📝 *Workshop Quotation ${quote.id}*\n👤 ${quote.quote_customer||job.customer_name||""}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${dispModel||""}`:""}\n💰 Total: ${fmt(total)}\n\nPlease find the attached PDF quotation and confirm to proceed.\n\n${shopName}${settings.phone?`\n📞 ${settings.phone}`:""}`;
@@ -758,6 +761,7 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
 
   <div class="totals">
     <div class="t-row"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+    ${discount>0?`<div class="t-row" style="color:#b91c1c"><span>Discount</span><span>- ${fmt(discount)}</span></div>`:""}
     ${settings.vat_number&&(settings.tax_rate||0)>0?`<div class="t-row"><span>VAT (${settings.tax_rate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
     <div class="t-total"><span>QUOTED TOTAL</span><span>${fmt(total)}</span></div>
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}

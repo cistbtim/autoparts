@@ -691,8 +691,9 @@ export function QuoteConfirmPage({token}) {
     if(!quote) return;
     const subtotal=items.reduce((s,i)=>s+(+i.total||0),0);
     const taxRate=bizVat?(shopSettings.tax_rate||0):0;
-    const taxAmt=subtotal*taxRate/100;
-    const total=subtotal+taxAmt;
+    const discount=Math.min(subtotal,Math.max(0,+quote.discount_amount||0));
+    const taxAmt=(subtotal-discount)*taxRate/100;
+    const total=subtotal-discount+taxAmt;
     const logoSrc=bizLogo;
     const logoHtml=logoSrc?`<img src="${logoSrc}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px"/>`:"";
     const partItems=items.filter(i=>i.type==="part");
@@ -797,6 +798,7 @@ export function QuoteConfirmPage({token}) {
 </table>
 <div class="totals">
   <div class="t-row"><span>${t.wsqPdfSubtotal}</span><span>${fmt(subtotal)}</span></div>
+  ${discount>0?`<div class="t-row" style="color:#b91c1c"><span>Discount</span><span>- ${fmt(discount)}</span></div>`:""}
   ${taxRate>0?`<div class="t-row"><span>${t.wsqPdfVat} (${taxRate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
   <div class="t-total"><span>${t.wsqPdfTotal}</span><span>${fmt(total)}</span></div>
 </div>
@@ -918,6 +920,12 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
                     );
                   })()
               }
+              {+quote.discount_amount>0&&(
+                <div style={{padding:"11px 18px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",color:"var(--red)"}}>
+                  <span style={{fontWeight:800,fontSize:14,textTransform:"uppercase",letterSpacing:".03em"}}>🏷️ Discount</span>
+                  <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:18}}>− {fmt(quote.discount_amount)}</span>
+                </div>
+              )}
               <div style={{padding:"16px 18px",borderTop:"3px solid var(--accent)",display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(255,122,46,.1)"}}>
                 <span style={{fontWeight:800,fontSize:16,textTransform:"uppercase",letterSpacing:".05em"}}>Total</span>
                 <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:900,fontSize:28,color:"var(--accent)"}}>{fmt(quote.total)}</span>

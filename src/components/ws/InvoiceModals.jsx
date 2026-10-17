@@ -64,8 +64,14 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],parts=[],w
   const toggleItem=id=>setSelectedIds(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const selItems=items.filter(i=>selectedIds.has(i.id));
   const selSubtotal=selItems.reduce((s,i)=>s+(+i.total||0),0);
-  const selTax=settings.vat_number?selSubtotal*(settings.tax_rate||0)/100:0;
-  const selTotal=selSubtotal+selTax;
+  // Discount at the end of the quote: a Rand amount or a % of the subtotal, taken off BEFORE VAT
+  const [discType,setDiscType]=useState(existing?.discount_type==="percent"?"percent":"amount");
+  const [discVal,setDiscVal]=useState(existing?.discount_value!=null&&+existing.discount_value>0?String(existing.discount_value):"");
+  const discAmt=Math.min(selSubtotal,Math.max(0,+(discType==="percent"?selSubtotal*(+discVal||0)/100:(+discVal||0)).toFixed(2)));
+  const selTax=settings.vat_number?(selSubtotal-discAmt)*(settings.tax_rate||0)/100:0;
+  const selTotal=selSubtotal-discAmt+selTax;
+  // Only send discount fields when there is (or was) a discount, so quotes without one never touch the new columns
+  const discPayload=(discAmt>0||+existing?.discount_amount>0)?{discount_type:discType,discount_value:+discVal||0,discount_amount:discAmt}:{};
   const [f,setF]=useState({
     id:existing?.id||null,
     job_id:job.id,
@@ -165,6 +171,16 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],parts=[],w
         </table>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
           <div style={{fontSize:13,color:"var(--text3)"}}>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selSubtotal)}</strong></div>
+          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"var(--text3)",flexWrap:"wrap",justifyContent:"flex-end"}}>
+            <span>🏷️ Discount:</span>
+            <input className="inp" type="number" min="0" step="0.01" value={discVal} onChange={e=>setDiscVal(e.target.value)} placeholder="0"
+              style={{width:90,textAlign:"right",padding:"3px 8px",fontSize:13,fontWeight:700}}/>
+            <select className="inp" value={discType} onChange={e=>setDiscType(e.target.value)} style={{width:64,padding:"3px 6px",fontSize:13}}>
+              <option value="amount">{C}</option>
+              <option value="percent">%</option>
+            </select>
+            {discAmt>0&&<strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--red)"}}>− {fmt(discAmt)}</strong>}
+          </div>
           {settings.vat_number&&(settings.tax_rate||0)>0&&<div style={{fontSize:13,color:"var(--text3)"}}>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selTax)}</strong></div>}
           <div style={{fontSize:16,fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>Total: {fmt(selTotal)}</div>
         </div>
@@ -198,13 +214,13 @@ export function WsQuoteModal({job,items,existing,settings,vehicles=[],parts=[],w
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
         <button className="btn btn-ghost" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{
           setSaving(true);
-          const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])};
+          const q={...f,subtotal:selSubtotal,tax:selTax,total:selTotal,...discPayload,selected_item_ids:JSON.stringify([...selectedIds])};
           try{ await onSave(q); printWorkshopQuote(job,selItems,q,settings,{},false,vehicles,parts); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>💾 Save &amp; Print</button>
         <button className="btn btn-primary" style={{flex:1}} disabled={saving||selItems.length===0||blockedNoLabour} onClick={async()=>{
           setSaving(true);
-          try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal,selected_item_ids:JSON.stringify([...selectedIds])}); }catch(e){alert(e.message);}
+          try{ await onSave({...f,subtotal:selSubtotal,tax:selTax,total:selTotal,...discPayload,selected_item_ids:JSON.stringify([...selectedIds])}); }catch(e){alert(e.message);}
           finally{setSaving(false);}
         }}>{saving?"Saving...":(existing?"💾 Save":"📝 Create Quote")}</button>
       </div>
@@ -442,8 +458,10 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
   const toggleItem=id=>setSelectedIds(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
   const selItems=items.filter(i=>selectedIds.has(i.id));
   const selSubtotal=selItems.reduce((s,i)=>s+(+i.total||0),0);
-  const selTax=settings.vat_number?selSubtotal*(settings.tax_rate||0)/100:0;
-  const selTotal=selSubtotal+selTax;
+  // Carry a discount over from the quotation this invoice is converted from (before VAT, same as the quote)
+  const invDisc=Math.min(selSubtotal,Math.max(0,+(prefill.discountType==="percent"?selSubtotal*(+prefill.discountValue||0)/100:(+prefill.discountAmount||0)).toFixed(2)));
+  const selTax=settings.vat_number?(selSubtotal-invDisc)*(settings.tax_rate||0)/100:0;
+  const selTotal=selSubtotal-invDisc+selTax;
 
   const handleCreate=async(payNow=false)=>{
     if(selItems.length===0){alert("Select at least one item to invoice.");return;}
@@ -455,6 +473,7 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
         vehicle_reg:job.vehicle_reg||"",
         invoice_date:invDate, due_date:dueDate,
         subtotal:selSubtotal, tax:selTax, total:selTotal, status:"unpaid", notes,
+        ...(invDisc>0?{discount_amount:invDisc}:{}),
       }, payNow);
     }catch(e){ alert("Failed to create invoice: "+e.message); }
     finally{ setSaving(false); }
@@ -519,6 +538,7 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
         </table>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
           <div>Subtotal: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selSubtotal)}</strong></div>
+          {invDisc>0&&<div style={{color:"var(--red)"}}>🏷️ Discount (from quotation): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>− {fmt(invDisc)}</strong></div>}
           {settings.vat_number&&(settings.tax_rate||0)>0&&<div>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selTax)}</strong></div>}
           <div style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>Total: {fmt(selTotal)}</div>
         </div>

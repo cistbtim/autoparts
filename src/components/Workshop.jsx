@@ -8563,7 +8563,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                     const msg=`📋 *Parts Quotation ${quote.id}*\n──────────────────\n`+
                       `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
                       `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
-                      `*Parts:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
+                      `*Parts:*\n${lines}\n\n${+quote.discount_amount>0?`🏷️ Discount: -${fmt(quote.discount_amount)}\n`:""}💰 *Total: ${fmt(quote.total)}*\n\n`+
                       `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
                     window.open(waLink(phone,msg),"_blank");
                     markQuoteSent();
@@ -8572,7 +8572,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                     const subj=`Parts Quotation ${quote.id} — ${name}`;
                     const body=`Dear ${name},\n\nPlease find your parts quotation below.\n\n`+
                       `Quotation: ${quote.id}\nDate: ${quote.quote_date}${quote.valid_until?`\nValid Until: ${quote.valid_until}`:""}\n`+
-                      `Vehicle: ${job.vehicle_reg||""}\n\nParts:\n${lines}\n\nTotal: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n${settings.shop_name||"Workshop"}`;
+                      `Vehicle: ${job.vehicle_reg||""}\n\nParts:\n${lines}\n\n${+quote.discount_amount>0?`Discount: -${fmt(quote.discount_amount)}\n`:""}Total: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n${settings.shop_name||"Workshop"}`;
                     window.location.href=`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
                   }
                 }}>📤 Send Customer Quotation</button>
@@ -8593,7 +8593,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 const msg=`📝 *Workshop Quotation ${quote.id}*\n──────────────────\n`+
                   `👤 ${name}\n🚗 ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n`+
                   `📅 Date: ${quote.quote_date}${quote.valid_until?`\n⏳ Valid Until: ${quote.valid_until}`:""}\n\n`+
-                  `*Items:*\n${lines}\n\n💰 *Total: ${fmt(quote.total)}*\n\n`+
+                  `*Items:*\n${lines}\n\n${+quote.discount_amount>0?`🏷️ Discount: -${fmt(quote.discount_amount)}\n`:""}💰 *Total: ${fmt(quote.total)}*\n\n`+
                   `Please confirm to proceed.\n\n${settings.shop_name||"Workshop"}${settings.phone?`\n📞 ${settings.phone}`:""}`;
                 window.open(waLink(phone,msg),"_blank");
                 markQuoteSent();
@@ -8610,7 +8610,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 const body=`Dear ${name},\n\nPlease find your workshop quotation below.\n\n`+
                   `Quotation: ${quote.id}\nDate: ${quote.quote_date}${quote.valid_until?`\nValid Until: ${quote.valid_until}`:""}\n`+
                   `Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n\n`+
-                  `Items:\n${lines}\n\nTotal: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n`+
+                  `Items:\n${lines}\n\n${+quote.discount_amount>0?`Discount: -${fmt(quote.discount_amount)}\n`:""}Total: ${fmt(quote.total)}\n\nPlease confirm to proceed.\n\n`+
                   `${settings.shop_name||"Workshop"}${settings.phone?`\nPhone: ${settings.phone}`:""}`;
                 markQuoteSent();
                 window.location.href=`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
@@ -9360,6 +9360,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             invPhone: quoteSrcForInv.quote_phone||"",
             invEmail: quoteSrcForInv.quote_email||"",
             dueDate:  quoteSrcForInv.valid_until||"",
+            discountType:quoteSrcForInv.discount_type, discountValue:quoteSrcForInv.discount_value, discountAmount:quoteSrcForInv.discount_amount,
             notes:    `Converted from Quote ${quoteSrcForInv.id}${quoteSrcForInv.notes?"\n"+quoteSrcForInv.notes:""}`,
           } : {}}
           onSave={async(inv, payNow=false)=>{

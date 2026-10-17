@@ -3485,7 +3485,7 @@ function WorkGroupsModal({items, onApply, onClose}) {
 // ═══════════════════════════════════════════════════════════════
 // SUPPLIER QUOTE MODAL — enter prices received from a supplier
 // ═══════════════════════════════════════════════════════════════
-function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, jobItems=null, onSave, onClose}) {
+function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=false, jobItems=null, onSave, onDelete=null, onClose}) {
   const vatRate = +(settings?.tax_rate||0) / 100;
   const parts = (() => { try { return JSON.parse(request.parts_list||"[]"); } catch { return []; } })();
   // Build name→sku map from items_json (present on generated-link and new manual-send requests)
@@ -3527,6 +3527,8 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
   const [saving,    setSaving]    = useState(false);
   const [showOcr,   setShowOcr]   = useState(false);
   const [showPaste, setShowPaste] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleting,   setDeleting]   = useState(false);
 
   const onOcrApply = (mapped) => {
     setPrices(prev => {
@@ -3689,6 +3691,27 @@ function SupplierQuoteModal({request, existingQuote, settings={}, priceOnly=fals
         {!priceOnly&&<FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="ETA, conditions…"/></FD>}
       </div>
 
+      {onDelete&&(
+        <div style={{marginTop:4,marginBottom:10}}>
+          {!confirmDel?(
+            <button type="button" className="btn btn-ghost btn-sm" style={{color:"var(--red)",width:"100%"}} onClick={()=>setConfirmDel(true)}>
+              🗑️ Delete this inquiry &amp; reply
+            </button>
+          ):(
+            <div style={{border:"1px solid var(--red)",borderRadius:10,padding:"10px 12px",background:"rgba(248,113,113,.08)"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"var(--red)",marginBottom:4}}>Delete the inquiry to {request.supplier_name||"this supplier"} and all prices saved on it?</div>
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>Costs already applied to the job's parts stay as they are. This cannot be undone.</div>
+              <div style={{display:"flex",gap:8}}>
+                <button type="button" className="btn btn-ghost btn-sm" style={{flex:1}} disabled={deleting} onClick={()=>setConfirmDel(false)}>Keep it</button>
+                <button type="button" className="btn btn-sm" style={{flex:1,background:"var(--red)",color:"#fff",border:"none",fontWeight:700}} disabled={deleting}
+                  onClick={async()=>{ setDeleting(true); try{ await onDelete(); }catch(e){ setDeleting(false); setConfirmDel(false); alert("Delete failed: "+e.message); } }}>
+                  {deleting?"Deleting…":"Yes, delete"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div style={{display:"flex",gap:10,marginTop:4,flexWrap:"wrap"}}>
         <button className="btn btn-ghost" style={{flex:1,minWidth:90}} onClick={onClose}>Cancel</button>
         <button className="btn btn-ghost" style={{flex:1,minWidth:110}} onClick={()=>setShowOcr(true)} title="Read prices from a screenshot">
@@ -8987,6 +9010,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           existingQuote={returnQuoteTarget.existingQuote}
           priceOnly
           jobItems={items}
+          onDelete={onDeleteWsSupplierRequest&&wsRole!=="mechanic"&&!wsLocked?async()=>{ await onDeleteWsSupplierRequest(returnQuoteTarget.request.id); setReturnQuoteTarget(null); }:null}
           settings={settings}
           onSave={async(d)=>{ if(onSaveWsSupplierQuote) await onSaveWsSupplierQuote(d); setReturnQuoteTarget(null); setReturnQuoteOpen(false); }}
           onClose={()=>setReturnQuoteTarget(null)}/>

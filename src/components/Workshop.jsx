@@ -7551,7 +7551,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               const key = (l.name||"").toLowerCase().trim();
               if (!supCostMap[key]) supCostMap[key] = [];
               const displayPrice = +(l.vat_incl_price||l.price)||0;
-              if (displayPrice > 0) supCostMap[key].push({name: sq.supplier_name||"Supplier", price: displayPrice});
+              if (displayPrice > 0) supCostMap[key].push({name: sq.supplier_name||"Supplier", price: displayPrice, reqId: sq.request_id, quoteId: sq.id});
             });
           });
           // Also include prices from digital supplier replies
@@ -7667,9 +7667,24 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                         background:isSel?"rgba(251,191,36,.1)":"var(--surface2)"}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>{sc.name}</div>
+                        {(()=>{ const rq=sc.reqId?wsSupplierRequests.find(r=>r.id===sc.reqId):null; return rq?(
+                          <div style={{fontSize:10,color:"var(--text3)"}}>Inquiry sent {fmtDT(rq.sent_at||rq.created_at)}</div>
+                        ):null; })()}
                         <div style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:18,color:"#f59e0b"}}>
                           {fmtAmt(sc.price)}<span style={{fontSize:11,color:"var(--text3)",marginLeft:4}}>cost</span>
                         </div>
+                        {sc.reqId&&wsRole!=="mechanic"&&!wsLocked&&(
+                          <button type="button" className="btn btn-ghost btn-xs" style={{marginTop:4,fontSize:10}}
+                            title="Open this supplier's reply to correct the price"
+                            onClick={e=>{
+                              e.stopPropagation();
+                              const rq=wsSupplierRequests.find(r=>r.id===sc.reqId);
+                              if(!rq) return;
+                              setPricePopup(null);
+                              setReturnQuoteTarget({request:rq,existingQuote:wsSupplierQuotes.find(q=>q.id===sc.quoteId)||null});
+                              setReturnQuoteOpen(true);
+                            }}>✏️ Edit this reply</button>
+                        )}
                       </div>
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:11,color:"var(--text3)",fontWeight:600}}>+{markup}% = sell</div>
@@ -8903,11 +8918,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       )}
       {/* Return Quote — supplier picker */}
       {returnQuoteOpen&&!returnQuoteTarget&&(()=>{
-        const jobRequests=wsSupplierRequests.filter(r=>r.job_id===job.id);
+        const jobRequests=wsSupplierRequests.filter(r=>r.job_id===job.id).sort((a,b)=>new Date(b.sent_at||b.created_at||0)-new Date(a.sent_at||a.created_at||0));
         return(
           <Overlay onClose={()=>setReturnQuoteOpen(false)}>
             <MHead title="↩️ Return Quote — Select Supplier" onClose={()=>setReturnQuoteOpen(false)}/>
-            <div style={{marginBottom:12,fontSize:13,color:"var(--text3)"}}>Choose which supplier is returning their quote:</div>
+            <div style={{marginBottom:12,fontSize:13,color:"var(--text3)"}}>
+              Each row is one inquiry you sent to a supplier (newest first). Tap a row to enter that supplier's prices, or to correct a reply you already saved.
+            </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {jobRequests.map(r=>{
                 const existing=wsSupplierQuotes.find(q=>q.request_id===r.id);
@@ -8930,7 +8947,24 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                     <span style={{fontSize:22,flexShrink:0}}>📲</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:14}}>{r.supplier_name||r.supplier_phone||"Unknown supplier"}</div>
-                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{fmtDT(r.sent_at||r.created_at)}</div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Sent {fmtDT(r.sent_at||r.created_at)}</div>
+                      {(()=>{
+                        // What this inquiry contains: the parts asked for, and (once replied) how the supplier answered
+                        let asked=[]; try{ asked=JSON.parse(r.parts_list||"[]"); }catch{}
+                        let lines=[]; try{ lines=JSON.parse(existing?.line_items||"[]"); }catch{}
+                        const priced=lines.filter(l=>+l.price>0).length;
+                        const noStock=lines.filter(l=>l.available==="No stock").length;
+                        return (<>
+                          <div style={{fontSize:11,color:"var(--text2)",marginTop:4,lineHeight:1.35,whiteSpace:"normal"}}>
+                            📋 Asked for {asked.length} part{asked.length!==1?"s":""}{asked.length>0?": ":""}{asked.slice(0,4).join(", ")}{asked.length>4?` +${asked.length-4} more`:""}
+                          </div>
+                          {existing&&(
+                            <div style={{fontSize:11,color:"var(--green)",marginTop:2}}>
+                              💰 {priced} priced{noStock>0?` · 🚫 ${noStock} no stock`:""}{+existing.total>0?` · ${fmtAmt(existing.total)}`:""}{existing.quote_ref?` · Ref ${existing.quote_ref}`:""}
+                            </div>
+                          )}
+                        </>);
+                      })()}
                     </div>
                     {existing
                       ? <span style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:6,padding:"3px 8px",flexShrink:0}}>✅ Quoted</span>

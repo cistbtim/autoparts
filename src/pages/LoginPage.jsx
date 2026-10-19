@@ -251,6 +251,8 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
     setLoading(true);setErr("");setExpiredInfo(null);
     const res = await api.fresh("users",`username=eq.${encodeURIComponent(licAgentUser)}&password=eq.${encodeURIComponent(licAgentPass)}&role=eq.licence_agent&select=*`);
     if(Array.isArray(res)&&res.length>0){
+      const accErr=checkAccess(res[0]);
+      if(accErr){setErr(accErr);setExpiredInfo({name:res[0].name,username:res[0].username});setLoading(false);return;}
       logLogin(res[0]);onLogin(res[0]);
     } else setErr(t.wrongPass);
     setLoading(false);

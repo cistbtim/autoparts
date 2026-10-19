@@ -146,9 +146,12 @@ export const getSubInfo = (u) => {
   if (u.role === "branch_warehouse")  return { status: "admin", label: "Branch Warehouse", color: "#84cc16" };
   if (u.role === "branch_picker")     return { status: "admin", label: "Branch Picker",    color: "#f59e0b" };
   if (u.role === "branch_salesman")   return { status: "admin", label: "Branch Salesman",  color: "#ec4899" };
-  if (u.role === "licence_agent")     return { status: "admin", label: "Licence Agent",     color: "#22d3ee" };
+  // Licence agents follow the same active / expiry date / blocked controls as other accounts (admin → Users).
+  // Only an agent with NO status and NO expiry date set stays unlimited, so existing agents are not locked out.
+  if (u.role === "licence_agent" && !u.subscription_status && !u.subscription_expires_at)
+    return { status: "admin", label: "Licence Agent", color: "#22d3ee" };
   if (u.role === "car_sales" || u.role === "carsales_admin") return { status: "admin", label: "Car Sales", color: "#fb923c" };
-  const s = u.subscription_status || "trial";
+  const s = u.subscription_status || (u.role === "licence_agent" && u.subscription_expires_at ? "active" : "trial");
   if (s === "active") {
     if (u.subscription_expires_at) {
       const exp = new Date(u.subscription_expires_at); exp.setHours(23,59,59,999);
@@ -181,7 +184,7 @@ export const canAccess = (u) => {
   if (u.role === "rental") return true;
   if (u.role === "rental_admin") return true;
   if (u.role === "supplier") return true;
-  if (u.role === "licence_agent") return true;
+  if (u.role === "licence_agent") { const st = getSubInfo(u).status; return st !== "expired" && st !== "blocked"; }
   if (u.role === "car_sales") return true;
   if (u.role === "carsales_admin") return true;
   if (u._isCustomer) return true;

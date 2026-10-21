@@ -567,3 +567,26 @@ export function workshopRegUrl(shopName, src = "") {
   const base = `${window.location.origin}${window.location.pathname}`;
   return `${base}?ws_register=${token}${src ? `&src=${src}` : ""}`;
 }
+
+// Work-group sections for printed / customer-facing quotes and invoices (HTML table rows, 4 columns).
+// Each group (items sharing job-item `work_group`) gets a dark-pink header and its own subtotal row;
+// items with no group follow under "Other items". With no groups at all it just returns the
+// ungrouped output, so jobs that never use groups print exactly as before.
+//   rowFn(item, idx) -> <tr> html for one item;  ungroupedFn(list) -> optional custom html for ungrouped items
+export function groupedRowsHtml(items, rowFn, fmt, ungroupedFn) {
+  const grp = i => String(i.work_group || "").trim();
+  const names = [...new Set(items.map(grp).filter(Boolean))];
+  const plain = list => (ungroupedFn ? ungroupedFn(list) : list.map(rowFn).join(""));
+  if (!names.length) return plain(items);
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const sum = l => l.reduce((s, i) => s + (+i.total || 0), 0);
+  const head = (label, n, bg) => `<tr><td colspan="4" style="padding:9px 12px;background:${bg};color:#fff;font-weight:700;font-size:13px;letter-spacing:.02em">${esc(label)} <span style="font-weight:400;opacity:.85;font-size:11px">· ${n} item${n !== 1 ? "s" : ""}</span></td></tr>`;
+  const foot = (label, list, color, bg) => `<tr style="background:${bg}"><td colspan="3" style="padding:8px 12px;border-bottom:2px solid ${color};text-align:right;font-weight:800;font-size:12px;color:${color};text-transform:uppercase;letter-spacing:.03em">${esc(label)} subtotal</td><td style="padding:8px 12px;border-bottom:2px solid ${color};text-align:right;font-weight:800;font-size:14px;color:${color}">${fmt(sum(list))}</td></tr>`;
+  const sections = names.map(n => {
+    const list = items.filter(i => grp(i) === n);
+    return head(n, list.length, "#9d174d") + list.map(rowFn).join("") + foot(n, list, "#9d174d", "#fdf2f8");
+  }).join("");
+  const rest = items.filter(i => !grp(i));
+  if (!rest.length) return sections;
+  return sections + head("Other items", rest.length, "#475569") + plain(rest) + (ungroupedFn ? "" : foot("Other items", rest, "#475569", "#f1f5f9"));
+}

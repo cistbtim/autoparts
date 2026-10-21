@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
-import { toImgUrl, waLink, makeId, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
+import { toImgUrl, waLink, makeId, isChineseVin, CHINACARMART_URL, groupedRowsHtml } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
@@ -696,10 +696,6 @@ export function QuoteConfirmPage({token}) {
     const total=subtotal-discount+taxAmt;
     const logoSrc=bizLogo;
     const logoHtml=logoSrc?`<img src="${logoSrc}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px"/>`:"";
-    const partItems=items.filter(i=>i.type==="part");
-    const labourItems=items.filter(i=>i.type!=="part");
-    const partsSubtotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
-    const labourSubtotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
     const itemRow=(it,i)=>`
       <tr style="background:${i%2===0?"#fff":"#f9f9f9"}">
         <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
@@ -717,11 +713,16 @@ export function QuoteConfirmPage({token}) {
         <td colspan="3" style="padding:10px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:800;font-size:13px;color:#1d4ed8;text-transform:uppercase;letter-spacing:.03em">${label}</td>
         <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:800;font-size:15px;color:#1d4ed8">${fmt(amt)}</td>
       </tr>`;
-    const rowsHtml=
-      partItems.map(itemRow).join("")+
-      (partItems.length>0?subtotalRowHtml(t.wsqPartsSubtotal,partsSubtotal):"")+
-      labourItems.map(itemRow).join("")+
-      (labourItems.length>0?subtotalRowHtml(t.wsqLabourSubtotal,labourSubtotal):"");
+    // Work groups first (each with its own subtotal); anything ungrouped keeps the Parts / Labour sections
+    const sumOf=l=>l.reduce((s,i)=>s+(+i.total||0),0);
+    const plainRows=list=>{
+      const pI=list.filter(i=>i.type==="part"), lI=list.filter(i=>i.type!=="part");
+      return pI.map(itemRow).join("")+
+        (pI.length>0?subtotalRowHtml(t.wsqPartsSubtotal,sumOf(pI)):"")+
+        lI.map(itemRow).join("")+
+        (lI.length>0?subtotalRowHtml(t.wsqLabourSubtotal,sumOf(lI)):"");
+    };
+    const rowsHtml=groupedRowsHtml(items,itemRow,fmt,plainRows);
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Quotation ${quote.id}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -889,8 +890,12 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
               {items.length===0
                 ? <div style={{padding:16,color:"var(--text3)",fontSize:13,textAlign:"center"}}>{t.wsqNoItems}</div>
                 : (()=>{
-                    const partItems=items.filter(i=>i.type==="part");
-                    const labourItems=items.filter(i=>i.type!=="part");
+                    // Work groups (each with its own subtotal) come first; ungrouped items keep the Parts / Labour sections
+                    const grpOf=i=>String(i.work_group||"").trim();
+                    const groupNames=[...new Set(items.map(grpOf).filter(Boolean))];
+                    const ungrouped=items.filter(i=>!grpOf(i));
+                    const partItems=ungrouped.filter(i=>i.type==="part");
+                    const labourItems=ungrouped.filter(i=>i.type!=="part");
                     const partsSubtotal=partItems.reduce((s,i)=>s+(+i.total||0),0);
                     const labourSubtotal=labourItems.reduce((s,i)=>s+(+i.total||0),0);
                     const row=(it,i)=>(
@@ -912,6 +917,25 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
                     );
                     return (
                       <>
+                        {groupNames.map(g=>{
+                          const gi=items.filter(i=>grpOf(i)===g);
+                          const gSub=gi.reduce((s,i)=>s+(+i.total||0),0);
+                          return (
+                            <div key={"grp-"+g}>
+                              <div style={{padding:"10px 16px",background:"#9d174d",color:"#fff",fontWeight:700,fontSize:14}}>
+                                {g} <span style={{fontWeight:400,opacity:.85,fontSize:12}}>· {gi.length} item{gi.length!==1?"s":""}</span>
+                              </div>
+                              {gi.map(row)}
+                              <div style={{padding:"11px 16px",borderBottom:"2px solid #9d174d",display:"flex",justifyContent:"space-between",background:"#fdf2f8"}}>
+                                <span style={{fontSize:14,fontWeight:800,color:"#9d174d",textTransform:"uppercase",letterSpacing:".03em"}}>{g} subtotal</span>
+                                <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:17,fontWeight:800,color:"#9d174d"}}>{fmt(gSub)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {groupNames.length>0&&ungrouped.length>0&&(
+                          <div style={{padding:"10px 16px",background:"#475569",color:"#fff",fontWeight:700,fontSize:14}}>Other items</div>
+                        )}
                         {partItems.map(row)}
                         {partItems.length>0&&subtotalRow(t.wsqPartsSubtotal,partsSubtotal)}
                         {labourItems.map(row)}

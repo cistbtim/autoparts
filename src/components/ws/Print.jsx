@@ -1,5 +1,5 @@
 import { getSettings, curSym } from "../../lib/settings.js";
-import { toImgUrl, waLink } from "../../lib/helpers.js";
+import { toImgUrl, waLink, groupedRowsHtml } from "../../lib/helpers.js";
 
 // job.vehicle_model is often stored as the catalog code (e.g. "VV42B") rather
 // than the human-readable model name — resolve the display name from the
@@ -436,7 +436,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   const invDate  = invoice?.invoice_date||new Date().toISOString().slice(0,10);
   const status   = invoice?.status||"unpaid";
 
-  const rowsHtml = items.map((i,idx)=>`
+  const rowsHtml = groupedRowsHtml(items,(i,idx)=>`
     <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5">
         <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${i.type==="part"?"#dbeafe":"#dcfce7"};color:${i.type==="part"?"#1d4ed8":"#166534"};margin-right:6px">${i.type==="part"?"PART":"LABOUR"}</span>
@@ -445,7 +445,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
-    </tr>`).join("");
+    </tr>`,fmt);
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Workshop Invoice ${invId}</title>
@@ -636,7 +636,7 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
 
   const attrEsc = s => String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;");
 
-  const rowsHtml = sortedItems.map((i,idx)=>{
+  const quoteRow = (i,idx)=>{
     const thumb = photoFor(i);
     const thumbHref = attrEsc(thumb);
     return `
@@ -654,7 +654,8 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${i.qty}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right">${fmt(i.unit_price)}</td>
       <td style="padding:9px 12px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700">${fmt(i.total)}</td>
-    </tr>`;}).join("");
+    </tr>`;};
+  const rowsHtml = groupedRowsHtml(sortedItems,quoteRow,fmt);
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Quotation ${quote.id}</title>

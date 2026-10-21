@@ -4759,6 +4759,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       setGrpOv(o=>{ const n={...o}; changes.forEach(c=>{ if(prev[c.id]===undefined) delete n[c.id]; else n[c.id]=prev[c.id]; }); return n; });
       throw new Error("Could not save the group — run the work_group SQL in Supabase first. ("+(bad.message||bad.code)+")");
     }
+    // Refresh the job items in the background so printing / sending the quote right away uses the new groups
+    try{ onRefresh&&onRefresh(); }catch{ /* non-critical */ }
   };
   const [wsShopReqModal, setWsShopReqModal] = useState(false);
   const [wsShopPartView, setWsShopPartView] = useState(null); // spare shop part info popup

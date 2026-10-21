@@ -547,6 +547,8 @@ export function RfqBatchReplyPage({token}) {
 export function QuoteConfirmPage({token}) {
   const [quote,setQuote]=useState(null);
   const [job,setJob]=useState(null);
+  const [vehPhotos,setVehPhotos]=useState([]); // [{url,label}] — every angle on the workshop vehicle record
+  const [photoView,setPhotoView]=useState(null); // index into vehPhotos for the lightbox
   const [items,setItems]=useState([]);
   const [shopSettings,setShopSettings]=useState({});
   const [wsProfile,setWsProfile]=useState({});
@@ -590,6 +592,19 @@ export function QuoteConfirmPage({token}) {
           : allItems;
         setItems(shownItems);
         if(Array.isArray(jj)&&jj[0]) setJob(jj[0]);
+        // Vehicle photos (all angles) so the customer can see which car the quote is for
+        if(Array.isArray(jj)&&jj[0]?.workshop_vehicle_id){
+          api.get("workshop_vehicles",`id=eq.${encodeURIComponent(jj[0].workshop_vehicle_id)}&select=*`).then(vr=>{
+            const v=Array.isArray(vr)&&vr[0]?vr[0]:null;
+            if(!v) return;
+            setVehPhotos([
+              {url:v.photo_front,label:"Front"},{url:v.photo_front_left,label:"Front-Left"},{url:v.photo_front_right,label:"Front-Right"},
+              {url:v.photo_left,label:"Left"},{url:v.photo_right,label:"Right"},
+              {url:v.photo_rear,label:"Rear"},{url:v.photo_rear_left,label:"Rear-Left"},{url:v.photo_rear_right,label:"Rear-Right"},
+              {url:v.photo_side,label:"Side"},
+            ].filter(p=>p.url));
+          }).catch(()=>{});
+        }
         // Build workshop info: denormalized quote fields for text, profile fetch for logo
         const prof=Array.isArray(wp)&&wp[0]?wp[0]:null;
         setWsProfile({
@@ -788,6 +803,7 @@ export function QuoteConfirmPage({token}) {
     </div>
   </div>
 </div>
+${vehPhotos.length?`<div style="display:flex;flex-wrap:nowrap;gap:6px;margin-bottom:20px">${vehPhotos.map(p=>`<div style="flex:1 1 0;min-width:0"><img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/><div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase">${p.label}</div></div>`).join("")}</div>`:""}
 <table>
   <thead><tr>
     <th>${t.wsqPdfDescription}</th>
@@ -883,6 +899,23 @@ ${quote.notes?`<div class="notes-box"><strong>${t.wsqPdfNotes}:</strong> ${quote
                 {quote.quote_customer&&<span className="badge" style={{background:"var(--surface2)"}}>👤 {quote.quote_customer}</span>}
               </div>
             </div>
+
+            {/* Vehicle photos — one sideways strip, tap a photo to enlarge */}
+            {vehPhotos.length>0&&(
+              <div className="card" style={{padding:"10px 12px",marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:8}}>📸 {t.wsqPdfVehicle}</div>
+                <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+                  {vehPhotos.map((p,i)=>(
+                    <div key={p.label} onClick={()=>setPhotoView(i)} style={{flex:"0 0 112px",cursor:"pointer"}}>
+                      <img src={toImgUrl(p.url)} alt={p.label} referrerPolicy="no-referrer"
+                        style={{width:"100%",height:76,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)",display:"block"}}/>
+                      <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:3,fontWeight:600}}>{p.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {photoView!==null&&<ImgLightbox urls={vehPhotos.map(p=>toImgUrl(p.url))} labels={vehPhotos.map(p=>p.label)} startIdx={photoView} onClose={()=>setPhotoView(null)}/>}
 
             {/* Line items */}
             <div className="card" style={{padding:0,marginBottom:14,overflow:"hidden"}}>

@@ -423,11 +423,11 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
     {url:photos.side,label:"Side"},
   ].filter(p=>p.url);
   const photosBlock = photoList.length ? `
-    <div style="width:190px;flex-shrink:0">
+    <div style="width:100%;flex-basis:100%">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-      ${photoList.map(p=>`<div style="width:88px;margin-bottom:2px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+      <div style="display:flex;flex-wrap:nowrap;gap:6px">
+      ${photoList.map(p=>`<div style="flex:1 1 0;min-width:0;margin-bottom:2px">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
       </div>
@@ -500,7 +500,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
     </div>
   </div>
 
-  <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px">
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-bottom:20px">
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
         <div class="card-label">👤 Customer</div>
@@ -614,11 +614,11 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
     {url:photos.side,label:"Side"},
   ].filter(p=>p.url);
   const photosBlock = photoList.length ? `
-    <div style="width:190px;flex-shrink:0">
+    <div style="width:100%;flex-basis:100%">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-      ${photoList.map(p=>`<div style="width:88px;margin-bottom:2px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+      <div style="display:flex;flex-wrap:nowrap;gap:6px">
+      ${photoList.map(p=>`<div style="flex:1 1 0;min-width:0;margin-bottom:2px">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
       </div>
@@ -718,7 +718,7 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
     </div>
   </div>
 
-  <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px">
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-bottom:20px">
     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
         <div class="card-label">👤 Customer</div>

@@ -12504,7 +12504,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <FD><FL label="Supplier Code (optional)"/><input className="inp" value={supCode} onChange={e=>setSupCode_(e.target.value)} placeholder="e.g. SUP-4567"/></FD>
             <FD><FL label="Number of copies"/><input className="inp" type="number" min="1" max="999" value={copies} onChange={e=>setCopies_(+e.target.value||1)}/></FD>
             <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
-              Size: {wsProfile?.part_label_w||settings?.part_label_w||98}×{wsProfile?.part_label_h||settings?.part_label_h||45}mm
+              Size: 50×50mm or 40×30mm (2 across) — pick in the print window
             </div>
             <div style={{display:"flex",gap:10,marginTop:18}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setPrintLabelPart(null)}>Cancel</button>
@@ -12535,7 +12535,7 @@ function WsSpareShopTab({linkedBranch,linkedBranchId,mainBranchId,settings,onPla
             <FD><FL label="Shelf / Bin Name *"/><input className="inp" value={binName} onChange={e=>setBinName_(e.target.value)} placeholder="e.g. A1-02"/></FD>
             <FD><FL label="Description (optional)"/><input className="inp" value={desc} onChange={e=>setDesc_(e.target.value)} placeholder="e.g. Engine Parts"/></FD>
             <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
-              Size: {wsProfile?.shelf_label_w||settings?.shelf_label_w||70}×{wsProfile?.shelf_label_h||settings?.shelf_label_h||45}mm
+              Size: 50×50mm or 40×30mm (2 across) — pick in the print window
             </div>
             {binName&&<div style={{marginTop:10,background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",padding:10}}>
               <div style={{display:"flex",alignItems:"center",gap:10,border:"2px solid var(--text)",borderRadius:6,overflow:"hidden",background:"#fff"}}>

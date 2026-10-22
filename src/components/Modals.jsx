@@ -366,54 +366,7 @@ export function WorkshopProfilePage({profile,onSave,wsRole="main",wsId,branches=
 
         {wsPTab==="labels"&&(<>
         {/* Label Sizes */}
-        <div>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Sizes</div>
-          <div style={{marginBottom:10}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Job / Workshop label (used on job cards)</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div>
-                <FL label="Width (mm)"/>
-                <input className="inp" type="number" min="50" max="200" step="1"
-                  value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
-              </div>
-              <div>
-                <FL label="Height (mm)"/>
-                <input className="inp" type="number" min="20" max="120" step="1"
-                  value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
-              </div>
-            </div>
-          </div>
-          <div style={{marginBottom:10}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Part / inventory label (spare shop, stock)</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div>
-                <FL label="Width (mm)"/>
-                <input className="inp" type="number" min="20" max="300" step="1"
-                  value={f.part_label_w||98} onChange={e=>s("part_label_w",Number(e.target.value)||98)}/>
-              </div>
-              <div>
-                <FL label="Height (mm)"/>
-                <input className="inp" type="number" min="15" max="200" step="1"
-                  value={f.part_label_h||45} onChange={e=>s("part_label_h",Number(e.target.value)||45)}/>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>Shelf / bin label</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div>
-                <FL label="Width (mm)"/>
-                <input className="inp" type="number" min="20" max="300" step="1"
-                  value={f.shelf_label_w||70} onChange={e=>s("shelf_label_w",Number(e.target.value)||70)}/>
-              </div>
-              <div>
-                <FL label="Height (mm)"/>
-                <input className="inp" type="number" min="15" max="200" step="1"
-                  value={f.shelf_label_h||45} onChange={e=>s("shelf_label_h",Number(e.target.value)||45)}/>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div style={{fontSize:12,color:"var(--text3)"}}>🏷️ Labels (part, shelf/bin, job, scrapyard) are all printed at <b>50×50mm</b> or <b>40×30mm (2 across)</b>. Choose the size in the print window — it is remembered.</div>
         </>)}
 
         {wsPTab==="agent"&&(<>
@@ -745,25 +698,7 @@ export function ScrapyardProfilePage({profile, onSave}) {
           </div>
         </div>
 
-        {/* Label Size */}
-        <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>🏷️ Label Size</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div>
-              <FL label="Label Width (mm)"/>
-              <input className="inp" type="number" min="50" max="200" step="1"
-                value={f.label_width_mm||98} onChange={e=>s("label_width_mm",Number(e.target.value)||98)}/>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 98 mm</div>
-            </div>
-            <div>
-              <FL label="Label Height (mm)"/>
-              <input className="inp" type="number" min="20" max="120" step="1"
-                value={f.label_height_mm||45} onChange={e=>s("label_height_mm",Number(e.target.value)||45)}/>
-              <div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>Default: 45 mm</div>
-            </div>
-          </div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Used for vehicle labels and stripping parts labels. Standard thermal label: 98 × 45 mm.</div>
-        </div>
+        <div style={{fontSize:12,color:"var(--text3)"}}>🏷️ Labels (part, shelf/bin, job, scrapyard) are all printed at <b>50×50mm</b> or <b>40×30mm (2 across)</b>. Choose the size in the print window — it is remembered.</div>
 
         {/* Spare Shop Mode */}
         <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>
@@ -1893,37 +1828,7 @@ export function SettingsPage({settings,onSave,t,ads=[],adContracts=[],onSaveAd,o
             </FD>
             <button className="btn btn-primary btn-sm" onClick={()=>onSave({max_customer_discount_pct:f.max_customer_discount_pct||0})}>💾 Save Max Discount</button>
           </div>
-          <div className="card" style={{padding:22}}>
-            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>🏷️ Part Label Size</h3>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Size for part/inventory labels (SKU, bin, supplier code, invoice)</div>
-            <FG cols="1fr 1fr">
-              <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.part_label_w||98} onChange={e=>s("part_label_w",+e.target.value)} placeholder="98"/></div>
-              <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.part_label_h||45} onChange={e=>s("part_label_h",+e.target.value)} placeholder="45"/></div>
-            </FG>
-            <div style={{background:"var(--surface2)",borderRadius:8,padding:10,border:"1px solid var(--border)",marginTop:8,display:"inline-flex",alignItems:"center",gap:10}}>
-              <div style={{width:Math.min(+(f.part_label_w||98),180),height:Math.min(+(f.part_label_h||45)*2,90),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.part_label_w||98}×{f.part_label_h||45}mm</span>
-              </div>
-              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (approx)<br/>Default: 98×45mm</div>
-            </div>
-          </div>
-          <div className="card" style={{padding:22}}>
-            <h3 style={{fontSize:14,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:6}}>📋 Shelf Label Size</h3>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>Size for shelf/bin identification labels</div>
-            <FG cols="1fr 1fr">
-              <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.shelf_label_w||70} onChange={e=>s("shelf_label_w",+e.target.value)} placeholder="70"/></div>
-              <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.shelf_label_h||45} onChange={e=>s("shelf_label_h",+e.target.value)} placeholder="45"/></div>
-            </FG>
-            <div style={{background:"var(--surface2)",borderRadius:8,padding:10,border:"1px solid var(--border)",marginTop:8,display:"inline-flex",alignItems:"center",gap:10}}>
-              <div style={{width:Math.min(+(f.shelf_label_w||70),180),height:Math.min(+(f.shelf_label_h||45)*2,90),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
-                <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.shelf_label_w||70}×{f.shelf_label_h||45}mm</span>
-              </div>
-              <div style={{fontSize:12,color:"var(--text3)"}}>Preview (approx)<br/>Default: 70×45mm</div>
-            </div>
-          </div>
-          <div style={{marginTop:4}}>
-            <button className="btn btn-primary btn-sm" onClick={()=>onSave({part_label_w:f.part_label_w||98,part_label_h:f.part_label_h||45,shelf_label_w:f.shelf_label_w||70,shelf_label_h:f.shelf_label_h||45})}>💾 Save Label Sizes</button>
-          </div>
+          <div style={{fontSize:12,color:"var(--text3)"}}>🏷️ Labels (part, shelf/bin, job, scrapyard) are all printed at <b>50×50mm</b> or <b>40×30mm (2 across)</b>. Choose the size in the print window — it is remembered.</div>
         </div>
       )}
 
@@ -9977,36 +9882,7 @@ export function BranchProfilePage({branch,user,onSave,t={}}) {
         <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:14}}>Logo</h3>
         <LogoUploader f={f} s={s}/>
       </div>
-      <div style={{background:"var(--surface)",borderRadius:12,padding:20,marginBottom:20}}>
-        <h3 style={{fontSize:13,fontWeight:700,color:"var(--text2)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>🏷️ Label Sizes</h3>
-        <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>Override the default label sizes for printing from this branch.</div>
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:8}}>Part / inventory label</div>
-          <FG>
-            <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.part_label_w} onChange={e=>s("part_label_w",+e.target.value||98)}/></div>
-            <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.part_label_h} onChange={e=>s("part_label_h",+e.target.value||45)}/></div>
-          </FG>
-          <div style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:10,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
-            <div style={{width:Math.min(f.part_label_w,160),height:Math.min(f.part_label_h*2,80),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
-              <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.part_label_w}×{f.part_label_h}mm</span>
-            </div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>Preview · Default 98×45mm</div>
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:8}}>Shelf / bin label</div>
-          <FG>
-            <div><FL label="Width (mm)"/><input className="inp" type="number" min="20" max="300" value={f.shelf_label_w} onChange={e=>s("shelf_label_w",+e.target.value||70)}/></div>
-            <div><FL label="Height (mm)"/><input className="inp" type="number" min="15" max="200" value={f.shelf_label_h} onChange={e=>s("shelf_label_h",+e.target.value||45)}/></div>
-          </FG>
-          <div style={{marginTop:8,display:"inline-flex",alignItems:"center",gap:10,background:"var(--surface2)",borderRadius:8,padding:"8px 12px",border:"1px solid var(--border)"}}>
-            <div style={{width:Math.min(f.shelf_label_w,160),height:Math.min(f.shelf_label_h*2,80),border:"1px dashed var(--border2)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--surface3)",flexShrink:0}}>
-              <span style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{f.shelf_label_w}×{f.shelf_label_h}mm</span>
-            </div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>Preview · Default 70×45mm</div>
-          </div>
-        </div>
-      </div>
+      <div style={{fontSize:12,color:"var(--text3)"}}>🏷️ Labels (part, shelf/bin, job, scrapyard) are all printed at <b>50×50mm</b> or <b>40×30mm (2 across)</b>. Choose the size in the print window — it is remembered.</div>
       <button className="btn btn-primary" onClick={save} disabled={busy} style={{width:"100%",marginBottom:24}}>
         {busy?"Saving…":"💾 Save Branch Profile"}
       </button>
@@ -10981,7 +10857,7 @@ export function PrintPartLabelModal({part,settings,suppliers=[],onClose}) {
       </FD>
       <FD><FL label="Number of copies"/><input className="inp" type="number" min="1" max="999" value={qty} onChange={e=>setQty(e.target.value)} placeholder="1"/></FD>
       <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
-        Label size: {settings?.part_label_w||98}×{settings?.part_label_h||45}mm · Change in ⚙️ Settings → Inventory
+        Label size: 50×50mm or 40×30mm (2 across) — pick in the print window
       </div>
       <div style={{display:"flex",gap:10,marginTop:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
@@ -11824,7 +11700,7 @@ export function PrintShelfLabelModal({settings,onClose,initialBin=""}) {
       <FD><FL label="Shelf / Bin Name *"/><input className="inp" value={binName} onChange={e=>setBinName(e.target.value)} placeholder="e.g. A1-02"/></FD>
       <FD><FL label="Description (optional)"/><input className="inp" value={description} onChange={e=>setDescription(e.target.value)} placeholder="e.g. Engine Parts"/></FD>
       <div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>
-        Label size: {settings?.shelf_label_w||70}×{settings?.shelf_label_h||45}mm · Change in ⚙️ Settings → Inventory
+        Label size: 50×50mm or 40×30mm (2 across) — pick in the print window
       </div>
       {binName&&(
         <div style={{marginTop:12,background:"var(--surface2)",borderRadius:8,border:"1px solid var(--border)",padding:10}}>

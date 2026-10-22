@@ -279,15 +279,13 @@ export const mailLink = (to, subj, body) => `mailto:${to || ""}?subject=${encode
 //   complaint     (workshop only, truncated)
 //   partName      (scrapyard only)
 //   tags          string[] (scrapyard only — condition, category, location, price)
-//   widthMm       label width  (default 98)
-//   heightMm      label height (default 45)
+//   (label size is chosen in the print window — see LABEL_PRESETS)
 export function openLabelWindow(data) {
   const {
     mode = "workshop", shopName = "", primaryId = "",
     make = "", model = "", dateIn = "", qrData = "",
     reg = "", customerName = "", complaint = "", mechanic = "",
     partName = "", tags = [],
-    widthMm = 98, heightMm = 45,
   } = data;
 
   const e = (s) => String(s || "")
@@ -295,100 +293,157 @@ export function openLabelWindow(data) {
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData || primaryId)}&format=png`;
   const px = (mm) => Math.round(mm * 3.78);
-  const W = px(widthMm);
-  const H = px(heightMm);
-  const qrSz = Math.min(Math.round(H * 0.48), 76);
-  const leftW = qrSz + 18;
 
   const rightHtml = mode === "workshop"
     ? `${reg ? `<div class="vreg">${e(reg)}</div>` : ""}
        <div class="mk">${e(make)}</div>
        <div class="md">${e(model)}</div>
-       ${customerName ? `<div class="inf">&#128100; ${e(customerName)}</div>` : ""}
-       ${mechanic    ? `<div class="inf">&#128296; ${e(mechanic)}</div>` : ""}
+       ${customerName ? `<div class="inf">${e(customerName)}</div>` : ""}
+       ${mechanic    ? `<div class="inf">${e(mechanic)}</div>` : ""}
        ${complaint   ? `<div class="cmp">${e(complaint).slice(0, 90)}</div>` : ""}`
     : `<div class="pn">${e(partName)}</div>
        <div class="mk">${e(make)}</div>
        <div class="md">${e(model)}</div>
        ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${e(t)}</span>`).join("")}</div>` : ""}`;
 
-  const sc = mode === "scrapyard"; // scrapyard gets ×2 on all non-name/date elements
+  const sc = mode === "scrapyard";
 
-  const css = [
-    "*{margin:0;padding:0;box-sizing:border-box}",
-    "body{font-family:Arial,sans-serif;font-weight:bold;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#e5e7eb;gap:14px;padding:20px}",
-    ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}",
-    `.label{width:${W}px;height:${H}px;border:2px solid #111;background:#fff;display:flex;overflow:hidden}`,
-    `.l{width:${leftW}px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px;gap:3px;border-right:1px solid #bbb;background:#f8f8f8}`,
-    `.qr{width:${qrSz}px;height:${qrSz}px}`,
-    ".din{font-size:21px;font-weight:bold;text-align:center;color:#222;line-height:1.2}",
-    ".r{flex:1;padding:5px 8px;display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;overflow:hidden}",
-    // shop name
-    `.sn{font-size:${sc?14:7}px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
-    // primary ID (part # or JOB #)
-    `.pid{font-size:${sc?26:13}px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1}`,
-    // plate number — workshop ×2 = 24px, scrapyard not used
-    `.vreg{font-size:24px;font-weight:900;font-family:monospace;letter-spacing:2px;border:1.5px solid #111;padding:1px 5px;border-radius:3px;display:inline-block;margin:1px 0}`,
-    // make / model
-    `.mk{font-size:${sc?20:10}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
-    `.md{font-size:${sc?20:10}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
-    // part name (scrapyard) — already ×2 at 22px
-    ".pn{font-size:22px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    // customer / mechanic info (workshop)
-    ".inf{font-size:9px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    // complaint — workshop ×3 = 24px
-    ".cmp{font-size:12px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    // tags (scrapyard)
-    ".tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}",
-    `.tag{border:1px solid #666;border-radius:2px;padding:0 4px;font-size:${sc?14:7}px;font-weight:bold}`,
-    `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
-    `@media print{body{background:#fff;padding:0;gap:0;min-height:auto}.print-btn{display:none}.label{border:1.5px solid #000;width:${widthMm - 2}mm;height:${heightMm - 2}mm}}`,
-  ].join("");
+  // Same two label sizes and QR-left / text-right design as the part and shelf labels.
+  const build = (widthMm, heightMm, cols, presetId) => {
+    const H = px(heightMm);
+    const small = widthMm <= 45;
+    const k = small ? 0.62 : 0.8; // font scale versus the old 98mm label
+    const f = (n) => Math.max(6, Math.round(n * k * 10) / 10);
+    const qrSz = small ? Math.round(H * 0.42) : 56;
+    const leftW = qrSz + 8;
+    const lw = (cols * widthMm - 2) / cols;
+    const css = [
+      "*{margin:0;padding:0;box-sizing:border-box}",
+      "body{font-family:Arial,sans-serif;font-weight:bold;display:flex;flex-direction:column;align-items:center;min-height:100vh;background:#e5e7eb;gap:14px;padding:20px}",
+      ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}",
+      SIZE_PICK_CSS,
+      `.label{width:${lw}mm;height:${heightMm-2}mm;border:1.5px solid #000;background:#fff;display:flex;overflow:hidden;flex-shrink:0}`,
+      ".row{display:flex;page-break-after:always}.label+.label{border-left-width:4.5px}",
+      `.l{width:${leftW}px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;gap:2px;border-right:1px solid #bbb;background:#f8f8f8}`,
+      `.qr{width:${qrSz}px;height:${qrSz}px}`,
+      `.din{font-size:${f(21)}px;font-weight:bold;text-align:center;color:#222;line-height:1.2}`,
+      ".r{flex:1;padding:2px 4px;display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;overflow:hidden}",
+      `.sn{font-size:${f(sc?14:9)}px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
+      `.pid{font-size:${f(sc?26:20)}px;font-weight:900;font-family:monospace;letter-spacing:.5px;line-height:1.1;white-space:nowrap;overflow:hidden}`,
+      `.vreg{font-size:${f(24)}px;font-weight:900;font-family:monospace;letter-spacing:1px;border:1.5px solid #111;padding:0 4px;border-radius:3px;display:inline-block;margin:1px 0;align-self:flex-start}`,
+      `.mk,.md{font-size:${f(sc?20:14)}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+      `.pn{font-size:${f(22)}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+      `.inf{font-size:${f(12)}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+      `.cmp{font-size:${f(14)}px;font-weight:bold;color:#333;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+      ".tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}",
+      `.tag{border:1px solid #666;border-radius:2px;padding:0 3px;font-size:${f(sc?14:9)}px;font-weight:bold}`,
+      small ? ".sn,.inf,.cmp{display:none}" : "",
+      `@page{size:${cols * widthMm}mm ${heightMm}mm;margin:1mm}`,
+      "@media print{body{background:#fff;padding:0;gap:0;min-height:auto}.print-btn,.size-pick{display:none}}",
+    ].join("");
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label</title><style>${css}</style></head><body>` +
-    `<button class="print-btn" onclick="window.print()">&#128424; Print / Save PDF</button>` +
-    `<div class="label"><div class="l"><img class="qr" src="${qrUrl}" alt="QR"/><div class="din">${e(dateIn)}</div></div>` +
-    `<div class="r"><div class="sn">${e(shopName)}</div><div class="pid">${e(primaryId)}</div>${rightHtml}</div></div>` +
-    `</body></html>`;
+    const one = `<div class="label"><div class="l"><img class="qr" src="${qrUrl}" alt="QR"/><div class="din">${e(dateIn)}</div></div>` +
+      `<div class="r"><div class="sn">${e(shopName)}</div><div class="pid">${e(primaryId)}</div>${rightHtml}</div></div>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label</title><style>${css}</style></head><body>` +
+      `<button class="print-btn" onclick="window.print()">&#128424; Print / Save PDF</button>` +
+      labelSizePickHtml(presetId) +
+      `<div class="row">${one.repeat(cols)}</div>` +
+      `</body></html>`;
+  };
 
-  const win = window.open("", "_blank", `width=${Math.max(W + 100, 480)},height=${Math.max(H + 130, 300)}`);
+  const first = getLabelPreset();
+  const win = window.open("", "_blank", `width=${Math.max(px(first.w * first.cols) + 100, 480)},height=${Math.max(px(first.h) + 200, 360)}`);
   if (!win) return;
-  win.document.write(html);
+  win.__relabel = (id) => {
+    const p = LABEL_PRESETS.find(x => x.id === id) || first;
+    setLabelPreset(p.id);
+    win.document.open();
+    win.document.write(build(p.w, p.h, p.cols, p.id));
+    win.document.close();
+  };
+  win.document.write(build(first.w, first.h, first.cols, first.id));
   win.document.close();
 }
+
+// ── LABEL SIZES (shared by every label printer) ────────────────
+// The whole app prints on two label stocks only. The choice is picked from a dropdown in the
+// print window and remembered, so part, job/scrapyard and shelf labels all follow it.
+export const LABEL_PRESETS = [
+  { id: "50x50", label: "50×50mm", w: 50, h: 50, cols: 1 },
+  { id: "40x30", label: "40×30mm · 2 across", w: 40, h: 30, cols: 2 },
+];
+export function getLabelPreset() {
+  let id = "";
+  try { id = localStorage.getItem("labelPreset") || ""; } catch { /* storage blocked */ }
+  return LABEL_PRESETS.find(p => p.id === id) || LABEL_PRESETS[0];
+}
+function setLabelPreset(id) {
+  try { localStorage.setItem("labelPreset", id); } catch { /* storage blocked */ }
+}
+function labelSizePickHtml(presetId) {
+  return `<label class="size-pick">Label size <select onchange="window.__relabel(this.value)">${LABEL_PRESETS.map(p => `<option value="${p.id}"${p.id === presetId ? " selected" : ""}>${p.label}</option>`).join("")}</select></label>`;
+}
+const SIZE_PICK_CSS = ".size-pick{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}.size-pick select{font-size:13px;padding:5px 8px}";
 
 // ── PART LABEL PRINTER ─────────────────────────────────────────
 // labels: [{sku, name, binLocation, supplierCode, invoiceNo, seq, total}]
 // Options: widthMm, heightMm, shopName
-export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shopName = "", win = null } = {}) {
+export function openPartLabelsWindow(labels, { shopName = "", win = null } = {}) {
   if (!labels?.length) { win?.close(); return; }
   const e = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const px = (mm) => Math.round(mm * 3.78);
+
+  const presets = LABEL_PRESETS;
+
+  const build = (widthMm, heightMm, cols, presetId) => {
   const W = px(widthMm); const H = px(heightMm);
-  const qrSz = Math.min(Math.round(H * 0.52), 80);
-  const leftW = qrSz + 14;
+  // Small labels: smaller QR and fonts, drop the low-value lines so the SKU stays readable.
+  const small = widthMm <= 45;        // 40×30
+  const square = !small && widthMm <= 60; // 50×50
+  const compact = small || square;
+  // QR is kept small so the text column (the SKU above all) gets the width
+  const qrSz = small ? Math.round(H * 0.42) : square ? 48 : Math.min(Math.round(H * 0.4), 56);
+  const leftW = qrSz + (compact ? 6 : 10);
+  const fs = small
+    ? { sku: 17, pn: 9, fit: 8, oe: 7, bin: 11, sup: 11 }
+    : square
+      ? { sku: 22, pn: 11, fit: 9, oe: 8, bin: 14, sup: 14 }
+      : { sku: 39, pn: 18, fit: 12, oe: 10, bin: 18, sup: 18 };
+  const lw = (cols * widthMm - 2) / cols; // printed label width (mm) so a row fits the page
 
   const css = [
     "*{margin:0;padding:0;box-sizing:border-box}",
     "body{font-family:Arial,sans-serif;font-weight:bold;background:#e5e7eb;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}",
     ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}",
-    `.label{width:${W}px;height:${H}px;border:2px solid #111;background:#fff;display:flex;overflow:hidden;page-break-after:always}`,
-    `.l{width:${leftW}px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;gap:2px;border-right:1px solid #bbb;background:#f8f8f8}`,
+    ".size-pick{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}.size-pick select{font-size:13px;padding:5px 8px}",
+    `.row{display:flex;page-break-after:always}`,
+    // Same mm size on screen as in print, so the auto-fit measured on screen is what prints
+    `.label{width:${lw}mm;height:${heightMm-2}mm;border:1.5px solid #000;background:#fff;display:flex;overflow:hidden;flex-shrink:0}`,
+    `.l{width:${leftW}px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${compact?2:4}px;gap:2px;border-right:1px solid #bbb;background:#f8f8f8}`,
     `.qr{width:${qrSz}px;height:${qrSz}px}`,
-    ".r{flex:1;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;overflow:hidden}",
+    // Divider between two labels on one row: double the normal 3px (two touching 1.5px borders) line
+    ".label+.label{border-left-width:4.5px}",
+    `.r{flex:1;padding:${compact?"2px 4px":"4px 7px"};display:flex;flex-direction:column;justify-content:center;gap:${compact?1:2}px;min-width:0;overflow:hidden}`,
     ".sn{font-size:7px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-    ".sku{font-size:39px;font-weight:900;font-family:monospace;letter-spacing:.8px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
-    ".pn{font-size:18px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}",
-    ".fit{font-size:12px;font-weight:bold;color:#1e40af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    ".oe{font-size:10px;font-weight:bold;font-family:monospace;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-    ".bin{font-size:18px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}",
-    ".bin-blank{height:22px;border:1.5px solid #999;border-radius:3px;background:#fff;margin-top:2px}",
-    ".sup{font-size:18px;font-weight:bold;color:#7c3aed;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    `.sku{font-size:${fs.sku}px;font-weight:900;font-family:monospace;letter-spacing:${compact?0:.8}px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
+    `.pn{font-size:${fs.pn}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}`,
+    // Make / model wraps onto a second line instead of being cut to "…"
+    `.fit{font-size:${fs.fit}px;font-weight:bold;color:#1e40af;line-height:1.15;word-break:break-word}`,
+    `.oe{font-size:${fs.oe}px;font-weight:bold;font-family:monospace;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+    `.bin{font-size:${fs.bin}px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:${compact?0:2}px}`,
+    `.bin-blank{height:${compact?14:22}px;border:1.5px solid #999;border-radius:3px;background:#fff;margin-top:${compact?0:2}px}`,
+    `.sup{font-size:${fs.sup}px;font-weight:bold;color:#7c3aed;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+    // 40×30 is too small for the shop name / fitment / OE / invoice lines — keep SKU, name, bin, supplier
+    small ? ".sn{display:none}" : "",
+    // Small labels: a long SKU wraps onto a second line (font shrinks until it fits 2 lines) instead of shrinking tiny on one
+    compact ? ".sku{white-space:normal;word-break:break-all;max-height:2.2em;text-overflow:clip}" : "",
+    // The 1/2 counter sits centred
+    compact ? ".inv-row{justify-content:center;gap:6px}.invno{display:none}" : "",
     ".inv-row{display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #ccc;margin-top:2px;padding-top:2px}",
     ".invno{font-size:8px;color:#555;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     ".seq{font-size:11px;font-weight:900;color:#059669;font-family:monospace;white-space:nowrap;flex-shrink:0}",
-    `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
-    `@media print{body{background:#fff;padding:0;gap:0}.print-btn{display:none}.label{border:1.5px solid #000;width:${widthMm-2}mm;height:${heightMm-2}mm;page-break-after:always}}`,
+    `@page{size:${cols * widthMm}mm ${heightMm}mm;margin:1mm}`,
+    `@media print{body{background:#fff;padding:0;gap:0}.print-btn,.size-pick{display:none}.label{border:1.5px solid #000;width:${lw}mm;height:${heightMm-2}mm}}`,
   ].join("");
 
   const labelsHtml = labels.map(lbl => {
@@ -400,14 +455,16 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
         <div class="sn">${e(shopName)}</div>
         <div class="sku">${e(lbl.sku||lbl.name)}</div>
         ${lbl.name&&lbl.sku?`<div class="pn">${e(lbl.name)}</div>`:""}
-        ${(lbl.make||lbl.model||lbl.yearRange)?`<div class="fit">🚗 ${e([lbl.make,lbl.model,lbl.yearRange].filter(Boolean).join(" · "))}</div>`:""}
-        ${lbl.oeNumber?`<div class="oe">OE: ${e(lbl.oeNumber)}</div>`:""}
-        ${lbl.binLocation?`<div class="bin">📦 ${e(lbl.binLocation)}</div>`:"<div class=\"bin-blank\"></div>"}
-        ${lbl.supplierCode?`<div class="sup">🏭 ${e(lbl.supplierCode)}</div>`:""}
+        ${(lbl.make||lbl.model||lbl.yearRange)?`<div class="fit">${e([lbl.make,lbl.model,lbl.yearRange].filter(Boolean).join(" · "))}</div>`:""}
+        ${lbl.binLocation?`<div class="bin">${e(lbl.binLocation)}</div>`:"<div class=\"bin-blank\"></div>"}
+        ${lbl.supplierCode?`<div class="sup">${e(lbl.supplierCode)}</div>`:""}
         ${(lbl.invoiceNo||lbl.seq)?`<div class="inv-row"><span class="invno">${lbl.invoiceNo?e(lbl.invoiceNo):""}</span><span class="seq">${lbl.seq?e(lbl.seq):""}</span></div>`:""}
       </div>
     </div>`;
-  }).join("");
+  });
+  // Group into rows of `cols` labels (one printed page per row)
+  const rowsHtml = [];
+  for (let i = 0; i < labelsHtml.length; i += cols) rowsHtml.push(`<div class="row">${labelsHtml.slice(i, i + cols).join("")}</div>`);
 
   // Fixed font sizes (bumped up earlier for readability) truncate with "..." once
   // a SKU/name is too long to fit — shrink each label's own text independently
@@ -438,7 +495,7 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
       function fit(el, minSize){
         if(!el) return minSize;
         var sz = parseFloat(getComputedStyle(el).fontSize);
-        while(sz>minSize && el.scrollWidth>el.clientWidth){
+        while(sz>minSize && (el.scrollWidth>el.clientWidth || el.scrollHeight>el.clientHeight+1)){
           sz -= 0.5;
           el.style.fontSize = sz+'px';
         }
@@ -469,18 +526,38 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
           squeeze(el); // safety net only — shouldn't trigger, every label already fit at >= uniform
         });
       }
-      fitUniform('.sku', 6);
-      fitUniform('.pn', 6);
-      fitUniform('.bin', 7);
-      fitUniform('.sup', 6);
+      var SEL = ['.sku','.pn','.bin','.sup','.oe'];
+      function run(){
+        // Clear any earlier fit first — the print layout is a different size from the
+        // on-screen one, so it must be measured again at print time (otherwise the
+        // SKU that fit on screen gets cut to "…" on the printed label).
+        document.querySelectorAll(SEL.join(',')).forEach(function(el){
+          el.style.transform=''; el.style.overflow=''; el.style.textOverflow=''; el.style.fontSize='';
+        });
+        fitUniform('.sku', 6);
+        fitUniform('.pn', 6);
+        fitUniform('.bin', 7);
+        fitUniform('.sup', 6);
+        fitUniform('.oe', 5);
+      }
+      run();
+      window.addEventListener('beforeprint', run);
+      if(window.matchMedia){ var mq=window.matchMedia('print'); if(mq.addEventListener) mq.addEventListener('change', function(){ run(); }); }
     })();
   `;
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Part Labels</title><style>${css}</style></head><body>
     <button class="print-btn" onclick="window.print()">&#128424; Print ${labels.length} Label${labels.length>1?"s":""}</button>
-    ${labelsHtml}
+    ${labelSizePickHtml(presetId)}
+    ${rowsHtml.join("")}
     <script>${fitScript}<\/script>
   </body></html>`;
+  return html;
+  };
+
+  const first = getLabelPreset();
+  const html = build(first.w, first.h, first.cols, first.id);
+  const W = px(first.w); const H = px(first.h);
 
   // A caller with a long await chain before this point (e.g. saving dozens of
   // line items one at a time) can pass in a window already opened synchronously
@@ -488,67 +565,93 @@ export function openPartLabelsWindow(labels, { widthMm = 98, heightMm = 45, shop
   // freshness, but writing into an already-open window isn't restricted.
   const w = win || window.open("", "_blank", `width=${Math.max(W+100,480)},height=${Math.max(H*3+200,500)}`);
   if (!w) return;
+  // Size dropdown in the print window re-renders the whole page with the chosen preset
+  w.__relabel = (id) => {
+    const p = presets.find(x => x.id === id) || first;
+    setLabelPreset(p.id);
+    w.document.open();
+    w.document.write(build(p.w, p.h, p.cols, p.id));
+    w.document.close();
+  };
   w.document.write(html);
   w.document.close();
 }
 
 // ── SHELF / BIN LABEL PRINTER ──────────────────────────────────
-export function openShelfLabelWindow({ binName, description = "" }, { widthMm = 70, heightMm = 45 } = {}) {
+// Same two label sizes (and same QR-left / text-right design) as every other label.
+export function openShelfLabelWindow({ binName, description = "" } = {}) {
   if (!binName) return;
   const e = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const px = (mm) => Math.round(mm * 3.78);
-  const W = px(widthMm); const H = px(heightMm);
-  const qrSz = Math.min(Math.round(H * 0.55), 72);
-  const leftW = qrSz + 12;
-  const maxFontSize = Math.min(Math.round((H - 12) * 0.7), 72);
-  const descFontSize = Math.min(Math.round(H * 0.12), 13);
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent("#"+binName)}&format=png`;
 
-  const css = [
-    "*{margin:0;padding:0;box-sizing:border-box}",
-    "body{font-family:Arial,sans-serif;background:#e5e7eb;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}",
-    ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}",
-    `.label{width:${W}px;height:${H}px;border:3px solid #111;background:#fff;display:flex;overflow:hidden}`,
-    `.l{width:${leftW}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:5px;border-right:2px solid #111;background:#f8f8f8}`,
-    `.qr{width:${qrSz}px;height:${qrSz}px;display:block}`,
-    `.r{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 8px;overflow:hidden;min-width:0}`,
-    `.bn{font-weight:900;font-family:monospace;letter-spacing:2px;color:#111;text-align:center;line-height:1;white-space:nowrap;display:inline-block}`,
-    `.desc{font-size:${descFontSize}px;font-weight:bold;color:#555;text-align:center;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-transform:uppercase;letter-spacing:.05em}`,
-    `@page{size:${widthMm}mm ${heightMm}mm;margin:1mm}`,
-    `@media print{body{background:#fff;padding:0;gap:0}.print-btn{display:none}.label{border:2px solid #000;width:${widthMm-2}mm;height:${heightMm-2}mm}}`,
-  ].join("");
+  const build = (widthMm, heightMm, cols, presetId) => {
+    const H = px(heightMm);
+    const small = widthMm <= 45;
+    const qrSz = small ? Math.round(H * 0.42) : 48;
+    const leftW = qrSz + 8;
+    const maxFontSize = small ? 26 : 40;
+    const descFontSize = small ? 8 : 10;
+    const lw = (cols * widthMm - 2) / cols;
+    const css = [
+      "*{margin:0;padding:0;box-sizing:border-box}",
+      "body{font-family:Arial,sans-serif;background:#e5e7eb;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}",
+      ".print-btn{padding:9px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px}",
+      SIZE_PICK_CSS,
+      ".row{display:flex;page-break-after:always}",
+      `.label{width:${lw}mm;height:${heightMm-2}mm;border:1.5px solid #000;background:#fff;display:flex;overflow:hidden;flex-shrink:0}`,
+      ".label+.label{border-left-width:4.5px}",
+      `.l{width:${leftW}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:2px;border-right:1px solid #bbb;background:#f8f8f8}`,
+      `.qr{width:${qrSz}px;height:${qrSz}px;display:block}`,
+      ".r{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 4px;overflow:hidden;min-width:0}",
+      ".bn{font-weight:900;font-family:monospace;letter-spacing:1px;color:#111;text-align:center;line-height:1;white-space:nowrap;display:inline-block}",
+      `.desc{font-size:${descFontSize}px;font-weight:bold;color:#555;text-align:center;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-transform:uppercase;letter-spacing:.05em}`,
+      `@page{size:${cols * widthMm}mm ${heightMm}mm;margin:1mm}`,
+      "@media print{body{background:#fff;padding:0;gap:0}.print-btn,.size-pick{display:none}}",
+    ].join("");
 
-  // JS in the popup auto-shrinks the bin name until it fits the right-panel width
-  const fitScript = `
-    (function(){
-      var el=document.querySelector('.bn');
-      var container=document.querySelector('.r');
-      var maxW=container.clientWidth-16;
-      var maxH=container.clientHeight-(${description?descFontSize+10:0});
-      var sz=${maxFontSize};
-      el.style.fontSize=sz+'px';
-      while(sz>8&&(el.scrollWidth>maxW||el.offsetHeight>maxH)){
-        sz--;
-        el.style.fontSize=sz+'px';
-      }
-    })();
-  `;
+    // JS in the popup auto-shrinks the bin name until the whole name fits the text panel
+    const fitScript = `
+      (function(){
+        function run(){
+          document.querySelectorAll('.bn').forEach(function(el){
+            var c=el.parentNode, maxW=c.clientWidth-8;
+            var sz=${maxFontSize};
+            el.style.fontSize=sz+'px';
+            while(sz>6&&el.scrollWidth>maxW){ sz--; el.style.fontSize=sz+'px'; }
+          });
+        }
+        run();
+        window.addEventListener('beforeprint', run);
+      })();
+    `;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Shelf Label</title><style>${css}</style></head><body>
-    <button class="print-btn" onclick="window.print()">&#128424; Print Label</button>
-    <div class="label">
+    const one = `<div class="label">
       <div class="l"><img class="qr" src="${qrUrl}" alt="QR"/></div>
       <div class="r">
         <div class="bn">${e(binName)}</div>
         ${description?`<div class="desc">${e(description)}</div>`:""}
       </div>
-    </div>
+    </div>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Shelf Label</title><style>${css}</style></head><body>
+    <button class="print-btn" onclick="window.print()">&#128424; Print Label</button>
+    ${labelSizePickHtml(presetId)}
+    <div class="row">${one.repeat(cols)}</div>
     <script>${fitScript}<\/script>
   </body></html>`;
+  };
 
-  const win = window.open("", "_blank", `width=${Math.max(W+100,400)},height=${Math.max(H+160,300)}`);
+  const first = getLabelPreset();
+  const win = window.open("", "_blank", `width=${Math.max(px(first.w * first.cols)+100,480)},height=${Math.max(px(first.h)+200,360)}`);
   if (!win) return;
-  win.document.write(html);
+  win.__relabel = (id) => {
+    const p = LABEL_PRESETS.find(x => x.id === id) || first;
+    setLabelPreset(p.id);
+    win.document.open();
+    win.document.write(build(p.w, p.h, p.cols, p.id));
+    win.document.close();
+  };
+  win.document.write(build(first.w, first.h, first.cols, first.id));
   win.document.close();
 }
 

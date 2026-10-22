@@ -3791,6 +3791,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
 }
 
 // ── Vehicle Add/Edit Modal ──
+// Search wording for finding a vehicle's photos. Chassis-code tokens such as "AZG416" (3+ letters then
+// digits) wreck image-search results, so they are dropped; real designators (X3, F25, E90) are kept.
+// The first production year is added so Google shows the right generation.
+const photoShortModel = (model) => String(model||"").split(" ").filter(Boolean)
+  .filter(tok=>!/^[A-Za-z]{3,}[0-9]{2,}[A-Za-z]?$/.test(tok)).join(" ").trim() || String(model||"");
+const photoSearchQuery = (f) => [f.make, photoShortModel(f.model), f.year_from].filter(Boolean).join(" ").trim();
+
 function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nextCodeForMake, wikiForModel}) {
   const isNew = !vehicle.id;
   const [f, setF] = useState({
@@ -3950,13 +3957,16 @@ function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nex
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,margin:"14px 0 8px",paddingBottom:6,borderBottom:"1px solid var(--border)"}}>
         <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em"}}>📸 Vehicle Photos</div>
         {(f.make||f.model)&&(()=>{
-          const q=`${f.make||""} ${f.model||""}`.trim();
+          const q=photoSearchQuery(f);
           return (
-            <div style={{display:"flex",gap:8,fontSize:11}}>
+            <div style={{display:"flex",gap:8,fontSize:11,flexWrap:"wrap"}}>
               <a href={`https://www.google.com/search?q=${encodeURIComponent(q)}&tbm=isch`} target="_blank" rel="noreferrer"
-                style={{color:"var(--blue)",textDecoration:"none",fontWeight:600}}>🔍 Search Google</a>
-              <a href={`https://www.webuycars.co.za/buy-a-car?${new URLSearchParams({q}).toString()}`} target="_blank" rel="noreferrer"
-                style={{color:"var(--green)",textDecoration:"none",fontWeight:600}}>🚗 Search WeBuyCars</a>
+                style={{color:"var(--blue)",textDecoration:"none",fontWeight:600}}>🔍 Google Images</a>
+              <a href={`https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(q)}&ns6=1&ns14=1`} target="_blank" rel="noreferrer"
+                title="Free-to-use photos"
+                style={{color:"#7c3aed",textDecoration:"none",fontWeight:600}}>🖼️ Wikimedia</a>
+              <a href={`https://www.webuycars.co.za/buy-a-car?${new URLSearchParams({q:[f.make,photoShortModel(f.model)].filter(Boolean).join(" ")}).toString()}`} target="_blank" rel="noreferrer"
+                style={{color:"var(--green)",textDecoration:"none",fontWeight:600}}>🚗 WeBuyCars</a>
             </div>
           );
         })()}
@@ -3964,14 +3974,20 @@ function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nex
       {f.id
         ? <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             {[
-              {key:"photo_front", label:"Front"},
-              {key:"photo_rear",  label:"Rear"},
-              {key:"photo_side",  label:"Side"},
-            ].map(({key,label})=>(
-              <VehiclePhotoUploader key={key} label={label} url={f[key]}
-                vehicleId={f.id} make={f.make} viewName={label.toLowerCase()}
-                bucket="cars_parts"
-                onChange={v=>s(key,v)}/>
+              {key:"photo_front", label:"Front", hint:"front view"},
+              {key:"photo_rear",  label:"Rear",  hint:"rear view"},
+              {key:"photo_side",  label:"Side",  hint:"side profile"},
+            ].map(({key,label,hint})=>(
+              <div key={key}>
+                <VehiclePhotoUploader label={label} url={f[key]}
+                  vehicleId={f.id} make={f.make} viewName={label.toLowerCase()}
+                  bucket="cars_parts"
+                  onChange={v=>s(key,v)}/>
+                {(f.make||f.model)&&(
+                  <a href={`https://www.google.com/search?q=${encodeURIComponent(photoSearchQuery(f)+" "+hint)}&tbm=isch`} target="_blank" rel="noreferrer"
+                    style={{display:"block",textAlign:"center",marginTop:4,fontSize:11,fontWeight:600,color:"var(--blue)",textDecoration:"none"}}>🔍 Find {label.toLowerCase()} photo</a>
+                )}
+              </div>
             ))}
           </div>
         : <div style={{textAlign:"center",padding:16,background:"var(--surface2)",borderRadius:10,color:"var(--text3)",fontSize:13}}>

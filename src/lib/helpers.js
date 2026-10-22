@@ -423,6 +423,7 @@ export function openPartLabelsWindow(labels, { shopName = "", win = null } = {})
     `.qr{width:${qrSz}px;height:${qrSz}px}`,
     // Divider between two labels on one row: double the normal 3px (two touching 1.5px borders) line
     ".label+.label{border-left-width:4.5px}",
+    ".label.blank{background:transparent;border-style:dashed;border-color:#999}@media print{.label.blank{border-color:transparent}}",
     `.r{flex:1;padding:${compact?"2px 4px":"4px 7px"};display:flex;flex-direction:column;justify-content:center;gap:${compact?1:2}px;min-width:0;overflow:hidden}`,
     ".sn{font-size:7px;font-weight:bold;text-transform:uppercase;letter-spacing:.07em;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     `.sku{font-size:${fs.sku}px;font-weight:900;font-family:monospace;letter-spacing:${compact?0:.8}px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
@@ -464,7 +465,12 @@ export function openPartLabelsWindow(labels, { shopName = "", win = null } = {})
   });
   // Group into rows of `cols` labels (one printed page per row)
   const rowsHtml = [];
-  for (let i = 0; i < labelsHtml.length; i += cols) rowsHtml.push(`<div class="row">${labelsHtml.slice(i, i + cols).join("")}</div>`);
+  for (let i = 0; i < labelsHtml.length; i += cols) {
+    const cells = labelsHtml.slice(i, i + cols);
+    // Odd count on a 2-across roll: fill the empty slot with a blank label so the row is always full-size and prints correctly
+    while (cells.length < cols) cells.push(`<div class="label blank"></div>`);
+    rowsHtml.push(`<div class="row">${cells.join("")}</div>`);
+  }
 
   // Fixed font sizes (bumped up earlier for readability) truncate with "..." once
   // a SKU/name is too long to fit — shrink each label's own text independently

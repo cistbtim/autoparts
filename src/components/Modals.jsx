@@ -5109,7 +5109,7 @@ export function CheckoutModal({cart,customers,cartTotal,customerDiscountPct=0,ca
   );
 }
 
-export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePortalLogin,onResetPortalPassword}) {
+export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePortalLogin,onCreateSetupLink,shopName="",onResetPortalPassword}) {
   const [f,setF]=useState(supplier?{name:supplier.name,full_name:supplier.full_name||"",address:supplier.address||"",email:supplier.email||"",phone:supplier.phone||"",country:supplier.country||"",contact_person:supplier.contact_person||"",notes:supplier.notes||"",search_url:supplier.search_url||"",account_number:supplier.account_number||"",supplier_origin:supplier.supplier_origin||"",supplier_types:supplier.supplier_types||[],is_catalogue_supplier:!!supplier.is_catalogue_supplier}:{name:"",full_name:"",address:"",email:"",phone:"",country:"",contact_person:"",notes:"",search_url:"",account_number:"",supplier_origin:"",supplier_types:[],is_catalogue_supplier:false});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleType=(tp)=>setF(p=>({...p,supplier_types:p.supplier_types.includes(tp)?p.supplier_types.filter(x=>x!==tp):[...p.supplier_types,tp]}));
@@ -5117,6 +5117,15 @@ export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePort
   const [newLoginPass,setNewLoginPass]=useState("");
   const [showReset,setShowReset]=useState(false);
   const [resetPass,setResetPass]=useState("");
+  const [setupUrl,setSetupUrl]=useState("");
+  const [setupBusy,setSetupBusy]=useState(false);
+  const [copied,setCopied]=useState(false);
+  const makeSetupLink=async()=>{
+    setSetupBusy(true);
+    try{ setSetupUrl(await onCreateSetupLink()||""); }catch{ setSetupUrl(""); }
+    setSetupBusy(false);
+  };
+  const setupMsg=`Hi${f.contact_person?" "+f.contact_person:""}, ${shopName||"we"} set up a supplier portal account for ${f.name}. Please open this link to choose your username and password (valid for 7 days):\n${setupUrl}`;
   return (
     <Overlay onClose={onClose}>
       <MHead title={supplier?"Edit Supplier":"Add Supplier"} onClose={onClose}/>
@@ -5209,6 +5218,27 @@ export function SupplierModal({supplier,onSave,onClose,t,portalUser,onCreatePort
               <div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>
                 Give this supplier their own login to manage their own parts catalogue.
               </div>
+              {onCreateSetupLink&&(
+                <div style={{marginBottom:12,paddingBottom:12,borderBottom:"1px dashed rgba(192,132,252,.3)"}}>
+                  <div style={{fontSize:12,fontWeight:600,marginBottom:6}}>Let the supplier choose their own username &amp; password</div>
+                  {!setupUrl?(
+                    <button className="btn btn-primary btn-sm" disabled={setupBusy} onClick={makeSetupLink}>{setupBusy?"Creating…":"🔗 Create setup link"}</button>
+                  ):(
+                    <div>
+                      <div style={{display:"flex",gap:6,marginBottom:8}}>
+                        <input className="inp" readOnly value={setupUrl} onFocus={e=>e.target.select()} style={{flex:1,fontSize:11,fontFamily:"DM Mono,monospace"}}/>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>{try{navigator.clipboard.writeText(setupUrl);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{/* clipboard blocked */}}}>{copied?"✓ Copied":"Copy"}</button>
+                      </div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        <a className="btn btn-ghost btn-sm" href={waLink(f.phone,setupMsg)} target="_blank" rel="noreferrer" style={{opacity:f.phone?1:.5,pointerEvents:f.phone?"auto":"none"}}>💬 WhatsApp{f.phone?"":" (add phone)"}</a>
+                        <a className="btn btn-ghost btn-sm" href={mailLink(f.email,`${f.name} — set up your supplier portal login`,setupMsg)} style={{opacity:f.email?1:.5,pointerEvents:f.email?"auto":"none"}}>✉️ Email{f.email?"":" (add email)"}</a>
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text3)",marginTop:6}}>Valid for 7 days, works once. Creating a new link replaces this one.</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>Or set it yourself:</div>
               <div style={{display:"flex",gap:8,alignItems:"flex-end",flexWrap:"wrap"}}>
                 <div style={{flex:1,minWidth:120}}>
                   <FL label="Username"/>

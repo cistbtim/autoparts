@@ -29,7 +29,7 @@ import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCu
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -163,6 +163,8 @@ export default function App() {
   if(rfqQuoteToken) return <RfqQuoteReplyPage token={rfqQuoteToken}/>;
   const rfqBatchToken = new URLSearchParams(window.location.search).get("rfq_batch");
   if(rfqBatchToken) return <RfqBatchReplyPage token={rfqBatchToken}/>;
+  const supplierSetupToken = new URLSearchParams(window.location.search).get("supplier_setup");
+  if(supplierSetupToken) return <SupplierSetupPage token={supplierSetupToken}/>;
   const wsqToken = new URLSearchParams(window.location.search).get("wsq");
   if(wsqToken) return <QuoteConfirmPage token={wsqToken}/>;
   const wsSupReqToken = new URLSearchParams(window.location.search).get("ws_supreq");
@@ -3141,6 +3143,15 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await api.upsert("users",{username,password,role:"supplier",supplier_id:es.id,name:es.name});
     await refreshTables("users");
     showToast(`✅ Portal login created for ${es.name}`);
+  };
+  // One-time link (valid 7 days) the supplier opens to choose their own username + password.
+  const createSupplierSetupLink=async()=>{
+    const es=mData("editSupplier");
+    if(!es?.id)return "";
+    const token=makeToken()+makeToken();
+    const expires=new Date(Date.now()+7*24*3600*1000).toISOString();
+    await api.patch("suppliers","id",es.id,{setup_token:token,setup_token_expires:expires});
+    return `${window.location.origin}${window.location.pathname}?supplier_setup=${token}`;
   };
   const resetSupplierPortalPassword=async(userId,password)=>{
     await api.patch("users","id",userId,{password});
@@ -9357,6 +9368,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {isOpen("editSupplier")&&<div style={{position:"fixed",inset:0,zIndex:260}}><SupplierModal supplier={mData("editSupplier")} onSave={saveSupplier} onClose={()=>closeM("editSupplier")} t={t}
         portalUser={users.find(u=>u.role==="supplier"&&String(u.supplier_id)===String(mData("editSupplier")?.id))}
         onCreatePortalLogin={createSupplierPortalLogin}
+        onCreateSetupLink={createSupplierSetupLink}
+        shopName={settings?.shop_name||""}
         onResetPortalPassword={resetSupplierPortalPassword}/></div>}
       {isOpen("importSuppliers")&&<SupplierImportModal onImport={async()=>{await refreshTables("suppliers");}} onClose={()=>closeM("importSuppliers")}/>}
       {isOpen("supplierParts")&&<SupplierPartsModal supplier={mData("supplierParts")} partSuppliers={partSuppliers.filter(ps=>ps.supplier_id===mData("supplierParts")?.id)} parts={parts} onDeleteMany={deletePartSupplierMany} onClose={()=>closeM("supplierParts")}/>}

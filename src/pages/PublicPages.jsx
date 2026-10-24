@@ -293,6 +293,70 @@ export function RfqQuoteReplyPage({token}) {
   );
 }
 
+// Supplier opens the one-time link sent by the shop and chooses their own portal username + password.
+export function SupplierSetupPage({token}) {
+  const [sup,setSup]=useState(null);
+  const [state,setState]=useState("loading"); // loading | ready | invalid | used | done
+  const [username,setUsername]=useState("");
+  const [pw,setPw]=useState("");const [pw2,setPw2]=useState("");
+  const [err,setErr]=useState("");const [busy,setBusy]=useState(false);
+  useEffect(()=>{
+    (async()=>{
+      const r=await api.fresh("suppliers",`setup_token=eq.${encodeURIComponent(token)}&select=id,name,full_name,setup_token_expires`);
+      const s=Array.isArray(r)?r[0]:null;
+      if(!s||(s.setup_token_expires&&new Date(s.setup_token_expires)<new Date())){setState("invalid");return;}
+      const ex=await api.fresh("users",`role=eq.supplier&supplier_id=eq.${s.id}&select=id`);
+      if(Array.isArray(ex)&&ex.length>0){setState("used");return;}
+      setSup(s);setState("ready");
+    })().catch(()=>setState("invalid"));
+  },[token]);
+  const submit=async()=>{
+    const u=username.trim();
+    if(!/^[A-Za-z0-9._-]{3,30}$/.test(u)){setErr("Username: 3–30 letters, numbers, dot, dash or underscore (no spaces).");return;}
+    if(pw.length<6){setErr("Password must be at least 6 characters.");return;}
+    if(pw!==pw2){setErr("Passwords do not match.");return;}
+    setErr("");setBusy(true);
+    try{
+      const taken=await api.fresh("users",`username=ilike.${encodeURIComponent(u)}&select=id`);
+      if(Array.isArray(taken)&&taken.length>0){setErr("That username is already taken — please choose another.");setBusy(false);return;}
+      await api.upsert("users",{username:u,password:pw,role:"supplier",supplier_id:sup.id,name:sup.name});
+      // burn the link so it can't be used again
+      await api.patch("suppliers","id",sup.id,{setup_token:null,setup_token_expires:null});
+      setState("done");
+    }catch{ setErr("Something went wrong — please try again."); }
+    setBusy(false);
+  };
+  const loginUrl=`${window.location.origin}${window.location.pathname}`;
+  return (
+    <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:440}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <ShopLogo settings={getSettings()} size="md" style={{width:"100%",maxWidth:"100%",maxHeight:100,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          <div style={{color:"var(--text3)",fontSize:12,marginTop:6}}>Supplier Portal</div>
+        </div>
+        <div className="card" style={{padding:26}}>
+          {state==="loading"&&<p style={{color:"var(--text3)",textAlign:"center",padding:30}}>Loading...</p>}
+          {state==="invalid"&&<div style={{color:"var(--red)",textAlign:"center",padding:24}}>⚠ This link is invalid or has expired. Please ask for a new one.</div>}
+          {state==="used"&&<div style={{textAlign:"center",padding:24}}><div style={{fontSize:40,marginBottom:10}}>✅</div><p style={{color:"var(--text2)"}}>This account is already set up.</p><a className="btn btn-primary" href={loginUrl} style={{display:"inline-block",marginTop:14}}>Go to sign in</a></div>}
+          {state==="done"&&<div style={{textAlign:"center",padding:24}}><div style={{fontSize:44,marginBottom:10}}>✅</div><h2 style={{fontSize:18,fontWeight:700,marginBottom:8}}>You're all set!</h2><p style={{color:"var(--text3)",marginBottom:14}}>Sign in with <b>{username.trim()}</b> and the password you chose (Supplier Sign In).</p><a className="btn btn-primary" href={loginUrl} style={{display:"inline-block"}}>Go to sign in</a></div>}
+          {state==="ready"&&(
+            <>
+              <h2 style={{fontSize:18,fontWeight:700,marginBottom:4}}>Set up your login</h2>
+              <p style={{color:"var(--text3)",fontSize:13,marginBottom:18}}>{sup.full_name||sup.name}</p>
+              <FD><FL label="Username (nickname)"/><input className="inp" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="e.g. mck"/></FD>
+              <FD><FL label="Password"/><input className="inp" type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="At least 6 characters"/></FD>
+              <FD><FL label="Confirm password"/><input className="inp" type="password" value={pw2} onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()}/></FD>
+              {err&&<div style={{color:"var(--red)",fontSize:13,marginBottom:12}}>⚠ {err}</div>}
+              <button className="btn btn-primary" style={{width:"100%",padding:13}} disabled={busy} onClick={submit}>{busy?"Saving…":"Create my login"}</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RfqBatchReplyPage({token}) {
   const [session,setSession]=useState(null);
   const [supplierName,setSupplierName]=useState("");

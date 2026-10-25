@@ -338,5 +338,8 @@ export const SUPPLIER_STRINGS = [
  "Grade C — fair, cosmetic wear",
  "Colour",
  "e.g. Pearl White",
- "— none —"
+ "— none —",
+ "Add a new category",
+ "New category name",
+ "Add"
 ];

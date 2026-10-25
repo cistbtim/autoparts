@@ -897,6 +897,12 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
   const [saving,setSaving]=useState(false);
   const [selectedOeTok,setSelectedOeTok]=useState("");
   const marginOptions=resolveMarginOptions({supplierOptions:supplierMarginOptions,category:f.category});
+  // "+" next to Category: a supplier can type their own category. It is saved on this part only
+  // (the shop-wide list in Settings is untouched) and then shows up in this dropdown for their other parts too.
+  const [addingCat,setAddingCat]=useState(false);
+  const [newCat,setNewCat]=useState("");
+  const categoryOptions=[...new Set([...getCategories(),...ownParts.map(p=>(p.category||"").trim()).filter(Boolean),...(f.category?[f.category]:[])])];
+  const commitNewCat=()=>{const c=newCat.trim();if(!c)return;s("category",c);setAddingCat(false);};
   // Same OE number typed onto two different part codes usually means an
   // accidental duplicate listing — catch it as soon as the modal opens/changes,
   // not after it's already been saved and is sitting in stock twice.
@@ -992,11 +998,23 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
         </div>
         <div>
           <FL label={ts("Category")}/>
-          <select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>
-            <option value="">{ts("— Select —")}</option>
-            {getCategories().map(c=><option key={c} value={c}>{c}</option>)}
-            {f.category&&!getCategories().includes(f.category)&&<option value={f.category}>{f.category}</option>}
-          </select>
+          {addingCat?(
+            <div style={{display:"flex",gap:6}}>
+              <input className="inp" autoFocus style={{flex:1,minWidth:0}} value={newCat} placeholder={ts("New category name")}
+                onChange={e=>setNewCat(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();commitNewCat();}else if(e.key==="Escape")setAddingCat(false);}}/>
+              <button type="button" className="btn btn-primary btn-sm" disabled={!newCat.trim()} onClick={commitNewCat}>{ts("Add")}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setAddingCat(false)}>✕</button>
+            </div>
+          ):(
+            <div style={{display:"flex",gap:6}}>
+              <select className="inp" style={{flex:1,minWidth:0}} value={f.category} onChange={e=>s("category",e.target.value)}>
+                <option value="">{ts("— Select —")}</option>
+                {categoryOptions.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <button type="button" className="btn btn-ghost btn-sm" title={ts("Add a new category")} style={{fontSize:18,fontWeight:700,padding:"0 12px"}} onClick={()=>{setNewCat("");setAddingCat(true);}}>+</button>
+            </div>
+          )}
         </div>
       </FG>
       <FG>

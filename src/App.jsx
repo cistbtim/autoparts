@@ -2,7 +2,7 @@
 import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt, ts } from "./lib/i18n.js";
-import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake, REF_REFERRER_REWARD_DAYS } from "./lib/helpers.js";
+import { nameWithTags, toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake, REF_REFERRER_REWARD_DAYS } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
 import { CSS } from "./styles.js";
@@ -25,7 +25,7 @@ import { PosPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { RentalDashboardPage, RentalVehiclesPage, RentalBookingsPage, RentalCustomersPage, RentalProfilePage } from "./components/Rental.jsx";
-import { SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
+import { PartTags, SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, SupplierCustomersPage, SupplierStockPage, SupplierPurchaseInvoicesPage, SupplierStockTakePage, SupplierScanStockPage, SupplierStockLogPage, SupplierOrdersPage } from "./components/SupplierPortal.jsx";
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
@@ -694,7 +694,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         id:`sp_${row.id}`, sku:`${supCode}-${row.part_code}`, name:row.name, chinese_desc:row.chinese_desc||"",
         category:row.category||"", price:row.price, cost_price:row.cost_price, stock:row.stock??0,
         image_url:row.image_url||"", make:row.make||"", model:row.model||"", year_range:row.year_range||"",
-        oe_number:row.oe_number||"", _isSupplierPart:true, _supplierPartId:row.id,
+        oe_number:row.oe_number||"", part_condition:row.part_condition||"", grade:row.grade||"", colour:row.colour||"", _isSupplierPart:true, _supplierPartId:row.id,
       }));
       setParts([...(Array.isArray(scopedParts)?scopedParts:[]),...selfParts]);
       setPartSuppliers(Array.isArray(links)?links:[]);
@@ -1619,7 +1619,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // pre-discount cartTotal (that's what customers.total_spent should track too).
     const orderObj={id:oid,customer_name:form.name,customer_phone:form.phone,customer_email:form.email||"",date:today(),status:"Processing",
       items:cart.map(i=>{
-        const base={partId:i.id,sku:i.sku||"",qty:i.qty,name:i.name,price:discountPrice(i.price),...(customerDiscountPct>0?{orig_price:i.price,discount_pct:customerDiscountPct}:{})};
+        const base={partId:i.id,sku:i.sku||"",qty:i.qty,name:nameWithTags(i.name,i),...(i.part_condition?{part_condition:i.part_condition}:{}),...(i.grade?{grade:i.grade}:{}),...(i.colour?{colour:i.colour}:{}),price:discountPrice(i.price),...(customerDiscountPct>0?{orig_price:i.price,discount_pct:customerDiscountPct}:{})};
         if(i._isSupplierPart) return base; // already identifiable via the "sp_" id prefix
         const links=linksByPart[i.id];
         return links?.length===1 ? {...base,partSuppliersId:links[0].id,supplierId:links[0].supplier_id} : base;
@@ -4957,6 +4957,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     const fields=[
       p.name, p.chinese_desc, p.sku, p.brand,
       p.make, p.model, p.year_range, p.oe_number, p.category,
+      p.colour, p.part_condition, p.grade&&`grade ${p.grade}`,
       ...(suppNoByPart[p.id]||[])
     ].map(v=>(v||"").toLowerCase()).join(" ");
     return words.every(w=>fields.includes(w));
@@ -7072,6 +7073,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                       <div style={{fontSize:14,fontWeight:700,marginBottom:2,lineHeight:1.3}}>{p.name}</div>
                       {p.chinese_desc&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:2}}>{p.chinese_desc}</div>}
                       {(p.make||p.model)&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:2}}>🚗 {[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
+                      <PartTags p={p} style={{marginBottom:4}}/>
                       {p.oe_number&&(()=>{const codes=p.oe_number.split(",").map(s=>s.trim()).filter(Boolean);const more=codes.length-1;return(
                         <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontFamily:"DM Mono,monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
                           title={p.oe_number}>OE: {codes[0]}{more>0?` +${more}`:""}</div>

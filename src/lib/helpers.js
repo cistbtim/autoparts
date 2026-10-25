@@ -259,6 +259,13 @@ export const toWaPhone = (phone, countryCode) => {
 // lowercasing alone, silently breaking every make-based lookup against it.
 export const normMake = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 export const waLink = (phone, msg, countryCode) => `https://wa.me/${toWaPhone(phone, countryCode || getSettings().whatsapp_country_code)}?text=${encodeURIComponent(msg)}`;
+// Condition / grade / colour of a supplier's own part, in plain English, for stored text (orders, queries, bookings)
+export const partTagsEn = (p) => [
+  { new: "New", used: "Used", refurbished: "Refurbished" }[p?.part_condition] || "",
+  p?.grade ? `Grade ${p.grade}` : "",
+  p?.colour || "",
+].filter(Boolean).join(" · ");
+export const nameWithTags = (name, p) => { const t = partTagsEn(p); return t ? `${name} (${t})` : name; };
 export const mailLink = (to, subj, body) => `mailto:${to || ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 
 // ── Shared label print window ─────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
 import { getSettings, C } from "../lib/settings.js";
-import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink, openPartLabelsWindow } from "../lib/helpers.js";
+import { toImgUrl, toFullUrl, fmtAmt, fmtDT, waLink, openPartLabelsWindow, nameWithTags } from "../lib/helpers.js";
 import { Overlay, MHead, FL, FG, FD, StatusBadge, ImgLightbox } from "./shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { PrintPartLabelModal, ExtraPhotosStrip, resolveMarginOptions } from "./Modals.jsx";
@@ -34,7 +34,7 @@ const colourSwatch=(c)=>{const k=(c||"").toLowerCase();for(const [n,v] of Object
 const conditionLabel=(v)=>{const m=PART_CONDITIONS.find(([k])=>k===v);return m?ts(m[1]):"";};
 // Plain-text version (labels): "Used · Grade A · Pearl White"
 const partTagText=(p)=>[conditionLabel(p?.part_condition),p?.grade?`${ts("Grade")} ${p.grade}`:"",p?.colour||""].filter(Boolean).join(" · ");
-function PartTags({p,style}) {
+export function PartTags({p,style}) {
   if(!p||(!p.part_condition&&!p.grade&&!p.colour)) return null;
   const chip={fontSize:10,fontWeight:700,borderRadius:99,padding:"1px 8px",border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text2)",display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap"};
   const sw=colourSwatch(p.colour);
@@ -2882,7 +2882,7 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
     ...existingParts.map(p=>({sourceType:"catalogue", targetId:p._linkId, partId:p.id, name:p.name, sku:p.sku, price:p.price, stock:p._supplierStock??0, image:p.image_url, extraPhotos:parseJsonArray(p.photos),
       fit:fitLabelFor("part_id",p.id,p),
       blob:`${searchBlob(p,p.sku)} ${fitTextFor("part_id",p.id)}`.toLowerCase()})),
-    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, partId:null, name:p.name, sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, price:p.price, stock:p.stock??0, image:p.image_url, extraPhotos:parseJsonArray(p.photos),
+    ...ownParts.map(p=>({sourceType:"own", targetId:p.id, partId:null, name:nameWithTags(p.name,p), sku:supplierCode?`${supplierCode}-${p.part_code}`:p.part_code, price:p.price, stock:p.stock??0, image:p.image_url, extraPhotos:parseJsonArray(p.photos),
       fit:fitLabelFor("supplier_part_id",p.id,p),
       blob:`${searchBlob(p,p.part_code)} ${fitTextFor("supplier_part_id",p.id)}`.toLowerCase()})),
   ];

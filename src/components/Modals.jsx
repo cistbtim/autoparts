@@ -5,7 +5,7 @@ import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
 import { C, curSym, getSettings, updateSettings } from "../lib/settings.js";
 import { T, tSt, registerLang } from "../lib/i18n.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow, nemigaVinUrl, isChineseVin, CHINACARMART_URL, workshopRegUrl } from "../lib/helpers.js";
+import { nameWithTags, fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, toFullUrl, toLogoUrl, detectGeoLocation, waLink, mailLink, openPartLabelsWindow, openShelfLabelWindow, nemigaVinUrl, isChineseVin, CHINACARMART_URL, workshopRegUrl } from "../lib/helpers.js";
 import { CAR_MAKES, getCategories, DEFAULT_CATS, getBrands, getRecentLocations, OC } from "../lib/constants.js";
 import { COUNTRIES, getProvinces } from "../lib/geoData.js";
 import { CSS } from "../styles.js";
@@ -5585,7 +5585,7 @@ export function CustomerQueryModal({part,currentUser,onSubmit,onClose,t}) {
       // keep part_id null for those and reference supplier_part_id instead, so this
       // never gets sent into an integer parts.id column as a string.
       part_id:part._isSupplierPart?null:part.id, supplier_part_id:part._isSupplierPart?part._supplierPartId:null,
-      part_name:part.name,part_sku:part.sku||"",
+      part_name:nameWithTags(part.name,part),part_sku:part.sku||"",
       part_price:part.price||0,part_image:part.image_url||"",
       customer_name:form.name,customer_phone:form.phone,customer_email:form.email,
       qty_requested:+form.qty||1,notes:form.notes,

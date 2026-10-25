@@ -429,6 +429,7 @@ export function openPartLabelsWindow(labels, { shopName = "", win = null } = {})
     `.sku{font-size:${fs.sku}px;font-weight:900;font-family:monospace;letter-spacing:${compact?0:.8}px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`,
     `.pn{font-size:${fs.pn}px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}`,
     // Make / model wraps onto a second line instead of being cut to "…"
+    `.tg{font-size:${fs.fit+1}px;font-weight:900;color:#111;line-height:1.15;word-break:break-word}`,
     `.fit{font-size:${fs.fit}px;font-weight:bold;color:#1e40af;line-height:1.15;word-break:break-word}`,
     `.oe{font-size:${fs.oe}px;font-weight:bold;font-family:monospace;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
     `.bin{font-size:${fs.bin}px;font-weight:900;color:#1d4ed8;background:#dbeafe;border-radius:3px;padding:1px 5px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:${compact?0:2}px}`,
@@ -456,6 +457,7 @@ export function openPartLabelsWindow(labels, { shopName = "", win = null } = {})
         <div class="sn">${e(shopName)}</div>
         <div class="sku">${e(lbl.sku||lbl.name)}</div>
         ${lbl.name&&lbl.sku?`<div class="pn">${e(lbl.name)}</div>`:""}
+        ${lbl.tags?`<div class="tg">${e(lbl.tags)}</div>`:""}
         ${(lbl.make||lbl.model||lbl.yearRange)?`<div class="fit">${e([lbl.make,lbl.model,lbl.yearRange].filter(Boolean).join(" · "))}</div>`:""}
         ${lbl.binLocation?`<div class="bin">${e(lbl.binLocation)}</div>`:"<div class=\"bin-blank\"></div>"}
         ${lbl.supplierCode?`<div class="sup">${e(lbl.supplierCode)}</div>`:""}

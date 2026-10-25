@@ -24,7 +24,28 @@ const parseJsonArray=(v)=>{ if(Array.isArray(v)) return v; try{ const a=JSON.par
 // Multi-keyword search — every space-separated word must appear somewhere in the
 // part's searchable text (in any order/field), so "bmw x1 head lamp" matches a part
 // whose make/model/name between them contain all four words, not one whole phrase.
-const searchBlob=(p,code)=>[code,p.name,p.make,p.model,p.year_range,p.category,p.oe_number,p.chinese_desc].filter(Boolean).join(" ").toLowerCase();
+const searchBlob=(p,code)=>[code,p.name,p.make,p.model,p.year_range,p.category,p.oe_number,p.chinese_desc,p.colour,p.part_condition,p.grade&&`grade ${p.grade}`].filter(Boolean).join(" ").toLowerCase();
+
+// Condition / grade / colour of a supplier's own part (used parts often come in several colours and grades)
+const PART_CONDITIONS=[["new","New"],["used","Used"],["refurbished","Refurbished"]];
+const PART_GRADES=[["A","Grade A — like new"],["B","Grade B — good"],["C","Grade C — fair, cosmetic wear"]];
+const COLOUR_SWATCH={white:"#ffffff",black:"#111111",silver:"#c0c0c0",grey:"#808080",gray:"#808080",red:"#dc2626",blue:"#2563eb",green:"#16a34a",yellow:"#facc15",orange:"#f97316",brown:"#78350f",gold:"#d4af37",beige:"#d6c7a1",purple:"#7c3aed",pink:"#ec4899",bronze:"#a16207"};
+const colourSwatch=(c)=>{const k=(c||"").toLowerCase();for(const [n,v] of Object.entries(COLOUR_SWATCH)) if(k.includes(n)) return v;return null;};
+const conditionLabel=(v)=>{const m=PART_CONDITIONS.find(([k])=>k===v);return m?ts(m[1]):"";};
+// Plain-text version (labels): "Used · Grade A · Pearl White"
+const partTagText=(p)=>[conditionLabel(p?.part_condition),p?.grade?`${ts("Grade")} ${p.grade}`:"",p?.colour||""].filter(Boolean).join(" · ");
+function PartTags({p,style}) {
+  if(!p||(!p.part_condition&&!p.grade&&!p.colour)) return null;
+  const chip={fontSize:10,fontWeight:700,borderRadius:99,padding:"1px 8px",border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text2)",display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"nowrap"};
+  const sw=colourSwatch(p.colour);
+  return (
+    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4,...style}}>
+      {p.part_condition&&<span style={{...chip,color:p.part_condition==="new"?"var(--green)":"var(--text2)"}}>{conditionLabel(p.part_condition)}</span>}
+      {p.grade&&<span style={{...chip,color:"var(--accent)",borderColor:"var(--accent)"}}>{ts("Grade")} {p.grade}</span>}
+      {p.colour&&<span style={chip}>{sw&&<span style={{width:10,height:10,borderRadius:"50%",background:sw,border:"1px solid var(--border2)"}}/>}{p.colour}</span>}
+    </div>
+  );
+}
 const matchesSearch=(blob,keywords)=>keywords.every(k=>blob.includes(k));
 
 // Columns the supplier can pick between for the "My Parts" PDF export — same
@@ -716,6 +737,7 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
           </div>
           <div style={{fontSize:15,fontWeight:600,color:"var(--text)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
           {(p.make||p.model)&&<div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} {ts("more fit")}{fitCount!==1?"s":""}</span>}</div>}
+          <PartTags p={p}/>
         </div>
       </div>
 
@@ -867,7 +889,8 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
     image_url:part.image_url||"", make:part.make||"", model:part.model||"",
     year_range:part.year_range||"", oe_number:part.oe_number||"", suggested_price:part.suggested_price??"",
     photos:parseJsonArray(part.photos),
-  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:"",photos:[]});
+    part_condition:part.part_condition||"", grade:part.grade||"", colour:part.colour||"",
+  }:{part_code:"",name:"",chinese_desc:"",category:"",cost_price:"",stock:0,image_url:"",make:"",model:"",year_range:"",oe_number:"",suggested_price:"",photos:[],part_condition:"",grade:"",colour:""});
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const canSave=f.part_code.trim()&&f.name.trim();
   const [lightbox,setLightbox]=useState(null); // {idx} — urls built from f.image_url + f.photos
@@ -897,6 +920,25 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
         <div><FL label={ts("Make")}/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder={ts("BMW")}/></div>
         <div><FL label={ts("Model")}/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="X3"/></div>
         <div><FL label={ts("Year")}/><input className="inp" value={f.year_range} onChange={e=>s("year_range",e.target.value)} placeholder="2021-2024"/></div>
+      </FG>
+
+      <FG cols="1fr 1fr 1fr">
+        <div><FL label={ts("Condition")}/>
+          <select className="inp" value={f.part_condition} onChange={e=>s("part_condition",e.target.value)}>
+            <option value="">{ts("— none —")}</option>
+            {PART_CONDITIONS.map(([v,l])=><option key={v} value={v}>{ts(l)}</option>)}
+          </select>
+        </div>
+        <div><FL label={ts("Grade")}/>
+          <select className="inp" value={f.grade} onChange={e=>s("grade",e.target.value)}>
+            <option value="">{ts("— none —")}</option>
+            {PART_GRADES.map(([v,l])=><option key={v} value={v}>{ts(l)}</option>)}
+          </select>
+        </div>
+        <div><FL label={ts("Colour")}/>
+          <input className="inp" list="sp-colours" value={f.colour} onChange={e=>s("colour",e.target.value)} placeholder={ts("e.g. Pearl White")}/>
+          <datalist id="sp-colours">{["White","Black","Silver","Grey","Red","Blue","Green","Yellow","Orange","Brown","Gold","Beige"].map(c=><option key={c} value={c}/>)}</datalist>
+        </div>
       </FG>
 
       {isEdit&&(
@@ -1528,7 +1570,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
     const labels=[];
     for(let i=1;i<=qty;i++){
       labels.push({sku:it.sku,name:it.name,binLocation:it.binLocation?.trim()||"",invoiceNo:invoiceNo||"",seq:qty>1?`${i}/${qty}`:"",
-        make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||"",oeNumber:full?.oe_number||""});
+        make:full?.make||"",model:full?.model||"",yearRange:full?.year_range||"",oeNumber:full?.oe_number||"",tags:partTagText(full)});
     }
     const settings=getSettings();
     openPartLabelsWindow(labels,{widthMm:settings?.part_label_w||98,heightMm:settings?.part_label_h||45,shopName:settings?.shop_name||""});
@@ -2031,7 +2073,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
 
   const rows = [
     ...existingParts.map(p=>({sourceType:"catalogue", id:p._linkId, sku:p.sku, name:p.name, stock:p._supplierStock??0, bin:p._supplierBinLocation||"", make:p.make||"", model:p.model||"", year_range:p.year_range||"", image:p.image_url||""})),
-    ...ownParts.map(p=>({sourceType:"own", id:p.id, sku:codePrefix?`${codePrefix}-${p.part_code}`:p.part_code, name:p.name, stock:p.stock??0, bin:p.bin_location||"", make:p.make||"", model:p.model||"", year_range:p.year_range||"", image:p.image_url||""})),
+    ...ownParts.map(p=>({sourceType:"own", id:p.id, sku:codePrefix?`${codePrefix}-${p.part_code}`:p.part_code, name:p.name, stock:p.stock??0, bin:p.bin_location||"", make:p.make||"", model:p.model||"", year_range:p.year_range||"", image:p.image_url||"", part_condition:p.part_condition||"", grade:p.grade||"", colour:p.colour||""})),
   ].sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const staleMainStockCount = existingParts.filter(p=>+p.stock>0&&codePrefix&&(p.sku||"").toUpperCase().startsWith(codePrefix+"-")).length;
 
@@ -2099,7 +2141,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
                         </div>
                       </td>
                       <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{row.sku||"—"}</td>
-                      <td>{row.name}</td>
+                      <td>{row.name}<PartTags p={row}/></td>
                       <td style={{fontSize:12,color:(row.make||row.model||row.year_range)?"var(--text)":"var(--text3)"}}>{[row.make,row.model,row.year_range].filter(Boolean).join(" · ")||"—"}</td>
                       <td><span className="badge" style={{fontSize:11,background:row.sourceType==="catalogue"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:row.sourceType==="catalogue"?"var(--blue)":"var(--green)"}}>{row.sourceType==="catalogue"?ts("Catalogue"):ts("My Part")}</span></td>
                       {isEditing ? (

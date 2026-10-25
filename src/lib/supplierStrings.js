@@ -327,5 +327,16 @@ export const SUPPLIER_STRINGS = [
  "My Stock Records",
  "My Orders",
  "My Queries",
- "My Customers"
+ "My Customers",
+ "Condition",
+ "New",
+ "Used",
+ "Refurbished",
+ "Grade",
+ "Grade A — like new",
+ "Grade B — good",
+ "Grade C — fair, cosmetic wear",
+ "Colour",
+ "e.g. Pearl White",
+ "— none —"
 ];

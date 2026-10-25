@@ -1,3 +1,5 @@
+import { SUPPLIER_STRINGS } from "./supplierStrings.js";
+
 // English is the hardcoded fallback — all other languages load from app_translations DB table.
 export const T = {
   en: {
@@ -418,6 +420,9 @@ export const T = {
   },
 };
 
+// Supplier-portal strings: key is "sp:"+English text, so every language row can override them
+for (const s of SUPPLIER_STRINGS) T.en["sp:" + s] = s;
+
 // Lang metadata: lang code → { name, flag }
 const _meta = { en: { name: "English", flag: "🇬🇧" } };
 
@@ -442,3 +447,5 @@ export const tSt = (s) => {
   const map = _statusMaps[_currentLang];
   return map ? (map[s] || s) : s;
 };
+// Translate a supplier-portal string (English text in, current language out; falls back to English)
+export const ts = (s) => T[_currentLang]?.["sp:" + s] || s;

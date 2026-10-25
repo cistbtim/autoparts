@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
-import { T, registerLang, getLangs, setCurrentLang, tSt } from "./lib/i18n.js";
+import { T, registerLang, getLangs, setCurrentLang, tSt, ts } from "./lib/i18n.js";
 import { toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake, REF_REFERRER_REWARD_DAYS } from "./lib/helpers.js";
 import { ROLES, BRANCH_ROLES, OC, CATS_EN, CATS_ZH, CAR_MAKES, DEFAULT_CATS, getCategories, TRIAL_DAYS, getSubInfo, canAccess, CITY_PROVINCE } from "./lib/constants.js";
 import { getDynamsoftReader, decodePDF417fromImage, parseLicenceDisc } from "./lib/barcode.js";
@@ -5242,17 +5242,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       },
     ]:[]),
     {
-      id:"grp_supplier", icon:"🏭", label:"My Catalogue", roles:["supplier"],
+      id:"grp_supplier", icon:"🏭", label:ts("My Catalogue"), roles:["supplier"],
       children:[
-        {id:"supplierParts",  icon:"📦",label:"My Parts",   roles:["supplier"]},
-        {id:"supplierStock",  icon:"📊",label:"My Stock",   roles:["supplier"]},
-        {id:"supplierPurchaseInvoices",icon:"📥",label:"Purchase Invoices", roles:["supplier"],badge:supplierPurchaseInvoices.filter(i=>i.status!=="received").length||0},
-        {id:"supplierStockTake",icon:"🔢",label:"My Stock Take", roles:["supplier"]},
-        {id:"supplierScanStock",icon:"📷",label:"Scan Stock Take", roles:["supplier"]},
-        {id:"supplierStockLogs",icon:"📜",label:"My Stock Records", roles:["supplier"]},
-        {id:"supplierOrders", icon:"📋",label:"My Orders",  roles:["supplier"],badge:supplierBookings.filter(b=>b.status==="pending").length||0},
-        {id:"supplierQueries",icon:"💬",label:"My Queries", roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
-        {id:"supplierCustomers",icon:"🎁",label:"My Customers", roles:["supplier"]},
+        {id:"supplierParts",  icon:"📦",label:ts("My Parts"),   roles:["supplier"]},
+        {id:"supplierStock",  icon:"📊",label:ts("My Stock"),   roles:["supplier"]},
+        {id:"supplierPurchaseInvoices",icon:"📥",label:ts("Purchase Invoices"), roles:["supplier"],badge:supplierPurchaseInvoices.filter(i=>i.status!=="received").length||0},
+        {id:"supplierStockTake",icon:"🔢",label:ts("My Stock Take"), roles:["supplier"]},
+        {id:"supplierScanStock",icon:"📷",label:ts("Scan Stock Take"), roles:["supplier"]},
+        {id:"supplierStockLogs",icon:"📜",label:ts("My Stock Records"), roles:["supplier"]},
+        {id:"supplierOrders", icon:"📋",label:ts("My Orders"),  roles:["supplier"],badge:supplierBookings.filter(b=>b.status==="pending").length||0},
+        {id:"supplierQueries",icon:"💬",label:ts("My Queries"), roles:["supplier"],badge:supplierQueries.filter(q=>q.status==="pending").length||0},
+        {id:"supplierCustomers",icon:"🎁",label:ts("My Customers"), roles:["supplier"]},
       ]
     },
     {

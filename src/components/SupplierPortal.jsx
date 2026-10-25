@@ -1,3 +1,4 @@
+import { ts } from "../lib/i18n.js";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
@@ -137,7 +138,7 @@ const openSupplierPartsPdf=(rows,fields,tabLabel,supplierLabel,contactPerson,pho
   <div class="pagefoot">${esc(supplierLabel)} — ${esc(tabLabel)} · ${dateStr}</div>
   </body></html>`;
   const w=window.open("","_blank","width=1000,height=800");
-  if(!w){ alert("Please allow pop-ups for this site to export the PDF"); return; }
+  if(!w){ alert(ts("Please allow pop-ups for this site to export the PDF")); return; }
   w.document.write(html);
   w.document.close();
 };
@@ -219,7 +220,7 @@ const openSupplierBookingInvoice=(booking, items, supplierLabel, contactPerson, 
   </div>
   </body></html>`;
   const w=window.open("","_blank","width=850,height=900");
-  if(!w){ alert("Please allow pop-ups for this site to view the invoice"); return; }
+  if(!w){ alert(ts("Please allow pop-ups for this site to view the invoice")); return; }
   w.document.write(html);
   w.document.close();
 };
@@ -229,8 +230,8 @@ const openSupplierBookingInvoice=(booking, items, supplierLabel, contactPerson, 
 function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, onClose}){
   return (
     <Overlay onClose={onClose}>
-      <MHead title="📄 Export PDF" sub={`${rowCount} part${rowCount!==1?"s":""} from "${tabLabel}" — matches your current search`} onClose={onClose}/>
-      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Choose which columns to include:</div>
+      <MHead title={ts("📄 Export PDF")} sub={`${rowCount} part${rowCount!==1?"s":""} from "${tabLabel}" — matches your current search`} onClose={onClose}/>
+      <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>{ts("Choose which columns to include:")}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginBottom:18}}>
         {EXPORT_FIELDS.map(f=>(
           <label key={f.key} style={{display:"flex",alignItems:"center",gap:7,fontSize:13,cursor:"pointer"}}>
@@ -240,9 +241,9 @@ function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, 
         ))}
       </div>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{ts("Cancel")}</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={rowCount===0||selected.size===0} onClick={onExport}>
-          📄 Export {rowCount} Part{rowCount!==1?"s":""}
+          {ts("📄 Export")} {rowCount} {ts("Part")}{rowCount!==1?"s":""}
         </button>
       </div>
     </Overlay>
@@ -360,20 +361,20 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📦 My Parts</h1>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📦 My Parts")}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            {existingParts.length} already in inventory · {parts.length} added by you ({parts.filter(p=>!p.price).length} awaiting pricing)
+            {existingParts.length} {ts("already in inventory ·")} {parts.length} {ts("added by you (")}{parts.filter(p=>!p.price).length} {ts("awaiting pricing)")}
           </p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh} title="Prices/stock can change on admin's side — refresh to see the latest">↺ Refresh</button>}
-          <button className="btn btn-ghost btn-sm" onClick={()=>setExportOpen(true)}>📄 Export PDF</button>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh} title={ts("Prices/stock can change on admin's side — refresh to see the latest")}>{ts("↺ Refresh")}</button>}
+          <button className="btn btn-ghost btn-sm" onClick={()=>setExportOpen(true)}>{ts("📄 Export PDF")}</button>
           {onBulkUpdateSuggestedPrices&&(
             <button className="btn btn-ghost btn-sm" onClick={()=>{if(bulkMode)exitBulkMode();else{setBulkMode(true);setTab("existing");}}}>
-              {bulkMode?"✕ Exit Bulk Update":"☑ Bulk Update Prices"}
+              {bulkMode?ts("✕ Exit Bulk Update"):ts("☑ Bulk Update Prices")}
             </button>
           )}
-          <button className="btn btn-primary" onClick={()=>setEditing({})}>+ Add Part</button>
+          <button className="btn btn-primary" onClick={()=>setEditing({})}>{ts("+ Add Part")}</button>
         </div>
       </div>
 
@@ -385,11 +386,11 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
         const eligible=existingFiltered.filter(p=>p._supplierPrice);
         return (
           <div className="card" style={{padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <div style={{fontSize:13,fontWeight:700}}>{selectedIds.size} selected</div>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set(eligible.map(p=>p.id)))}>Select All ({eligible.length} with cost set)</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set())} disabled={!selectedIds.size}>Clear</button>
+            <div style={{fontSize:13,fontWeight:700}}>{selectedIds.size} {ts("selected")}</div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set(eligible.map(p=>p.id)))}>{ts("Select All (")}{eligible.length} {ts("with cost set)")}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedIds(new Set())} disabled={!selectedIds.size}>{ts("Clear")}</button>
             <div style={{flex:1,minWidth:8}}/>
-            <span style={{fontSize:12,color:"var(--text3)"}}>Apply markup to selected:</span>
+            <span style={{fontSize:12,color:"var(--text3)"}}>{ts("Apply markup to selected:")}</span>
             {supplierBaseMarginOptions.map(m=>(
               <button key={m} type="button" className="btn btn-primary btn-sm" disabled={!selectedIds.size||bulkApplying}
                 onClick={async()=>{
@@ -400,7 +401,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
                   setBulkApplying(false);
                   exitBulkMode();
                 }}>
-                {bulkApplying?"Applying…":`${m}%`}
+                {bulkApplying?ts("Applying…"):`${m}%`}
               </button>
             ))}
           </div>
@@ -409,7 +410,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
 
       <div style={{marginBottom:14}}>
         <input className="inp" value={search} onChange={e=>setSearch(e.target.value)}
-          placeholder="Search e.g. bmw x1 head lamp — matches any word in any order"/>
+          placeholder={ts("Search e.g. bmw x1 head lamp — matches any word in any order")}/>
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
@@ -421,12 +422,12 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       {tab==="existing"&&(
         existingFiltered.length===0 ? (
           <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-            {existingParts.length===0?"Nothing linked to you in the main inventory yet.":"No parts match your search."}
+            {existingParts.length===0?ts("Nothing linked to you in the main inventory yet."):ts("No parts match your search.")}
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>
-              {bulkMode?"Tick parts to bulk-update, then pick a markup % above (only parts with a cost already set can be selected).":"Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo."}
+              {bulkMode?ts("Tick parts to bulk-update, then pick a markup % above (only parts with a cost already set can be selected)."):ts("Name, customer price & stock are managed by admin. Click a part to update your own cost price or photo.")}
             </div>
             {existingFiltered.map(p=><PartRow key={p.id} p={p} code={p.sku} name={p.name} readOnly
               priceChanged={!!(lastViewed&&p.price_updated_at&&p.price_updated_at>lastViewed)}
@@ -442,7 +443,7 @@ export function SupplierPartsPage({parts=[], existingParts=[], supplierCode, sup
       {tab==="mine"&&(
         minesFiltered.length===0 ? (
           <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-            {parts.length===0?'No parts yet — click "+ Add Part" to add your first one.':"No parts match your search."}
+            {parts.length===0?ts("No parts yet — click \"+ Add Part\" to add your first one."):ts("No parts match your search.")}
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -469,17 +470,17 @@ function ShareCatalogueCard({supplierName}) {
   return (
     <div className="card" style={{padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div style={{flex:1,minWidth:220}}>
-        <div style={{fontSize:13,fontWeight:700}}>📤 Share Your Catalogue</div>
-        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Anyone who signs up through this link only sees your parts</div>
+        <div style={{fontSize:13,fontWeight:700}}>{ts("📤 Share Your Catalogue")}</div>
+        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{ts("Anyone who signs up through this link only sees your parts")}</div>
         <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--blue)",marginTop:4,wordBreak:"break-all"}}>{link}</div>
       </div>
       <div style={{display:"flex",gap:6,flexShrink:0}}>
         <button type="button" className="btn btn-ghost btn-sm"
           onClick={()=>{navigator.clipboard.writeText(link);setCopied(true);setTimeout(()=>setCopied(false),1500);}}>
-          {copied?"✅ Copied":"📋 Copy Link"}
+          {copied?ts("✅ Copied"):ts("📋 Copy Link")}
         </button>
         <a href={waLink("",waMsg)} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-          <button type="button" className="btn btn-ghost btn-sm" style={{background:"#25D366",color:"#fff",border:"none"}}>📲 WhatsApp</button>
+          <button type="button" className="btn btn-ghost btn-sm" style={{background:"#25D366",color:"#fff",border:"none"}}>{ts("📲 WhatsApp")}</button>
         </a>
       </div>
     </div>
@@ -503,33 +504,33 @@ function BusinessInfoCard({fullName="", address="", contactPerson="", phone="", 
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <div style={{flex:1,minWidth:220}}>
-          <div style={{fontSize:13,fontWeight:700}}>🏢 Business Info</div>
-          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Shown to admin and on your exported catalogue PDF</div>
+          <div style={{fontSize:13,fontWeight:700}}>{ts("🏢 Business Info")}</div>
+          <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{ts("Shown to admin and on your exported catalogue PDF")}</div>
         </div>
-        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
+        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>{ts("✏️ Edit")}</button>}
       </div>
       {editing ? (
         <div style={{marginTop:10}}>
           <div style={{marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Company Full Name</div>
-            <input className="inp" value={f.full_name} onChange={e=>s("full_name",e.target.value)} placeholder="e.g. MCK Auto Parts (Pty) Ltd"/>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>{ts("Company Full Name")}</div>
+            <input className="inp" value={f.full_name} onChange={e=>s("full_name",e.target.value)} placeholder={ts("e.g. MCK Auto Parts (Pty) Ltd")}/>
           </div>
           <div style={{marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Address</div>
-            <textarea className="inp" value={f.address} onChange={e=>s("address",e.target.value)} placeholder="Street, city, postal code"/>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>{ts("Address")}</div>
+            <textarea className="inp" value={f.address} onChange={e=>s("address",e.target.value)} placeholder={ts("Street, city, postal code")}/>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Contact Person</div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>{ts("Contact Person")}</div>
               <input className="inp" value={f.contact_person} onChange={e=>s("contact_person",e.target.value)}/>
             </div>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>Phone</div>
+              <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:3}}>{ts("Phone")}</div>
               <input className="inp" type="tel" value={f.phone} onChange={e=>s("phone",e.target.value)}/>
             </div>
           </div>
           <div style={{marginBottom:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5}}>Supplier Types</div>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",marginBottom:5}}>{ts("Supplier Types")}</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
               {["new","used","dealer","factory"].map(tp=>(
                 <label key={tp} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",fontSize:13}}>
@@ -540,8 +541,8 @@ function BusinessInfoCard({fullName="", address="", contactPerson="", phone="", 
             </div>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>{ts("Cancel")}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?ts("Saving…"):ts("💾 Save")}</button>
           </div>
         </div>
       ) : hasAny ? (
@@ -556,7 +557,7 @@ function BusinessInfoCard({fullName="", address="", contactPerson="", phone="", 
           )}
         </div>
       ) : (
-        <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>Not set yet — click Edit to add your business details.</div>
+        <div style={{marginTop:8,fontSize:12,color:"var(--text3)"}}>{ts("Not set yet — click Edit to add your business details.")}</div>
       )}
     </div>
   );
@@ -578,12 +579,12 @@ function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <div style={{flex:1,minWidth:220}}>
-          <div style={{fontSize:13,fontWeight:700}}>💰 Your Suggested Markup %</div>
+          <div style={{fontSize:13,fontWeight:700}}>{ts("💰 Your Suggested Markup %")}</div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>
-            {isCustom?"Using your own percentages":"Using the shop's default percentages"} — shown as quick-price buttons next to Cost Price
+            {isCustom?ts("Using your own percentages"):ts("Using the shop's default percentages")} {ts("— shown as quick-price buttons next to Cost Price")}
           </div>
         </div>
-        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
+        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>{ts("✏️ Edit")}</button>}
       </div>
       {editing&&(
         <div style={{marginTop:10}}>
@@ -594,9 +595,9 @@ function MarkupOptionsCard({marginOptions, effectiveMarginOptions, onSave}) {
             ))}
           </div>
           <div style={{display:"flex",gap:8,marginTop:10}}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
-            {isCustom&&<button type="button" className="btn btn-ghost btn-sm" onClick={reset} disabled={saving}>Reset to shop default</button>}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>{ts("Cancel")}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?ts("Saving…"):ts("💾 Save")}</button>
+            {isCustom&&<button type="button" className="btn btn-ghost btn-sm" onClick={reset} disabled={saving}>{ts("Reset to shop default")}</button>}
           </div>
         </div>
       )}
@@ -640,12 +641,12 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onS
   return (
     <div className="card" style={{padding:"12px 14px",marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        <div style={{fontSize:13,fontWeight:700,flex:1,minWidth:160}}>🎁 Customer Discount</div>
-        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit</button>}
+        <div style={{fontSize:13,fontWeight:700,flex:1,minWidth:160}}>{ts("🎁 Customer Discount")}</div>
+        {!editing&&<button type="button" className="btn btn-ghost btn-sm" onClick={startEdit}>{ts("✏️ Edit")}</button>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:10}}>
         <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
-          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Default Amount</div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>{ts("Default Amount")}</div>
           {editing?(
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <button type="button" className="btn btn-ghost btn-xs" onClick={()=>step(-1)} disabled={saving}>−</button>
@@ -659,7 +660,7 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onS
           )}
         </div>
         <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px"}}>
-          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>Maximum Discount Limit</div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>{ts("Maximum Discount Limit")}</div>
           {editing?(
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <button type="button" className="btn btn-ghost btn-xs" onClick={()=>stepMax(-1)} disabled={saving}>−</button>
@@ -669,21 +670,21 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onS
               <span style={{fontSize:13,color:"var(--text3)"}}>%</span>
             </div>
           ):(
-            <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{maxDiscountPct>0?`${maxDiscountPct}%`:"No limit"}</div>
+            <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{maxDiscountPct>0?`${maxDiscountPct}%`:ts("No limit")}</div>
           )}
           <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>
-            Only affects your own catalogue{shopWideCap>0?` · shop ceiling ${shopWideCap}%`:""}
+            {ts("Only affects your own catalogue")}{shopWideCap>0?` · shop ceiling ${shopWideCap}%`:""}
           </div>
         </div>
       </div>
       <div style={{fontSize:11,color:"var(--text3)",marginTop:8}}>
-        {discountPct>0?"Applied automatically for customers who sign up through your catalogue link":"No discount set — customers pay full price"}
+        {discountPct>0?ts("Applied automatically for customers who sign up through your catalogue link"):ts("No discount set — customers pay full price")}
       </div>
       {editing&&(
         <div style={{display:"flex",gap:8,marginTop:10}}>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
-          {discountPct>0&&<button type="button" className="btn btn-ghost btn-sm" onClick={remove} disabled={saving}>Remove discount</button>}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(false)} disabled={saving}>{ts("Cancel")}</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={save} disabled={saving}>{saving?ts("Saving…"):ts("💾 Save")}</button>
+          {discountPct>0&&<button type="button" className="btn btn-ghost btn-sm" onClick={remove} disabled={saving}>{ts("Remove discount")}</button>}
         </div>
       )}
     </div>
@@ -710,18 +711,18 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
             <span style={{fontFamily:"DM Mono,monospace",fontWeight:700,fontSize:14,wordBreak:"break-all"}}>{code}</span>
-            {readOnly&&<span title="Managed by admin" style={{fontSize:12,opacity:.6,flexShrink:0}}>🔒</span>}
-            {priceChanged&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",flexShrink:0,whiteSpace:"nowrap"}}>🔔 UPDATED</span>}
+            {readOnly&&<span title={ts("Managed by admin")} style={{fontSize:12,opacity:.6,flexShrink:0}}>🔒</span>}
+            {priceChanged&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",flexShrink:0,whiteSpace:"nowrap"}}>{ts("🔔 UPDATED")}</span>}
           </div>
           <div style={{fontSize:15,fontWeight:600,color:"var(--text)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
-          {(p.make||p.model)&&<div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} more fit{fitCount!==1?"s":""}</span>}</div>}
+          {(p.make||p.model)&&<div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}{fitCount>0&&<span> · +{fitCount} {ts("more fit")}{fitCount!==1?"s":""}</span>}</div>}
         </div>
       </div>
 
       {readOnly&&(
         <div style={{fontSize:12,color:"var(--text3)",display:"flex",gap:14,flexWrap:"wrap",paddingLeft:indent}}>
-          <span>Your cost: <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):"not set"}</strong></span>
-          {p._suggestedPrice&&<span>Suggested retail: <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>}
+          <span>{ts("Your cost:")} <strong style={{color:"var(--text2)"}}>{p._supplierPrice?fmtAmt(p._supplierPrice):ts("not set")}</strong></span>
+          {p._suggestedPrice&&<span>{ts("Suggested retail:")} <strong style={{color:"var(--text2)"}}>{fmtAmt(p._suggestedPrice)}</strong></span>}
         </div>
       )}
 
@@ -729,17 +730,17 @@ function PartRow({p, code, name, readOnly, priceChanged, onClick, onPrintLabel, 
         <div style={{display:"flex",alignItems:"baseline",gap:10}}>
           {p.price
             ? <span style={{fontWeight:700,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:19}}>{fmtAmt(p.price)}</span>
-            : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:12}}>⏳ Awaiting pricing</span>}
-          <span style={{fontSize:12,color:"var(--text3)"}}>Stock: {p.stock??0}</span>
+            : <span className="badge" style={{background:"rgba(251,191,36,.12)",color:"var(--yellow)",fontSize:12}}>{ts("⏳ Awaiting pricing")}</span>}
+          <span style={{fontSize:12,color:"var(--text3)"}}>{ts("Stock:")} {p.stock??0}</span>
         </div>
         <div style={{display:"flex",gap:6}}>
           {onEditFitments&&(
-            <button type="button" title="Vehicle fits" className="btn btn-ghost btn-xs" style={{fontSize:13}}
-              onClick={e=>{e.stopPropagation();onEditFitments();}}>🚗 Fits{fitCount>0?` (${fitCount})`:""}</button>
+            <button type="button" title={ts("Vehicle fits")} className="btn btn-ghost btn-xs" style={{fontSize:13}}
+              onClick={e=>{e.stopPropagation();onEditFitments();}}>{ts("🚗 Fits")}{fitCount>0?` (${fitCount})`:""}</button>
           )}
           {onPrintLabel&&(
-            <button type="button" title="Print part label" className="btn btn-ghost btn-xs" style={{fontSize:13}}
-              onClick={e=>{e.stopPropagation();onPrintLabel();}}>🏷️ Label</button>
+            <button type="button" title={ts("Print part label")} className="btn btn-ghost btn-xs" style={{fontSize:13}}
+              onClick={e=>{e.stopPropagation();onPrintLabel();}}>{ts("🏷️ Label")}</button>
           )}
         </div>
       </div>
@@ -767,13 +768,12 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
   },[part?.id]);
   return (
     <Overlay onClose={onClose}>
-      <MHead title="Update Your Cost Price" sub={`${part.sku} — ${part.name}`} onClose={onClose}/>
+      <MHead title={ts("Update Your Cost Price")} sub={`${part.sku} — ${part.name}`} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
-        Your cost price is just your own reference — it doesn't change what customers see. The suggested retail price
-        below is a hint for admin to consider when they set the live selling price.
+        {ts("Your cost price is just your own reference — it doesn't change what customers see. The suggested retail price below is a hint for admin to consider when they set the live selling price.")}
       </div>
       <FD>
-        <FL label="Your Cost Price"/>
+        <FL label={ts("Your Cost Price")}/>
         <input className="inp" type="number" min="0" step="0.01" autoFocus value={price} onChange={e=>{setPrice(e.target.value);setSuggestedPrice(null);}} placeholder="0"/>
         {+price>0&&(
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
@@ -794,14 +794,14 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
         )}
         {suggestedPrice!=null&&(
           <div style={{marginTop:10,padding:"10px 14px",borderRadius:10,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
+            <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>{ts("Suggested retail price for admin to review")}</span>
             <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{suggestedPrice.toLocaleString()}</span>
           </div>
         )}
       </FD>
 
       <FD>
-        <FL label="Photo"/>
+        <FL label={ts("Photo")}/>
         <PartPhotoUploader imageUrl={imageUrl} onChange={setImageUrl} sku={part.sku} t={{}} bucket="cars_parts"/>
         <ExtraPhotosStrip photos={photos} onChange={setPhotos} sku={part.sku}
           autosave={newPhotos=>api.patch("parts","id",part.id,{photos:newPhotos})}
@@ -820,24 +820,24 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
       <div style={{marginBottom:14}}>
         <button type="button" onClick={()=>setHistoryOpen(v=>!v)}
           style={{background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,color:"var(--text3)",display:"flex",alignItems:"center",gap:5}}>
-          📜 Price History {history.length>0?`(${history.length})`:""} {historyOpen?"▲":"▼"}
+          {ts("📜 Price History")} {history.length>0?`(${history.length})`:""} {historyOpen?"▲":"▼"}
         </button>
         {historyOpen&&(
           history.length===0
-            ? <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>No price changes recorded yet.</div>
+            ? <div style={{fontSize:12,color:"var(--text3)",marginTop:8}}>{ts("No price changes recorded yet.")}</div>
             : (
               <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
                 {history.map(h=>(
                   <div key={h.id} style={{padding:"8px 12px",borderBottom:"1px solid var(--border)",fontSize:12,display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                     <div>
                       {h.old_price!=null&&h.new_price!=null&&+h.old_price!==+h.new_price&&(
-                        <div>Selling: {fmtAmt(h.old_price)} → <strong>{fmtAmt(h.new_price)}</strong></div>
+                        <div>{ts("Selling:")} {fmtAmt(h.old_price)} → <strong>{fmtAmt(h.new_price)}</strong></div>
                       )}
                       {h.old_cost_price!=null&&h.new_cost_price!=null&&+h.old_cost_price!==+h.new_cost_price&&(
-                        <div style={{color:"var(--text2)"}}>Cost: {fmtAmt(h.old_cost_price)} → <strong>{fmtAmt(h.new_cost_price)}</strong></div>
+                        <div style={{color:"var(--text2)"}}>{ts("Cost:")} {fmtAmt(h.old_cost_price)} → <strong>{fmtAmt(h.new_cost_price)}</strong></div>
                       )}
                       <div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>
-                        {h.source==="supplier_cost_update"?"🏭 Your update":"✏️ Admin update"}
+                        {h.source==="supplier_cost_update"?ts("🏭 Your update"):ts("✏️ Admin update")}
                       </div>
                     </div>
                     <div style={{color:"var(--text3)",fontSize:11,whiteSpace:"nowrap"}}>{fmtDT(h.created_at)}</div>
@@ -849,10 +849,10 @@ function SupplierCostPriceModal({part, supplierMarginOptions=null, onSave, onClo
       </div>
 
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{ts("Cancel")}</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||price===""}
           onClick={async()=>{setSaving(true);await onSave({price:+price,suggestedPrice,imageUrl,photos});setSaving(false);}}>
-          {saving?"Saving…":"Save"}
+          {saving?ts("Saving…"):ts("Save")}
         </button>
       </div>
     </Overlay>
@@ -890,28 +890,28 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
         <input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={f.part_code}
           onChange={e=>s("part_code",e.target.value.toUpperCase().replace(/\s+/g,""))} placeholder="e.g. A1679066909R"/>
       </FD>
-      <FD><FL label="Name *"/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="e.g. Head Lamp LED Right Side"/></FD>
-      <FD><FL label="Chinese Description"/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)}/></FD>
+      <FD><FL label={ts("Name *")}/><input className="inp" value={f.name} onChange={e=>s("name",e.target.value)} placeholder={ts("e.g. Head Lamp LED Right Side")}/></FD>
+      <FD><FL label={ts("Chinese Description")}/><input className="inp" value={f.chinese_desc} onChange={e=>s("chinese_desc",e.target.value)}/></FD>
 
       <FG cols="1fr 1fr 1fr">
-        <div><FL label="Make"/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder="BMW"/></div>
-        <div><FL label="Model"/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="X3"/></div>
-        <div><FL label="Year"/><input className="inp" value={f.year_range} onChange={e=>s("year_range",e.target.value)} placeholder="2021-2024"/></div>
+        <div><FL label={ts("Make")}/><input className="inp" value={f.make} onChange={e=>s("make",e.target.value)} placeholder={ts("BMW")}/></div>
+        <div><FL label={ts("Model")}/><input className="inp" value={f.model} onChange={e=>s("model",e.target.value)} placeholder="X3"/></div>
+        <div><FL label={ts("Year")}/><input className="inp" value={f.year_range} onChange={e=>s("year_range",e.target.value)} placeholder="2021-2024"/></div>
       </FG>
 
       {isEdit&&(
         <div style={{fontSize:11,color:"var(--text3)",marginTop:-8,marginBottom:14}}>
-          More fitment vehicles can be linked from the part's "🚗 Fits" button once saved.
+          {ts("More fitment vehicles can be linked from the part's \"🚗 Fits\" button once saved.")}
         </div>
       )}
 
       <FG>
         <div>
-          <FL label="OE Number"/>
+          <FL label={ts("OE Number")}/>
           <input className="inp" value={f.oe_number} onChange={e=>s("oe_number",e.target.value)}/>
           {oeDuplicates.length>0&&(
             <div style={{marginTop:6,padding:"8px 10px",borderRadius:8,background:"rgba(248,113,113,.1)",border:"1px solid rgba(248,113,113,.35)",fontSize:12,color:"var(--red)"}}>
-              ⚠️ This OE Number is already on {oeDuplicates.length} other part{oeDuplicates.length>1?"s":""} in your inventory:
+              {ts("⚠️ This OE Number is already on")} {oeDuplicates.length} {ts("other part")}{oeDuplicates.length>1?"s":""} {ts("in your inventory:")}
               {oeDuplicates.map(p=><div key={p.id} style={{marginTop:3,fontWeight:600}}>{p.name} <span style={{fontFamily:"DM Mono,monospace",fontWeight:400}}>({supplierCode}-{p.part_code})</span></div>)}
             </div>
           )}
@@ -927,14 +927,14 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
             ];
             return (
               <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginTop:6,padding:"8px 10px",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8}}>
-                <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",flexShrink:0}}>🔍 Search</span>
+                <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",flexShrink:0}}>{ts("🔍 Search")}</span>
                 {oeTokens.length>1&&(
                   <select className="inp" style={{width:"auto",fontSize:11,fontWeight:700,padding:"4px 8px"}}
                     value={activeTok} onChange={e=>setSelectedOeTok(e.target.value)}>
                     {oeTokens.map((tok,i)=>(<option key={i} value={tok}>{tok}</option>))}
                   </select>
                 )}
-                <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>on:</span>
+                <span style={{fontSize:11,color:"var(--text3)",flexShrink:0}}>{ts("on:")}</span>
                 {sites.map(site=>(
                   <button key={site.label} type="button"
                     onClick={()=>window.open(site.url(activeTok),"_blank","noopener,noreferrer")}
@@ -949,9 +949,9 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
           })()}
         </div>
         <div>
-          <FL label="Category"/>
+          <FL label={ts("Category")}/>
           <select className="inp" value={f.category} onChange={e=>s("category",e.target.value)}>
-            <option value="">— Select —</option>
+            <option value="">{ts("— Select —")}</option>
             {getCategories().map(c=><option key={c} value={c}>{c}</option>)}
             {f.category&&!getCategories().includes(f.category)&&<option value={f.category}>{f.category}</option>}
           </select>
@@ -959,7 +959,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
       </FG>
       <FG>
         <div>
-          <FL label="Your Cost Price"/>
+          <FL label={ts("Your Cost Price")}/>
           <input className="inp" type="number" value={f.cost_price} onChange={e=>s("cost_price",e.target.value)} placeholder="0"/>
           {+f.cost_price>0&&(
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
@@ -979,17 +979,17 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
             </div>
           )}
         </div>
-        <div><FL label="Stock"/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",+e.target.value||0)}/></div>
+        <div><FL label={ts("Stock")}/><input className="inp" type="number" value={f.stock} onChange={e=>s("stock",+e.target.value||0)}/></div>
       </FG>
       {+f.suggested_price>0&&(
         <div style={{marginTop:-4,marginBottom:14,padding:"10px 14px",borderRadius:10,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-          <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>Suggested retail price for admin to review</span>
+          <span style={{fontSize:12,fontWeight:600,color:"var(--text2)"}}>{ts("Suggested retail price for admin to review")}</span>
           <span style={{fontSize:22,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+f.suggested_price).toLocaleString()}</span>
         </div>
       )}
 
       <FD>
-        <FL label="Photo"/>
+        <FL label={ts("Photo")}/>
         <PartPhotoUploader imageUrl={f.image_url} onChange={url=>s("image_url",url)} sku={`${supplierCode}-${f.part_code||"part"}`} t={{}} bucket="cars_parts"/>
         <ExtraPhotosStrip photos={f.photos} onChange={photos=>s("photos",photos)} sku={`${supplierCode}-${f.part_code||"part"}`}
           autosave={isEdit?(newPhotos=>api.patch("supplier_parts","id",f.id,{photos:newPhotos})):undefined}
@@ -1011,15 +1011,15 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
           color:part.price?"var(--green)":"var(--yellow)"}}>
           {part.price
             ? `✅ Live — customers see this at ${fmtAmt(part.price)}`
-            : "⏳ Awaiting pricing — not visible to customers until priced"}
+            : ts("⏳ Awaiting pricing — not visible to customers until priced")}
         </div>
       )}
 
       <div style={{display:"flex",gap:10}}>
         {onDelete&&<button className="btn btn-ghost" style={{color:"var(--red)",borderColor:"rgba(239,68,68,.3)"}}
           onClick={()=>{if(window.confirm(`Delete ${supplierCode}-${f.part_code}?`)) onDelete();}}>🗑</button>}
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} disabled={!canSave||saving} onClick={async()=>{setSaving(true);try{await onSave(f);}finally{setSaving(false);}}}>{saving?"Saving…":"Save"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{ts("Cancel")}</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={!canSave||saving} onClick={async()=>{setSaving(true);try{await onSave(f);}finally{setSaving(false);}}}>{saving?ts("Saving…"):ts("Save")}</button>
       </div>
     </Overlay>
   );
@@ -1051,10 +1051,10 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>💰 Supplier Pricing</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} awaiting pricing · {costUpdates.length} cost update{costUpdates.length!==1?"s":""} to review</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("💰 Supplier Pricing")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{allParts.filter(p=>!p.price).length} {ts("awaiting pricing ·")} {costUpdates.length} {ts("cost update")}{costUpdates.length!==1?"s":""} {ts("to review")}</p>
         </div>
-        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
       </div>
 
       <div style={{display:"flex",borderBottom:"1px solid var(--border)",marginBottom:16}}>
@@ -1065,15 +1065,15 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
 
       {filter==="costUpdates"&&(
         costUpdates.length===0 ? (
-          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No cost price updates waiting on review 🎉</div>
+          <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No cost price updates waiting on review 🎉")}</div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>Suppliers updated their cost on these parts — check if the selling price still makes sense.</div>
+            <div style={{fontSize:12,color:"var(--text3)",marginBottom:2}}>{ts("Suppliers updated their cost on these parts — check if the selling price still makes sense.")}</div>
             {costUpdateSupplierOptions.length>1&&(
               <div style={{marginBottom:2}}>
                 <select className="inp" style={{width:"auto",minWidth:220}} value={costUpdateSupplier}
                   onChange={e=>{setCostUpdateSupplier(e.target.value);setSelectedCostUpdates(new Set());}}>
-                  <option value="__all__">All Suppliers ({costUpdates.length})</option>
+                  <option value="__all__">{ts("All Suppliers (")}{costUpdates.length})</option>
                   {costUpdateSupplierOptions.map(s=>(
                     <option key={s.id} value={s.id}>{s.name} ({s.count})</option>
                   ))}
@@ -1082,9 +1082,9 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
             )}
             {onBulkApproveCostUpdates&&(
               <div className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2}}>
-                <div style={{fontSize:13,fontWeight:700}}>{selectedCostUpdates.size} selected</div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set(visibleCostUpdates.map(l=>l.id)))}>Select All ({visibleCostUpdates.length})</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set())} disabled={!selectedCostUpdates.size}>Clear</button>
+                <div style={{fontSize:13,fontWeight:700}}>{selectedCostUpdates.size} {ts("selected")}</div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set(visibleCostUpdates.map(l=>l.id)))}>{ts("Select All (")}{visibleCostUpdates.length})</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setSelectedCostUpdates(new Set())} disabled={!selectedCostUpdates.size}>{ts("Clear")}</button>
                 <div style={{flex:1,minWidth:8}}/>
                 <button type="button" className="btn btn-primary btn-sm" disabled={!selectedCostUpdates.size||approving}
                   onClick={async()=>{
@@ -1094,12 +1094,12 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                     setApproving(false);
                     setSelectedCostUpdates(new Set());
                   }}>
-                  {approving?"Approving…":`✅ Approve ${selectedCostUpdates.size||""} Selected`}
+                  {approving?ts("Approving…"):`✅ Approve ${selectedCostUpdates.size||""} Selected`}
                 </button>
               </div>
             )}
             {visibleCostUpdates.length===0&&(
-              <div className="card" style={{padding:32,textAlign:"center",color:"var(--text3)"}}>No cost updates from this supplier.</div>
+              <div className="card" style={{padding:32,textAlign:"center",color:"var(--text3)"}}>{ts("No cost updates from this supplier.")}</div>
             )}
             {visibleCostUpdates.map(l=>(
               <div key={l.id} className="card" style={{padding:14,display:"flex",gap:12,alignItems:"center"}}>
@@ -1117,19 +1117,19 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                   <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(l.supplier_id)}</div>
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
-                  Selling price<br/><strong style={{color:"var(--text2)"}}>{l._part?.price?fmtAmt(l._part.price):"—"}</strong>
+                  {ts("Selling price")}<br/><strong style={{color:"var(--text2)"}}>{l._part?.price?fmtAmt(l._part.price):"—"}</strong>
                 </div>
                 <div style={{fontSize:12,color:"var(--blue)",textAlign:"right",flexShrink:0}}>
-                  New supplier cost<br/><strong>{l.supplier_price?fmtAmt(l.supplier_price):"—"}</strong>
+                  {ts("New supplier cost")}<br/><strong>{l.supplier_price?fmtAmt(l.supplier_price):"—"}</strong>
                 </div>
                 {l.suggested_price&&(
                   <div style={{fontSize:12,color:"var(--green)",textAlign:"right",flexShrink:0}}>
-                    Supplier suggests<br/><strong>{fmtAmt(l.suggested_price)}</strong>
+                    {ts("Supplier suggests")}<br/><strong>{fmtAmt(l.suggested_price)}</strong>
                   </div>
                 )}
                 <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-                  {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l)}>✏️ Update Price</button>}
-                  <button className="btn btn-ghost btn-sm" onClick={()=>onDismissCostUpdate(l.id)}>Dismiss</button>
+                  {onGoToPart&&<button className="btn btn-primary btn-sm" onClick={()=>onGoToPart(l)}>{ts("✏️ Update Price")}</button>}
+                  <button className="btn btn-ghost btn-sm" onClick={()=>onDismissCostUpdate(l.id)}>{ts("Dismiss")}</button>
                 </div>
               </div>
             ))}
@@ -1140,7 +1140,7 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
       {(filter==="pending"||filter==="all")&&(
         rows.length===0 ? (
           <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-            {filter==="pending"?"Nothing waiting on a price 🎉":"No supplier-added parts yet."}
+            {filter==="pending"?ts("Nothing waiting on a price 🎉"):ts("No supplier-added parts yet.")}
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1157,17 +1157,17 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                   <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{supName(p.supplier_id)}{(p.make||p.model)?` · ${[p.make,p.model,p.year_range].filter(Boolean).join(" ")}`:""}</div>
                 </div>
                 <div style={{fontSize:12,color:"var(--text3)",textAlign:"right",flexShrink:0}}>
-                  Cost<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
-                  {p.suggested_price&&<div style={{color:"var(--green)",marginTop:2}}>Suggests: <strong>{fmtAmt(p.suggested_price)}</strong></div>}
+                  {ts("Cost")}<br/><strong style={{color:"var(--text2)"}}>{p.cost_price?fmtAmt(p.cost_price):"—"}</strong>
+                  {p.suggested_price&&<div style={{color:"var(--green)",marginTop:2}}>{ts("Suggests:")} <strong>{fmtAmt(p.suggested_price)}</strong></div>}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-                  <input className="inp" type="number" style={{width:100}} placeholder="Set price"
+                  <input className="inp" type="number" style={{width:100}} placeholder={ts("Set price")}
                     value={drafts[p.id]??p.price??p.suggested_price??""}
                     onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}/>
                   <button className="btn btn-primary btn-sm"
                     disabled={!String(drafts[p.id]??p.price??p.suggested_price??"").trim()}
                     onClick={()=>onSetPrice(p.id,+(drafts[p.id]??p.price??p.suggested_price)||0)}>
-                    {p.price?"Update":"Set Live"}
+                    {p.price?ts("Update"):ts("Set Live")}
                   </button>
                 </div>
               </div>
@@ -1203,14 +1203,14 @@ export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[],
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>💬 My Queries</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{queries.filter(q=>q.status==="pending").length} pending · {queries.length} total</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("💬 My Queries")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{queries.filter(q=>q.status==="pending").length} {ts("pending ·")} {queries.length} {ts("total")}</p>
         </div>
-        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
       </div>
 
       {queries.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No queries yet.</div>
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No queries yet.")}</div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {queries.map(q=>{
@@ -1228,7 +1228,7 @@ export function SupplierQueriesPage({queries=[], existingParts=[], selfParts=[],
                   <div style={{fontWeight:700,fontSize:14}}>{q.part_name}</div>
                   {q.part_sku&&<div style={{fontSize:12,color:"var(--blue)",fontFamily:"DM Mono,monospace"}}>{q.part_sku}</div>}
                   {(p?.make||p?.model)&&<div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{[p.make,p.model,p.year_range].filter(Boolean).join(" · ")}</div>}
-                  <div style={{fontSize:12,color:"var(--text2)",marginTop:4}}>👤 {q.customer_name} · 📞 {q.customer_phone} · Qty: {q.qty_requested}</div>
+                  <div style={{fontSize:12,color:"var(--text2)",marginTop:4}}>👤 {q.customer_name} · 📞 {q.customer_phone} {ts("· Qty:")} {q.qty_requested}</div>
                   {q.notes&&<div style={{fontSize:12,color:"var(--text3)",fontStyle:"italic",marginTop:4}}>"{q.notes}"</div>}
                 </div>
                 <StatusBadge status={q.status}/>
@@ -1273,19 +1273,19 @@ export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDi
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>🎁 My Customers</h1>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("🎁 My Customers")}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            {customers.length} registered through your catalogue link
+            {customers.length} {ts("registered through your catalogue link")}
           </p>
         </div>
-        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
       </div>
 
       {onUpdateDefaultDiscount&&<CustomerDiscountCard discountPct={defaultDiscountPct} maxDiscountPct={maxDiscountPct} shopWideCap={shopWideCap} onSave={onUpdateDefaultDiscount} onSaveMax={onUpdateMaxDiscount}/>}
 
       {customers.length===0 ? (
         <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>
-          Nobody's registered through your catalogue link yet — share it from My Parts.
+          {ts("Nobody's registered through your catalogue link yet — share it from My Parts.")}
         </div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1297,23 +1297,23 @@ export function SupplierCustomersPage({customers=[], defaultDiscountPct=0, maxDi
                 <div style={{flex:1,minWidth:180}}>
                   <div style={{fontWeight:700,fontSize:14}}>{c.name}</div>
                   <div style={{fontSize:12,color:"var(--text3)",marginTop:1}}>📞 {c.phone}{c.email?` · ${c.email}`:""}</div>
-                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{c.orders||0} order{c.orders!==1?"s":""} · {fmtAmt(c.total_spent||0)} spent</div>
+                  <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{c.orders||0} {ts("order")}{c.orders!==1?"s":""} · {fmtAmt(c.total_spent||0)} {ts("spent")}</div>
                 </div>
                 {editingId===c.id ? (
                   <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                     <input className="inp" type="number" min="0" max={hasCap?effectiveCap:100} style={{width:80}}
                       placeholder={String(defaultDiscountPct||0)} value={val} onChange={e=>setVal(e.target.value)} autoFocus/>
                     <span style={{fontSize:12,color:"var(--text3)"}}>%</span>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditingId(null)} disabled={saving}>Cancel</button>
-                    <button type="button" className="btn btn-primary btn-sm" onClick={()=>save(c.id)} disabled={saving}>{saving?"Saving…":"💾 Save"}</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditingId(null)} disabled={saving}>{ts("Cancel")}</button>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={()=>save(c.id)} disabled={saving}>{saving?ts("Saving…"):ts("💾 Save")}</button>
                   </div>
                 ) : (
                   <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:16,fontWeight:800,color:effective>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif"}}>{effective}% off</div>
-                      <div style={{fontSize:10,color:"var(--text3)"}}>{isOverride?"Custom":"Default"}</div>
+                      <div style={{fontSize:16,fontWeight:800,color:effective>0?"var(--green)":"var(--text3)",fontFamily:"Rajdhani,sans-serif"}}>{effective}{ts("% off")}</div>
+                      <div style={{fontSize:10,color:"var(--text3)"}}>{isOverride?ts("Custom"):ts("Default")}</div>
                     </div>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>startEdit(c)}>✏️ Edit</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={()=>startEdit(c)}>{ts("✏️ Edit")}</button>
                   </div>
                 )}
               </div>
@@ -1342,7 +1342,7 @@ function SupplierQueryReplyModal({query, part, onReply, onClose}) {
   };
   return (
     <Overlay onClose={onClose}>
-      <MHead title="Reply to Query" sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
+      <MHead title={ts("Reply to Query")} sub={`${query.customer_name} — ${query.part_name}`} onClose={onClose}/>
       {lightbox&&img&&<ImgLightbox url={toImgUrl(img)} onClose={()=>setLightbox(false)}/>}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13,display:"flex",gap:12}}>
         <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:img?"zoom-in":"default"}}
@@ -1353,21 +1353,21 @@ function SupplierQueryReplyModal({query, part, onReply, onClose}) {
         </div>
         <div style={{flex:1,minWidth:0}}>
           {query.part_sku&&<div style={{fontFamily:"DM Mono,monospace",fontWeight:700,color:"var(--blue)"}}>{query.part_sku}</div>}
-          {part?.oe_number&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>OE: {part.oe_number}</div>}
+          {part?.oe_number&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>{ts("OE:")} {part.oe_number}</div>}
           {(part?.make||part?.model)&&<div style={{color:"var(--text3)",fontSize:12,marginTop:1}}>{[part.make,part.model,part.year_range].filter(Boolean).join(" · ")}</div>}
           <div style={{marginTop:6}}>👤 {query.customer_name} · 📞 {query.customer_phone}</div>
-          <div style={{marginTop:2}}>🔢 Requested qty: <strong>{query.qty_requested}</strong></div>
+          <div style={{marginTop:2}}>{ts("🔢 Requested qty:")} <strong>{query.qty_requested}</strong></div>
         </div>
       </div>
       {query.notes&&<div style={{marginTop:-8,marginBottom:14,color:"var(--text3)",fontStyle:"italic",fontSize:13}}>"{query.notes}"</div>}
       <FG cols="1fr 1fr">
-        <div><FL label="Confirmed Price"/><input className="inp" type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Unit price"/></div>
-        <div><FL label="Confirmed Qty"/><input className="inp" type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} placeholder="Available qty"/></div>
+        <div><FL label={ts("Confirmed Price")}/><input className="inp" type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder={ts("Unit price")}/></div>
+        <div><FL label={ts("Confirmed Qty")}/><input className="inp" type="number" min="0" value={qty} onChange={e=>setQty(e.target.value)} placeholder={ts("Available qty")}/></div>
       </FG>
-      <FD><FL label="Notes to customer"/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} rows={3}/></FD>
+      <FD><FL label={ts("Notes to customer")}/><textarea className="inp" value={notes} onChange={e=>setNotes(e.target.value)} rows={3}/></FD>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={handle}>{saving?"Sending…":"Send Reply"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{ts("Cancel")}</button>
+        <button className="btn btn-primary" style={{flex:2}} disabled={saving} onClick={handle}>{saving?ts("Sending…"):ts("Send Reply")}</button>
       </div>
     </Overlay>
   );
@@ -1387,22 +1387,22 @@ function CatalogFitmentEditModal({part, onSave, onClose}) {
   const [saving, setSaving] = useState(false);
   return (
     <Overlay onClose={onClose}>
-      <MHead title="Edit Catalogue Part" sub={part.sku} onClose={onClose}/>
+      <MHead title={ts("Edit Catalogue Part")} sub={part.sku} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.3)"}}>
-        ⚠️ This is a shared VelGenius catalogue part — saving here updates the master listing that admin and every supplier of this part see, not just your own copy.
+        {ts("⚠️ This is a shared VelGenius catalogue part — saving here updates the master listing that admin and every supplier of this part see, not just your own copy.")}
       </div>
-      <FD><FL label="Name *"/><input className="inp" value={name} onChange={e=>setName(e.target.value)} autoFocus/></FD>
-      <FD><FL label="OE Number"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={oe} onChange={e=>setOe(e.target.value.toUpperCase())}/></FD>
+      <FD><FL label={ts("Name *")}/><input className="inp" value={name} onChange={e=>setName(e.target.value)} autoFocus/></FD>
+      <FD><FL label={ts("OE Number")}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={oe} onChange={e=>setOe(e.target.value.toUpperCase())}/></FD>
       <FG cols="1fr 1fr 1fr">
-        <div><FL label="Make"/><input className="inp" value={make} onChange={e=>setMake(e.target.value.toUpperCase())} placeholder="BMW, TOYOTA…"/></div>
-        <div><FL label="Model"/><input className="inp" value={model} onChange={e=>setModel(e.target.value.toUpperCase())} placeholder="G30, HILUX…"/></div>
-        <div><FL label="Year Range"/><input className="inp" value={yearRange} onChange={e=>setYearRange(e.target.value)} placeholder="2018-2023"/></div>
+        <div><FL label={ts("Make")}/><input className="inp" value={make} onChange={e=>setMake(e.target.value.toUpperCase())} placeholder={ts("BMW, TOYOTA…")}/></div>
+        <div><FL label={ts("Model")}/><input className="inp" value={model} onChange={e=>setModel(e.target.value.toUpperCase())} placeholder={ts("G30, HILUX…")}/></div>
+        <div><FL label={ts("Year Range")}/><input className="inp" value={yearRange} onChange={e=>setYearRange(e.target.value)} placeholder="2018-2023"/></div>
       </FG>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{ts("Cancel")}</button>
         <button className="btn btn-primary" style={{flex:2}} disabled={saving||!name.trim()}
           onClick={async()=>{setSaving(true);const ok=await onSave({id:part.id,name,oe_number:oe,make,model,year_range:yearRange});setSaving(false);if(ok)onClose();}}>
-          {saving?"Saving…":"Save"}
+          {saving?ts("Saving…"):ts("Save")}
         </button>
       </div>
     </Overlay>
@@ -1638,7 +1638,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   };
 
   const submit=()=>{
-    if(alreadyStocked&&!window.confirm("This invoice's stock is already live. Saving will adjust your actual stock quantities to match these changes (only what changed — added, removed, or re-counted lines). Continue?")) return;
+    if(alreadyStocked&&!window.confirm(ts("This invoice's stock is already live. Saving will adjust your actual stock quantities to match these changes (only what changed — added, removed, or re-counted lines). Continue?"))) return;
     // A big invoice saves one line at a time (awaited sequentially) before labels
     // are ready — by then the browser no longer treats window.open() as tied to
     // this click, and silently blocks it. Reserve the tab HERE, still inside the
@@ -1662,7 +1662,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
   // discard a shipment that's half-typed in.
   const hasUnsavedWork=items.length>0||invoiceNo.trim()||fromName.trim()||notes.trim();
   const handleClose=()=>{
-    if(hasUnsavedWork&&!window.confirm("You have unsaved items on this invoice. Close without saving?")) return;
+    if(hasUnsavedWork&&!window.confirm(ts("You have unsaved items on this invoice. Close without saving?"))) return;
     onCancel();
   };
 
@@ -1730,24 +1730,24 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         sub={alreadyStocked?`Stock from ${editingInvoice.invoice_no||editingInvoice.id} is already in your system`:editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={handleClose}/>
       {alreadyStocked&&(
         <div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--yellow)"}}>
-          ⚠️ This invoice's stock was already added to your system. Change a line's qty, remove one, or add a new one (e.g. splitting one part into left/right) — saving will adjust live stock by only what actually changed, and log it in My Stock Records.
+          {ts("⚠️ This invoice's stock was already added to your system. Change a line's qty, remove one, or add a new one (e.g. splitting one part into left/right) — saving will adjust live stock by only what actually changed, and log it in My Stock Records.")}
         </div>
       )}
       <div style={{background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 14px 4px",marginBottom:16}}>
         <FG cols="1fr 1fr">
-          <div><FL label="Invoice No"/><input className="inp" value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></div>
-          <div><FL label="Invoice Date"/><input className="inp" type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></div>
+          <div><FL label={ts("Invoice No")}/><input className="inp" value={invoiceNo} onChange={e=>setInvoiceNo(e.target.value)}/></div>
+          <div><FL label={ts("Invoice Date")}/><input className="inp" type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></div>
         </FG>
-        <FD><FL label="From (supplier)"/><input className="inp" value={fromName} onChange={e=>setFromName(e.target.value)}/></FD>
+        <FD><FL label={ts("From (supplier)")}/><input className="inp" value={fromName} onChange={e=>setFromName(e.target.value)}/></FD>
         <FG cols="1fr 1fr 1fr">
-          <div><FL label="Shipping Cost"/><input className="inp" type="number" min="0" value={shippingCost} onChange={e=>setShippingCost(e.target.value)} placeholder="0"/></div>
-          <div><FL label="Customs Cost (USD)"/><input className="inp" type="number" min="0" value={customsCostUsd} onChange={e=>setCustomsCostUsd(e.target.value)} placeholder="0"/></div>
-          <div><FL label="Exchange Rate"/><input className="inp" type="number" min="0" step="0.0001" value={exchangeRate} onChange={e=>setExchangeRate(e.target.value)} placeholder="e.g. 18.50"/></div>
+          <div><FL label={ts("Shipping Cost")}/><input className="inp" type="number" min="0" value={shippingCost} onChange={e=>setShippingCost(e.target.value)} placeholder="0"/></div>
+          <div><FL label={ts("Customs Cost (USD)")}/><input className="inp" type="number" min="0" value={customsCostUsd} onChange={e=>setCustomsCostUsd(e.target.value)} placeholder="0"/></div>
+          <div><FL label={ts("Exchange Rate")}/><input className="inp" type="number" min="0" step="0.0001" value={exchangeRate} onChange={e=>setExchangeRate(e.target.value)} placeholder="e.g. 18.50"/></div>
         </FG>
       </div>
       <div style={{background:"rgba(255,122,46,.06)",border:"1px solid rgba(255,122,46,.25)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-        <FL label="➕ Add Item"/>
-        <input className="inp" style={{marginTop:6}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your parts by name, SKU, OE…"/>
+        <FL label={ts("➕ Add Item")}/>
+        <input className="inp" style={{marginTop:6}} value={search} onChange={e=>setSearch(e.target.value)} placeholder={ts("Search your parts by name, SKU, OE…")}/>
         {keywords.length>0&&(
           filtered.length>0 ? (
             <div style={{border:"1px solid var(--border)",borderRadius:8,marginTop:6,maxHeight:200,overflowY:"auto"}}>
@@ -1759,7 +1759,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                       ? <img src={toImgUrl(p.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
                       : <span style={{fontSize:14,opacity:.3}}>🖼</span>}
                     {p.image&&(
-                      <button type="button" title="Enlarge photo" onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name});}}
+                      <button type="button" title={ts("Enlarge photo")} onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name});}}
                         style={{position:"absolute",top:1,right:1,width:16,height:16,borderRadius:"50%",background:"rgba(0,0,0,.65)",border:"none",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                         <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg>
                       </button>
@@ -1778,7 +1778,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                         {p.make&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>🚗 {p.make}</span>}
                         {p.model&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>{p.model}</span>}
                         {p.year_range&&<span style={{fontSize:10,fontWeight:700,color:"var(--text3)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:99,padding:"1px 7px"}}>{p.year_range}</span>}
-                        {p.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>OE {p.oe_number}</span>}
+                        {p.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>{ts("OE")} {p.oe_number}</span>}
                       </div>
                     )}
                   </div>
@@ -1787,18 +1787,18 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
             </div>
           ) : (
             <div style={{marginTop:6}}>
-              <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>No parts match "{search}".</div>
-              {onQuickAddPart&&!addingNew&&<button type="button" className="btn btn-ghost btn-sm" onClick={openAddNew}>➕ Add "{search}" as a new part</button>}
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:6}}>{ts("No parts match \"")}{search}".</div>
+              {onQuickAddPart&&!addingNew&&<button type="button" className="btn btn-ghost btn-sm" onClick={openAddNew}>{ts("➕ Add \"")}{search}{ts("\" as a new part")}</button>}
             </div>
           )
         )}
         {addingNew&&(
           <div style={{border:"1px solid var(--accent)",borderRadius:8,padding:10,marginTop:8}}>
-            <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>➕ New Part</div>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{ts("➕ New Part")}</div>
             <FG cols="1fr 1fr">
               <div><FL label={`Part Code * — will show as ${supplierCode||"SUP"}-${newPartCode.trim()||"…"}`}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartCode} onChange={e=>setNewPartCode(e.target.value.toUpperCase())}/></div>
               <div>
-                <FL label="Cost Price"/>
+                <FL label={ts("Cost Price")}/>
                 <input className="inp" type="number" min="0" value={newPartCost} onChange={e=>setNewPartCost(e.target.value)}/>
                 {+newPartCost>0&&(
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:6}}>
@@ -1821,20 +1821,20 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
             </FG>
             {+newPartSuggestedPrice>0&&(
               <div style={{marginBottom:14,padding:"8px 12px",borderRadius:8,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.3)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:11,fontWeight:600,color:"var(--text2)"}}>Suggested sell price for admin to review</span>
+                <span style={{fontSize:11,fontWeight:600,color:"var(--text2)"}}>{ts("Suggested sell price for admin to review")}</span>
                 <span style={{fontSize:16,fontWeight:800,color:"var(--accent)",fontFamily:"Rajdhani,sans-serif"}}>{C()}{(+newPartSuggestedPrice).toLocaleString()}</span>
               </div>
             )}
-            <FD><FL label="Name *"/><input className="inp" value={newPartName} onChange={e=>setNewPartName(e.target.value)} autoFocus/></FD>
-            <FD><FL label="OE Number"/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartOe} onChange={e=>setNewPartOe(e.target.value.toUpperCase())} placeholder="OE number / OEM reference"/></FD>
+            <FD><FL label={ts("Name *")}/><input className="inp" value={newPartName} onChange={e=>setNewPartName(e.target.value)} autoFocus/></FD>
+            <FD><FL label={ts("OE Number")}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartOe} onChange={e=>setNewPartOe(e.target.value.toUpperCase())} placeholder={ts("OE number / OEM reference")}/></FD>
             <FG cols="1fr 1fr 1fr">
-              <div><FL label="Make"/><input className="inp" value={newPartMake} onChange={e=>setNewPartMake(e.target.value.toUpperCase())} placeholder="BMW, TOYOTA…"/></div>
-              <div><FL label="Model"/><input className="inp" value={newPartModel} onChange={e=>setNewPartModel(e.target.value.toUpperCase())} placeholder="G30, HILUX…"/></div>
-              <div><FL label="Year Range"/><input className="inp" value={newPartYearRange} onChange={e=>setNewPartYearRange(e.target.value)} placeholder="2018-2023"/></div>
+              <div><FL label={ts("Make")}/><input className="inp" value={newPartMake} onChange={e=>setNewPartMake(e.target.value.toUpperCase())} placeholder={ts("BMW, TOYOTA…")}/></div>
+              <div><FL label={ts("Model")}/><input className="inp" value={newPartModel} onChange={e=>setNewPartModel(e.target.value.toUpperCase())} placeholder={ts("G30, HILUX…")}/></div>
+              <div><FL label={ts("Year Range")}/><input className="inp" value={newPartYearRange} onChange={e=>setNewPartYearRange(e.target.value)} placeholder="2018-2023"/></div>
             </FG>
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-ghost btn-xs" onClick={()=>setAddingNew(false)}>Cancel</button>
-              <button className="btn btn-primary btn-xs" onClick={submitNewPart} disabled={addingNewSaving||!newPartCode.trim()||!newPartName.trim()}>{addingNewSaving?"Adding…":"✅ Add & Insert"}</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setAddingNew(false)}>{ts("Cancel")}</button>
+              <button className="btn btn-primary btn-xs" onClick={submitNewPart} disabled={addingNewSaving||!newPartCode.trim()||!newPartName.trim()}>{addingNewSaving?ts("Adding…"):ts("✅ Add & Insert")}</button>
             </div>
           </div>
         )}
@@ -1845,25 +1845,25 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
         return (
           <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.35)",borderRadius:10,padding:"12px 14px",marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
             <div style={{fontSize:13}}>
-              <strong>{ex.name}</strong> <span style={{color:"var(--text3)"}}>({ex.sku})</span> is already on this invoice — {ex.qty} × {C()}{ex.unitCost} unit cost.
+              <strong>{ex.name}</strong> <span style={{color:"var(--text3)"}}>({ex.sku})</span> {ts("is already on this invoice —")} {ex.qty} × {C()}{ex.unitCost} {ts("unit cost.")}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button className="btn btn-primary btn-xs" onClick={()=>{updateItem(dupPrompt.idx,{qty:ex.qty+1});setFlashIdx(dupPrompt.idx);setDupPrompt(null);}}>
-                +1 Qty — same cost ({C()}{ex.unitCost})
+                {ts("+1 Qty — same cost (")}{C()}{ex.unitCost})
               </button>
               <button className="btn btn-ghost btn-xs" onClick={()=>{addItem(dupPrompt.p,{forceNew:true});setDupPrompt(null);}}>
-                ➕ Add as separate line — different cost this time
+                {ts("➕ Add as separate line — different cost this time")}
               </button>
-              <button className="btn btn-ghost btn-xs" onClick={()=>setDupPrompt(null)}>Cancel</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>setDupPrompt(null)}>{ts("Cancel")}</button>
             </div>
           </div>
         );
       })()}
       {items.length>0&&(
         <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("cost")}>📄 Export PDF</button>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("sell")}>💰 Export PDF (Sell Price)</button>
-          <button type="button" className="btn btn-ghost btn-xs" onClick={exportCsv}>📊 Export Excel</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("cost")}>{ts("📄 Export PDF")}</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={()=>exportPdf("sell")}>{ts("💰 Export PDF (Sell Price)")}</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={exportCsv}>{ts("📊 Export Excel")}</button>
         </div>
       )}
       {items.length>0&&(
@@ -1903,20 +1903,20 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                         {full?.make&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>🚗 {full.make}</span>}
                         {full?.model&&<span style={{fontSize:10,fontWeight:700,color:"var(--blue)",background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.3)",borderRadius:99,padding:"1px 7px"}}>{full.model}</span>}
                         {full?.year_range&&<span style={{fontSize:10,fontWeight:700,color:"var(--text3)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:99,padding:"1px 7px"}}>{full.year_range}</span>}
-                        {full?.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>OE {full.oe_number}</span>}
+                        {full?.oe_number&&<span style={{fontSize:10,fontWeight:700,color:"var(--purple)",background:"rgba(167,139,250,.12)",border:"1px solid rgba(167,139,250,.3)",borderRadius:99,padding:"1px 7px",fontFamily:"DM Mono,monospace"}}>{ts("OE")} {full.oe_number}</span>}
                       </div>
                     );
                   })()}
                 </div>
-                <div><FL label="Qty"/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>
-                <div><FL label="Unit Cost"/><input className="inp" type="number" min="0" style={{width:90}} value={it.unitCost} onChange={e=>updateItem(idx,{unitCost:+e.target.value||0})}/></div>
-                <div><FL label="Bin Location"/><input className="inp" style={{width:110}} value={it.binLocation} onChange={e=>updateItem(idx,{binLocation:e.target.value})} placeholder="e.g. A1-02"/></div>
-                <button className="btn btn-ghost btn-xs" title="Print label(s) for this item now" onClick={()=>printItemLabel(it)}>🖨️ Print</button>
+                <div><FL label={ts("Qty")}/><input className="inp" type="number" min="1" style={{width:70}} value={it.qty} onChange={e=>updateItem(idx,{qty:Math.max(1,+e.target.value||1)})}/></div>
+                <div><FL label={ts("Unit Cost")}/><input className="inp" type="number" min="0" style={{width:90}} value={it.unitCost} onChange={e=>updateItem(idx,{unitCost:+e.target.value||0})}/></div>
+                <div><FL label={ts("Bin Location")}/><input className="inp" style={{width:110}} value={it.binLocation} onChange={e=>updateItem(idx,{binLocation:e.target.value})} placeholder="e.g. A1-02"/></div>
+                <button className="btn btn-ghost btn-xs" title={ts("Print label(s) for this item now")} onClick={()=>printItemLabel(it)}>{ts("🖨️ Print")}</button>
                 {it.sourceType==="own"&&onUpdatePart&&(
-                  <button className="btn btn-ghost btn-xs" onClick={()=>openEditItem(idx)}>✏️ Edit</button>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>openEditItem(idx)}>{ts("✏️ Edit")}</button>
                 )}
                 {it.sourceType==="catalogue"&&onUpdateCatalogPart&&(
-                  <button className="btn btn-ghost btn-xs" onClick={()=>setEditingCatalogIdx(idx)}>✏️ Edit</button>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setEditingCatalogIdx(idx)}>{ts("✏️ Edit")}</button>
                 )}
               </div>
             </div>
@@ -1924,16 +1924,16 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           })}
           {itemsTotalPages>1&&(
             <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:10,paddingTop:4}}>
-              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage===0} onClick={()=>setItemsPage(p=>Math.max(0,p-1))}>‹ Prev</button>
-              <span style={{fontSize:12,color:"var(--text3)"}}>Page {itemsCurPage+1} of {itemsTotalPages} ({items.length} items)</span>
-              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage>=itemsTotalPages-1} onClick={()=>setItemsPage(p=>Math.min(itemsTotalPages-1,p+1))}>Next ›</button>
+              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage===0} onClick={()=>setItemsPage(p=>Math.max(0,p-1))}>{ts("‹ Prev")}</button>
+              <span style={{fontSize:12,color:"var(--text3)"}}>{ts("Page")} {itemsCurPage+1} {ts("of")} {itemsTotalPages} ({items.length} {ts("items)")}</span>
+              <button className="btn btn-ghost btn-xs" disabled={itemsCurPage>=itemsTotalPages-1} onClick={()=>setItemsPage(p=>Math.min(itemsTotalPages-1,p+1))}>{ts("Next ›")}</button>
             </div>
           )}
         </div>
       )}
       {editingItemIdx!=null&&!editingFullPart&&(
         <Overlay onClose={()=>setEditingItemIdx(null)}>
-          <div style={{padding:30,textAlign:"center",color:"var(--text3)"}}>Loading part…</div>
+          <div style={{padding:30,textAlign:"center",color:"var(--text3)"}}>{ts("Loading part…")}</div>
         </Overlay>
       )}
       {editingItemIdx!=null&&editingFullPart&&(
@@ -1957,25 +1957,25 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           }}
           onClose={()=>setEditingCatalogIdx(null)}/>
       )}
-      <FD><FL label="Notes"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)}/></FD>
+      <FD><FL label={ts("Notes")}/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)}/></FD>
       {items.length>0&&(()=>{
         const diff=+invoiceTotal===0||invoiceTotal===""?null:total-(+invoiceTotal||0);
         return (
         <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",marginBottom:14,display:"flex",flexDirection:"column",gap:4,fontSize:13}}>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Total Qty</span><span style={{fontWeight:700}}>{totalQty}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Items</span><span>{fmtAmt(itemsTotal)}</span></div>
-          {shippingNum>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Shipping</span><span>{fmtAmt(shippingNum)}</span></div>}
-          {customsLocal>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>Customs ({customsCostUsd} USD × {exchangeRate})</span><span>{fmtAmt(customsLocal)}</span></div>}
+          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>{ts("Total Qty")}</span><span style={{fontWeight:700}}>{totalQty}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>{ts("Items")}</span><span>{fmtAmt(itemsTotal)}</span></div>
+          {shippingNum>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>{ts("Shipping")}</span><span>{fmtAmt(shippingNum)}</span></div>}
+          {customsLocal>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--text3)"}}>{ts("Customs (")}{customsCostUsd} {ts("USD ×")} {exchangeRate})</span><span>{fmtAmt(customsLocal)}</span></div>}
           <div style={{display:"flex",justifyContent:"space-between",fontWeight:800,fontSize:15,paddingTop:6,borderTop:"1px solid var(--border)"}}>
-            <span>Total Landed Cost</span><span>{fmtAmt(total)}</span>
+            <span>{ts("Total Landed Cost")}</span><span>{fmtAmt(total)}</span>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:6,borderTop:"1px solid var(--border)"}}>
-            <span style={{color:"var(--text3)"}}>Invoice Total (from paper invoice)</span>
+            <span style={{color:"var(--text3)"}}>{ts("Invoice Total (from paper invoice)")}</span>
             <input className="inp" type="number" min="0" style={{width:110,textAlign:"right"}} value={invoiceTotal} onChange={e=>setInvoiceTotal(e.target.value)} placeholder="0"/>
           </div>
           {diff!==null&&(
             <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,color:Math.abs(diff)<0.01?"var(--green)":"var(--red)"}}>
-              <span>Difference</span><span>{Math.abs(diff)<0.01?"✅ Matches":`${diff>0?"+":""}${fmtAmt(diff)}`}</span>
+              <span>{ts("Difference")}</span><span>{Math.abs(diff)<0.01?ts("✅ Matches"):`${diff>0?"+":""}${fmtAmt(diff)}`}</span>
             </div>
           )}
         </div>
@@ -1983,16 +1983,16 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       })()}
       {!alreadyStocked&&<label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:6,cursor:"pointer"}}>
         <input type="checkbox" checked={printLabels} onChange={e=>setPrintLabels(e.target.checked)}/>
-        🖨️ Print labels after saving
+        {ts("🖨️ Print labels after saving")}
       </label>}
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
         {alreadyStocked
-          ? "Only lines you actually change (qty, add, or remove) will move live stock — everything else is left untouched."
+          ? ts("Only lines you actually change (qty, add, or remove) will move live stock — everything else is left untouched.")
           : `This only records the invoice${printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.`}
       </div>
       <div style={{display:"flex",gap:10}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?"Saving…":alreadyStocked?"✅ Save & Adjust Stock":printLabels?"✅ Save & Print Labels":"✅ Save Invoice"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{ts("Cancel")}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||items.length===0}>{saving?ts("Saving…"):alreadyStocked?ts("✅ Save & Adjust Stock"):printLabels?ts("✅ Save & Print Labels"):ts("✅ Save Invoice")}</button>
       </div>
       {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} onClose={()=>setZoomImage(null)}/>}
     </Overlay>
@@ -2057,11 +2057,11 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📊 My Stock</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{searchKeywords.length?`${visibleRows.length} of ${rows.length}`:rows.length} parts — your own qty & location</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📊 My Stock")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{searchKeywords.length?`${visibleRows.length} of ${rows.length}`:rows.length} {ts("parts — your own qty & location")}</p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
           {onZeroMainStock&&staleMainStockCount>0&&(
             <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={zeroing} onClick={runZeroMainStock}>
               {zeroing?"…":`🧹 Zero VelGenius Stock (${staleMainStockCount})`}
@@ -2071,20 +2071,20 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
       </div>
       {onZeroMainStock&&staleMainStockCount>0&&(
         <div style={{fontSize:12,color:"var(--text3)",marginTop:-12,marginBottom:16}}>
-          {staleMainStockCount} catalogue part{staleMainStockCount>1?"s":""} still show{staleMainStockCount>1?"":"s"} a nonzero VelGenius-side stock count from before you took over your own stock — the "Zero VelGenius Stock" button clears just that old number, not your own.
+          {staleMainStockCount} {ts("catalogue part")}{staleMainStockCount>1?"s":""} {ts("still show")}{staleMainStockCount>1?"":"s"} {ts("a nonzero VelGenius-side stock count from before you took over your own stock — the \"Zero VelGenius Stock\" button clears just that old number, not your own.")}
         </div>
       )}
       <input className="inp" style={{marginBottom:14,maxWidth:420,textTransform:"uppercase"}} value={search} onChange={e=>setSearch(e.target.value.toUpperCase())}
-        placeholder="🔍 Search by SKU, name, make, model…"/>
+        placeholder={ts("🔍 Search by SKU, name, make, model…")}/>
       {rows.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No parts yet.</div>
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No parts yet.")}</div>
       ) : visibleRows.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No parts match "{search}"</div>
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No parts match \"")}{search}"</div>
       ) : (
         <div className="card" style={{overflow:"hidden"}}>
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th></th><th>SKU</th><th>Name</th><th>Make / Model / Year</th><th>Source</th><th>Stock</th><th>Location</th><th>Actions</th></tr></thead>
+              <thead><tr><th></th><th>{ts("SKU")}</th><th>{ts("Name")}</th><th>{ts("Make / Model / Year")}</th><th>{ts("Source")}</th><th>{ts("Stock")}</th><th>{ts("Location")}</th><th>{ts("Actions")}</th></tr></thead>
               <tbody>
                 {visibleRows.map(row=>{
                   const isEditing=editing&&editing.sourceType===row.sourceType&&editing.id===row.id;
@@ -2101,15 +2101,15 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
                       <td style={{fontFamily:"DM Mono,monospace",fontSize:12}}>{row.sku||"—"}</td>
                       <td>{row.name}</td>
                       <td style={{fontSize:12,color:(row.make||row.model||row.year_range)?"var(--text)":"var(--text3)"}}>{[row.make,row.model,row.year_range].filter(Boolean).join(" · ")||"—"}</td>
-                      <td><span className="badge" style={{fontSize:11,background:row.sourceType==="catalogue"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:row.sourceType==="catalogue"?"var(--blue)":"var(--green)"}}>{row.sourceType==="catalogue"?"Catalogue":"My Part"}</span></td>
+                      <td><span className="badge" style={{fontSize:11,background:row.sourceType==="catalogue"?"rgba(96,165,250,.12)":"rgba(52,211,153,.12)",color:row.sourceType==="catalogue"?"var(--blue)":"var(--green)"}}>{row.sourceType==="catalogue"?ts("Catalogue"):ts("My Part")}</span></td>
                       {isEditing ? (
                         <>
                           <td><input className="inp" type="number" min="0" style={{width:80}} value={stockVal} onChange={e=>setStockVal(e.target.value)}/></td>
                           <td><input className="inp" style={{width:110}} value={binVal} onChange={e=>setBinVal(e.target.value)} placeholder="e.g. A1-02"/></td>
                           <td>
                             <div style={{display:"flex",gap:5}}>
-                              <button className="btn btn-ghost btn-xs" onClick={()=>setEditing(null)} disabled={saving}>Cancel</button>
-                              <button className="btn btn-primary btn-xs" onClick={save} disabled={saving}>{saving?"…":"💾 Save"}</button>
+                              <button className="btn btn-ghost btn-xs" onClick={()=>setEditing(null)} disabled={saving}>{ts("Cancel")}</button>
+                              <button className="btn btn-primary btn-xs" onClick={save} disabled={saving}>{saving?"…":ts("💾 Save")}</button>
                             </div>
                           </td>
                         </>
@@ -2117,7 +2117,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
                         <>
                           <td style={{fontWeight:700,color:row.stock>0?"var(--green)":"var(--red)"}}>{row.stock}</td>
                           <td style={{color:"var(--text3)"}}>{row.bin||"—"}</td>
-                          <td><button className="btn btn-ghost btn-xs" onClick={()=>startEdit(row)}>✏️ Edit</button></td>
+                          <td><button className="btn btn-ghost btn-xs" onClick={()=>startEdit(row)}>{ts("✏️ Edit")}</button></td>
                         </>
                       )}
                     </tr>
@@ -2157,12 +2157,12 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📥 Purchase Invoices</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{purchaseInvoices.length} invoice{purchaseInvoices.length!==1?"s":""} — record stock coming onto your own shelf</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📥 Purchase Invoices")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{purchaseInvoices.length} {ts("invoice")}{purchaseInvoices.length!==1?"s":""} {ts("— record stock coming onto your own shelf")}</p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
-          <button className="btn btn-primary btn-sm" onClick={()=>setShowReceive(true)}>📥 Receive Stock</button>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowReceive(true)}>{ts("📥 Receive Stock")}</button>
         </div>
       </div>
       {(showReceive||continuingInvoice)&&(
@@ -2173,7 +2173,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
           onSave={async(data)=>{await onSavePurchaseInvoice(data);setShowReceive(false);setContinuingInvoice(null);}}/>
       )}
       {purchaseInvoices.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No purchase invoices yet — click "Receive Stock" to record one.</div>
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No purchase invoices yet — click \"Receive Stock\" to record one.")}</div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {purchaseInvoices.map(inv=>{
@@ -2190,18 +2190,18 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{inv.invoice_no||inv.id}{inv.from_name?` · ${inv.from_name}`:""}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date||fmtDT(inv.created_at)} · {inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units · {fmtAmt(inv.total)}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date||fmtDT(inv.created_at)} · {inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} {ts("units ·")} {fmtAmt(inv.total)}</div>
                     {diff!=null&&(
                       <div style={{fontSize:11,fontWeight:700,marginTop:2,color:hasMismatch?"var(--red)":"var(--green)"}}>
-                        {hasMismatch?`⚠️ Difference: ${diff>0?"+":""}${fmtAmt(diff)} vs invoice total ${fmtAmt(inv.invoice_total)}`:"✅ Matches invoice total"}
+                        {hasMismatch?`⚠️ Difference: ${diff>0?"+":""}${fmtAmt(diff)} vs invoice total ${fmtAmt(inv.invoice_total)}`:ts("✅ Matches invoice total")}
                       </div>
                     )}
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <span className="badge" style={{fontSize:11,
                       background:pending?"rgba(251,191,36,.15)":"rgba(52,211,153,.12)",
-                      color:pending?"var(--yellow)":"var(--green)"}}>{pending?"⏳ Not yet in system":"✅ In system"}</span>
-                    <button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>{pending?"✏️ Continue":"✏️ Edit Items"}</button>
+                      color:pending?"var(--yellow)":"var(--green)"}}>{pending?ts("⏳ Not yet in system"):ts("✅ In system")}</span>
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>{pending?ts("✏️ Continue"):ts("✏️ Edit Items")}</button>
                     {pending&&onApplyPurchaseInvoiceStock&&(
                       <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id||hasMismatch}
                         title={hasMismatch?"Fix the difference (Continue → adjust items/costs) before adding stock":undefined}
@@ -2211,7 +2211,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                           await onApplyPurchaseInvoiceStock(inv.id);
                           setApplyingId(null);
                         }}>
-                        {applyingId===inv.id?"Adding…":hasMismatch?"⚠️ Fix difference first":"✅ Add Stock to System"}
+                        {applyingId===inv.id?ts("Adding…"):hasMismatch?ts("⚠️ Fix difference first"):ts("✅ Add Stock to System")}
                       </button>
                     )}
                   </div>
@@ -2256,20 +2256,20 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>🔢 My Stock Take</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Count your own stock — catalogue parts and your own parts together</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("🔢 My Stock Take")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{ts("Count your own stock — catalogue parts and your own parts together")}</p>
         </div>
-        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
       </div>
 
       <div className="card" style={{padding:14,marginBottom:16,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
         <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
-        <button className="btn btn-primary btn-sm" onClick={start} disabled={starting}>{starting?"Starting…":"+ Start New Stock Take"}</button>
+        <button className="btn btn-primary btn-sm" onClick={start} disabled={starting}>{starting?ts("Starting…"):ts("+ Start New Stock Take")}</button>
       </div>
 
       <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
         {stockTakes.length===0
-          ? <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>No stock takes yet.</div>
+          ? <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>{ts("No stock takes yet.")}</div>
           : stockTakes.map(st=>(
             <div key={st.id} className="card" style={{padding:12,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",border:openId===st.id?"1px solid var(--accent)":undefined}} onClick={()=>openTake(st.id)}>
               <div>
@@ -2277,8 +2277,8 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
                 <div style={{fontSize:11,color:"var(--text3)"}}>{st.created_at?new Date(st.created_at).toLocaleString():""}</div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span className="badge" style={{fontSize:11,background:st.status==="completed"?"rgba(52,211,153,.12)":"rgba(251,191,36,.15)",color:st.status==="completed"?"var(--green)":"var(--yellow)"}}>{st.status==="completed"?"✅ Completed":"🔓 Open"}</span>
-                {onDelete&&<button className="btn btn-ghost btn-xs" title="Delete this stock take" onClick={e=>removeTake(e,st.id)}>🗑</button>}
+                <span className="badge" style={{fontSize:11,background:st.status==="completed"?"rgba(52,211,153,.12)":"rgba(251,191,36,.15)",color:st.status==="completed"?"var(--green)":"var(--yellow)"}}>{st.status==="completed"?ts("✅ Completed"):ts("🔓 Open")}</span>
+                {onDelete&&<button className="btn btn-ghost btn-xs" title={ts("Delete this stock take")} onClick={e=>removeTake(e,st.id)}>🗑</button>}
               </div>
             </div>
           ))}
@@ -2288,11 +2288,11 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
         <div className="card" style={{overflow:"hidden"}}>
           <div style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontWeight:700}}>{currentTake.name}</div>
-            {currentTake.status==="open"&&<button className="btn btn-primary btn-sm" onClick={()=>onComplete(currentTake.id)}>✅ Complete & Apply</button>}
+            {currentTake.status==="open"&&<button className="btn btn-primary btn-sm" onClick={()=>onComplete(currentTake.id)}>{ts("✅ Complete & Apply")}</button>}
           </div>
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>SKU</th><th>Item</th><th>Location</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th></tr></thead>
+              <thead><tr><th>{ts("SKU")}</th><th>{ts("Item")}</th><th>{ts("Location")}</th><th>{ts("System Qty")}</th><th>{ts("Counted Qty")}</th><th>{ts("Variance")}</th></tr></thead>
               <tbody>
                 {items.filter(i=>i.stock_take_id===currentTake.id).map(item=>(
                   <tr key={item.id}>
@@ -2447,7 +2447,7 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
 
   const finish=async()=>{
     if(!activeTakeId) return;
-    if(!window.confirm("Finish this stock take? Counted quantities and locations will be written to your live stock.")) return;
+    if(!window.confirm(ts("Finish this stock take? Counted quantities and locations will be written to your live stock."))) return;
     setFinishing(true);
     await onComplete(activeTakeId);
     setFinishing(false);
@@ -2501,14 +2501,14 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
     return (
       <div className="fu">
         <div style={{marginBottom:16}}>
-          <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock Take</h1>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📷 Scan Stock Take")}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            Scan a shelf/bin label, then scan parts one at a time to verify they're in the right place and tally what's found.
+            {ts("Scan a shelf/bin label, then scan parts one at a time to verify they're in the right place and tally what's found.")}
           </p>
         </div>
         <div className="card" style={{padding:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",maxWidth:420}}>
           <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
-          <button className="btn btn-primary btn-sm" onClick={startTake} disabled={starting}>{starting?"Starting…":"▶ Start Stock Take"}</button>
+          <button className="btn btn-primary btn-sm" onClick={startTake} disabled={starting}>{starting?ts("Starting…"):ts("▶ Start Stock Take")}</button>
         </div>
       </div>
     );
@@ -2524,17 +2524,17 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
     <div className="fu">
       <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📷 Scan Stock Take</h1>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📷 Scan Stock Take")}</h1>
           <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>
-            Scan a shelf/bin label first, then scan parts — green if they're where the system expects, red if not.
+            {ts("Scan a shelf/bin label first, then scan parts — green if they're where the system expects, red if not.")}
           </p>
         </div>
-        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={discardTake}>🗑 Discard</button>
+        <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={discardTake}>{ts("🗑 Discard")}</button>
       </div>
 
       <div className="card" style={{padding:14,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-        <div style={{fontSize:13}}>📍 Active location: <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||"— scan a bin label —"}</strong></div>
-        <button className="btn btn-primary btn-xs" onClick={()=>{setActiveLocation("");pushLog("📍 Ready — scan the next location","loc");}}>📍 Scan New Location</button>
+        <div style={{fontSize:13}}>{ts("📍 Active location:")} <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||"— scan a bin label —"}</strong></div>
+        <button className="btn btn-primary btn-xs" onClick={()=>{setActiveLocation("");pushLog("📍 Ready — scan the next location","loc");}}>{ts("📍 Scan New Location")}</button>
       </div>
 
       {supported!==false ? (
@@ -2544,15 +2544,15 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
             <div style={{width:200,height:140,border:"2.5px solid rgba(52,211,153,.9)",borderRadius:14,boxShadow:"0 0 0 9999px rgba(0,0,0,.38)"}}/>
           </div>
           <div style={{position:"absolute",bottom:8,left:0,right:0,textAlign:"center",color:"rgba(255,255,255,.8)",fontSize:11}}>
-            {scanning?"Point at a location or part label":"Starting camera…"}
+            {scanning?ts("Point at a location or part label"):ts("Starting camera…")}
           </div>
         </div>
       ) : (
         <div className="card" style={{padding:16,marginBottom:14,maxWidth:420}}>
-          <div style={{fontSize:13,marginBottom:8}}>Camera scanning isn't supported on this browser/device. Type a code manually:</div>
+          <div style={{fontSize:13,marginBottom:8}}>{ts("Camera scanning isn't supported on this browser/device. Type a code manually:")}</div>
           <div style={{display:"flex",gap:8}}>
-            <input className="inp" value={manualCode} onChange={e=>setManualCode(e.target.value)} placeholder="#A1-02 (location) or a SKU" onKeyDown={e=>{if(e.key==="Enter"){handleCode(manualCode);setManualCode("");}}}/>
-            <button className="btn btn-primary btn-sm" onClick={()=>{handleCode(manualCode);setManualCode("");}}>Go</button>
+            <input className="inp" value={manualCode} onChange={e=>setManualCode(e.target.value)} placeholder={ts("#A1-02 (location) or a SKU")} onKeyDown={e=>{if(e.key==="Enter"){handleCode(manualCode);setManualCode("");}}}/>
+            <button className="btn btn-primary btn-sm" onClick={()=>{handleCode(manualCode);setManualCode("");}}>{ts("Go")}</button>
           </div>
         </div>
       )}
@@ -2561,10 +2561,10 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
       {pendingMismatch&&(
         <div className="card" style={{padding:14,marginBottom:14,border:"1.5px solid var(--red)",maxWidth:420}}>
           <div style={{fontWeight:700,marginBottom:6,color:"var(--red)"}}>⚠️ {pendingMismatch.item.item_name} ({pendingMismatch.item.sku})</div>
-          <div style={{fontSize:13,marginBottom:10}}>Should be at <strong>{pendingMismatch.item.counted_location??pendingMismatch.item.bin_location??"(no location on file)"}</strong> — found here at <strong style={{color:"var(--accent)"}}>{pendingMismatch.foundLocation}</strong>. Still counts either way.</div>
+          <div style={{fontSize:13,marginBottom:10}}>{ts("Should be at")} <strong>{pendingMismatch.item.counted_location??pendingMismatch.item.bin_location??"(no location on file)"}</strong> {ts("— found here at")} <strong style={{color:"var(--accent)"}}>{pendingMismatch.foundLocation}</strong>{ts(". Still counts either way.")}</div>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(false)}>Keep recorded at {pendingMismatch.item.bin_location||"(none)"}</button>
-            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(true)}>Move to {pendingMismatch.foundLocation}</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(false)}>{ts("Keep recorded at")} {pendingMismatch.item.bin_location||"(none)"}</button>
+            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(true)}>{ts("Move to")} {pendingMismatch.foundLocation}</button>
           </div>
         </div>
       )}
@@ -2581,17 +2581,17 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
 
       <div className="card" style={{overflow:"hidden"}}>
         <div style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-          <div style={{fontWeight:700}}>📋 Still Short {loadingTake?"":`— ${countedN}/${takeItems.length} items counted`}</div>
-          <button className="btn btn-primary btn-sm" onClick={finish} disabled={finishing}>{finishing?"Finishing…":"✅ Finish & Update Stock"}</button>
+          <div style={{fontWeight:700}}>{ts("📋 Still Short")} {loadingTake?"":`— ${countedN}/${takeItems.length} items counted`}</div>
+          <button className="btn btn-primary btn-sm" onClick={finish} disabled={finishing}>{finishing?ts("Finishing…"):ts("✅ Finish & Update Stock")}</button>
         </div>
         {loadingTake ? (
-          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>Loading…</div>
+          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>{ts("Loading…")}</div>
         ) : shortages.length===0 ? (
-          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>No shortages — everything counted matches or exceeds system qty. 🎉</div>
+          <div style={{padding:24,textAlign:"center",color:"var(--text3)"}}>{ts("No shortages — everything counted matches or exceeds system qty. 🎉")}</div>
         ) : (
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>SKU</th><th>Item</th><th>Expected Location</th><th>System</th><th>Counted</th><th>Short</th><th></th></tr></thead>
+              <thead><tr><th>{ts("SKU")}</th><th>{ts("Item")}</th><th>{ts("Expected Location")}</th><th>{ts("System")}</th><th>{ts("Counted")}</th><th>{ts("Short")}</th><th></th></tr></thead>
               <tbody>
                 {shortages.map(item=>(
                   <tr key={item.id}>
@@ -2605,12 +2605,12 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
                       {editingId===item.id ? (
                         <div style={{display:"flex",gap:4,alignItems:"center"}}>
                           <input className="inp" type="number" min="0" style={{width:64}} value={editQty} onChange={e=>setEditQty(e.target.value)}/>
-                          <input className="inp" style={{width:90}} placeholder="Location" value={editLoc} onChange={e=>setEditLoc(e.target.value)}/>
-                          <button className="btn btn-primary btn-xs" onClick={()=>saveEdit(item)}>Save</button>
+                          <input className="inp" style={{width:90}} placeholder={ts("Location")} value={editLoc} onChange={e=>setEditLoc(e.target.value)}/>
+                          <button className="btn btn-primary btn-xs" onClick={()=>saveEdit(item)}>{ts("Save")}</button>
                           <button className="btn btn-ghost btn-xs" onClick={()=>setEditingId(null)}>✕</button>
                         </div>
                       ) : (
-                        <button className="btn btn-ghost btn-xs" onClick={()=>startEdit(item)}>✏️ Adjust</button>
+                        <button className="btn btn-ghost btn-xs" onClick={()=>startEdit(item)}>{ts("✏️ Adjust")}</button>
                       )}
                     </td>
                   </tr>
@@ -2645,18 +2645,18 @@ export function SupplierStockLogPage({logs=[], existingParts=[], ownParts=[], su
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📜 My Stock Records</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{logs.length} stock movements</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📜 My Stock Records")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{logs.length} {ts("stock movements")}</p>
         </div>
-        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
+        {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
       </div>
       {logs.length===0 ? (
-        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>No stock movements yet.</div>
+        <div className="card" style={{padding:44,textAlign:"center",color:"var(--text3)"}}>{ts("No stock movements yet.")}</div>
       ) : (
         <div className="card" style={{overflow:"hidden"}}>
           <div className="tbl-wrap">
             <table className="tbl">
-              <thead><tr><th>Date</th><th>Item</th><th>Make / Model / Year</th><th>Reason</th><th>Change</th><th>Before → After</th></tr></thead>
+              <thead><tr><th>{ts("Date")}</th><th>{ts("Item")}</th><th>{ts("Make / Model / Year")}</th><th>{ts("Reason")}</th><th>{ts("Change")}</th><th>{ts("Before → After")}</th></tr></thead>
               <tbody>
                 {logs.map(l=>{
                   const v=vehicleFor(l.sku);
@@ -2713,7 +2713,7 @@ function PartVehicleCompareZoom({vehicleImages=[], vehicleTitle, partImages=[], 
         ?{flex:1,minHeight:0,position:"relative",overflow:"auto"}
         :{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",minHeight:0,overflow:"hidden"}}>
         {images.length===0?(
-          <div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>No photo</div>
+          <div style={{color:"rgba(255,255,255,.4)",fontSize:13}}>{ts("No photo")}</div>
         ):(
           <>
             <img key={images[idx]} src={images[idx]} alt="" style={zoomStyle}
@@ -2765,7 +2765,7 @@ function PartImageZoom({images=[], title, fits=[], onClose, onOpenVehicle}) {
         <div style={{fontWeight:700,fontSize:15}}>{title}</div>
         {fits.length>0&&(
           <div style={{marginTop:10,fontSize:13,color:"rgba(255,255,255,.75)"}}>
-            <div style={{textTransform:"uppercase",fontSize:10,letterSpacing:.6,fontWeight:700,color:"rgba(255,255,255,.5)",marginBottom:6}}>Fits</div>
+            <div style={{textTransform:"uppercase",fontSize:10,letterSpacing:.6,fontWeight:700,color:"rgba(255,255,255,.5)",marginBottom:6}}>{ts("Fits")}</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {fits.map((f,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center"}}>
@@ -2916,14 +2916,14 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
 
   return (
     <Overlay onClose={onCancel}>
-      <MHead title="➕ New Booking" sub="Record a sale from your own stock" onClose={onCancel}/>
+      <MHead title={ts("➕ New Booking")} sub={ts("Record a sale from your own stock")} onClose={onCancel}/>
       <FG cols="1fr 1fr">
         <div style={{position:"relative"}}>
-          <FL label="Customer Name *"/>
+          <FL label={ts("Customer Name *")}/>
           <input className="inp" value={customerName}
             onChange={e=>{setCustomerName(e.target.value);setCustDropdown(true);}}
             onFocus={()=>setCustDropdown(true)} onBlur={()=>setTimeout(()=>setCustDropdown(false),150)}
-            placeholder="Type to search or add new"/>
+            placeholder={ts("Type to search or add new")}/>
           {custDropdown&&custMatches.length>0&&(
             <div style={{position:"absolute",zIndex:10,left:0,right:0,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginTop:2,maxHeight:160,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,.15)"}}>
               {custMatches.map(c=>(
@@ -2935,14 +2935,14 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
             </div>
           )}
         </div>
-        <div><FL label="Customer Phone"/><input className="inp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}/></div>
+        <div><FL label={ts("Customer Phone")}/><input className="inp" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)}/></div>
       </FG>
       <FD>
-        <FL label="Add item"/>
-        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your parts by name, SKU, make, model, OE…"/>
+        <FL label={ts("Add item")}/>
+        <input className="inp" value={search} onChange={e=>setSearch(e.target.value)} placeholder={ts("Search your parts by name, SKU, make, model, OE…")}/>
         <div style={{display:"flex",gap:8,marginTop:6}}>
           <select className="inp" style={{flex:1}} value={vMake} onChange={e=>{setVMake(e.target.value);setVModel("");setVModelInput("");}} disabled={!!keywords.length}>
-            <option value="">Or pick a vehicle: Make…</option>
+            <option value="">{ts("Or pick a vehicle: Make…")}</option>
             {vMakes.map(m=><option key={m} value={m}>{m}</option>)}
           </select>
           <div style={{position:"relative",flex:1}}>
@@ -2967,10 +2967,10 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
           {vMake&&!keywords.length&&<button type="button" className="btn btn-ghost btn-xs" onClick={()=>{setVMake("");setVModel("");setVModelInput("");}}>✕</button>}
         </div>
         {usingMakeFallback&&(
-          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No exact fitment match for {vMake} {vModel} — showing other {vMake} parts instead:</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{ts("No exact fitment match for")} {vMake} {vModel} {ts("— showing other")} {vMake} {ts("parts instead:")}</div>
         )}
         {noneFitMake&&(
-          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts in your stock fit any {vMake} — check My Stock, or the fitment may need adding there first.</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{ts("No parts in your stock fit any")} {vMake} {ts("— check My Stock, or the fitment may need adding there first.")}</div>
         )}
         {filtered.length>0 ? (
           <div style={{marginTop:6,maxHeight:320,overflowY:"auto",border:"1px solid var(--border)",borderRadius:8,padding:8}}>
@@ -2984,7 +2984,7 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
                       ? <img src={toImgUrl(p.image)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
                       : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
                     {p.image&&(
-                      <button type="button" title="Enlarge photo" onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name,fits:p.fit?.allFits||[]});}}
+                      <button type="button" title={ts("Enlarge photo")} onClick={e=>{e.stopPropagation();setZoomImage({images:imagesFor(p),title:p.name,fits:p.fit?.allFits||[]});}}
                         style={{position:"absolute",top:4,right:4,width:24,height:24,borderRadius:"50%",background:"rgba(0,0,0,.65)",border:"none",cursor:"zoom-in",display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><circle cx="10" cy="10" r="6"/><line x1="15" y1="15" x2="20" y2="20"/></svg>
                       </button>
@@ -3004,16 +3004,16 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
                       {p.fit.year&&<div style={{color:"var(--text3)"}}>{p.fit.year}</div>}
                     </div>
                   )}
-                  <div style={{fontSize:11,fontWeight:700,color:p.stock>0?"var(--green)":"var(--red)"}}>Stock: {p.stock}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:p.stock>0?"var(--green)":"var(--red)"}}>{ts("Stock:")} {p.stock}</div>
                 </div>
               ))}
             </div>
-            {filtered.length>50&&<div style={{padding:"6px 10px",fontSize:11,color:"var(--text3)",textAlign:"center"}}>+{filtered.length-50} more — type to narrow it down</div>}
+            {filtered.length>50&&<div style={{padding:"6px 10px",fontSize:11,color:"var(--text3)",textAlign:"center"}}>+{filtered.length-50} {ts("more — type to narrow it down")}</div>}
           </div>
         ) : keywords.length>0 ? (
-          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts match "{search}" — check My Stock, or try a different keyword (make/model/OE number all work too).</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{ts("No parts match \"")}{search}{ts("\" — check My Stock, or try a different keyword (make/model/OE number all work too).")}</div>
         ) : !vMake ? (
-          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>No parts in your stock yet — add some in My Stock first.</div>
+          <div style={{fontSize:12,color:"var(--text3)",marginTop:6}}>{ts("No parts in your stock yet — add some in My Stock first.")}</div>
         ) : null}
       </FD>
       {items.length>0&&(
@@ -3037,25 +3037,25 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
       {items.length>0&&(
         <div style={{background:"var(--surface2)",borderRadius:8,padding:"10px 12px",marginBottom:14,display:"flex",flexDirection:"column",gap:6}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
-            <span style={{color:"var(--text3)"}}>Subtotal</span><span>{fmtAmt(subtotal)}</span>
+            <span style={{color:"var(--text3)"}}>{ts("Subtotal")}</span><span>{fmtAmt(subtotal)}</span>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-            <FL label="Discount %"/>
+            <FL label={ts("Discount %")}/>
             <input className="inp" type="number" min="0" max="100" style={{width:80}} value={discountPct} onChange={e=>setDiscountPct(e.target.value)} placeholder="0"/>
           </div>
           {pct>0&&(
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13,color:"var(--red)"}}>
-              <span>Discount ({pct}%)</span><span>-{fmtAmt(discountAmt)}</span>
+              <span>{ts("Discount (")}{pct}%)</span><span>-{fmtAmt(discountAmt)}</span>
             </div>
           )}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:15,fontWeight:800,borderTop:"1px solid var(--border)",paddingTop:6}}>
-            <span>Total</span><span>{fmtAmt(total)}</span>
+            <span>{ts("Total")}</span><span>{fmtAmt(total)}</span>
           </div>
         </div>
       )}
       <div style={{display:"flex",gap:10,marginTop:4}}>
-        <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>Cancel</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||!customerName.trim()||items.length===0}>{saving?"Saving…":"✅ Confirm Booking"}</button>
+        <button className="btn btn-ghost" style={{flex:1}} onClick={onCancel}>{ts("Cancel")}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={submit} disabled={saving||!customerName.trim()||items.length===0}>{saving?ts("Saving…"):ts("✅ Confirm Booking")}</button>
       </div>
       {zoomImage&&<PartImageZoom images={zoomImage.images} title={zoomImage.title} fits={zoomImage.fits} onClose={()=>setZoomImage(null)} onOpenVehicle={setVehicleZoom}/>}
       {vehicleZoom&&<PartVehicleCompareZoom vehicleImages={vehicleZoom.vehicleImages} vehicleTitle={vehicleZoom.vehicleTitle}
@@ -3094,18 +3094,18 @@ export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], exi
     <div className="fu">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div>
-          <h1 style={{fontSize:20,fontWeight:700}}>📋 My Orders</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>Confirm incoming orders, or book a sale yourself</p>
+          <h1 style={{fontSize:20,fontWeight:700}}>{ts("📋 My Orders")}</h1>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{ts("Confirm incoming orders, or book a sale yourself")}</p>
         </div>
         <div style={{display:"flex",gap:8}}>
-          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>↺ Refresh</button>}
-          <button className="btn btn-primary btn-sm" onClick={()=>setShowNewBooking(true)}>➕ New Booking</button>
+          {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
+          <button className="btn btn-primary btn-sm" onClick={()=>setShowNewBooking(true)}>{ts("➕ New Booking")}</button>
         </div>
       </div>
 
-      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>Incoming Orders</div>
+      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>{ts("Incoming Orders")}</div>
       {orders.filter(o=>(o.items||[]).some(isMine)).length===0 ? (
-        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)",marginBottom:24}}>No orders yet.</div>
+        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)",marginBottom:24}}>{ts("No orders yet.")}</div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
           {orders.map(o=>{
@@ -3117,16 +3117,16 @@ export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], exi
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{o.customer_name} <span style={{color:"var(--text3)",fontWeight:400}}>· {o.customer_phone}</span></div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{o.date} · Order {o.id}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{o.date} {ts("· Order")} {o.id}</div>
                   </div>
                   {confirmed
-                    ? <span className="badge" style={{fontSize:11,background:"rgba(52,211,153,.12)",color:"var(--green)"}}>✅ Confirmed</span>
+                    ? <span className="badge" style={{fontSize:11,background:"rgba(52,211,153,.12)",color:"var(--green)"}}>{ts("✅ Confirmed")}</span>
                     : <StatusBadge status={o.status}/>}
                 </div>
                 {mine.map((item,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderTop:"1px solid var(--border)",fontSize:13}}>
                     <div>{item.name} <span style={{color:"var(--text3)"}}>× {item.qty} @ {fmtAmt(item.price)}</span></div>
-                    {!confirmed&&<button className="btn btn-primary btn-xs" onClick={()=>onConfirmItem(o,item)}>✅ Confirm</button>}
+                    {!confirmed&&<button className="btn btn-primary btn-xs" onClick={()=>onConfirmItem(o,item)}>{ts("✅ Confirm")}</button>}
                   </div>
                 ))}
               </div>
@@ -3135,9 +3135,9 @@ export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], exi
         </div>
       )}
 
-      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>Bookings</div>
+      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:.6,margin:"4px 0 8px"}}>{ts("Bookings")}</div>
       {bookings.length===0 ? (
-        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>No confirmed bookings yet.</div>
+        <div className="card" style={{padding:30,textAlign:"center",color:"var(--text3)"}}>{ts("No confirmed bookings yet.")}</div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {bookings.map(b=>{
@@ -3147,26 +3147,26 @@ export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], exi
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:8}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{b.customer_name}{b.customer_phone?` · ${b.customer_phone}`:""}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{b.source_order_id?`From order ${b.source_order_id}`:"Manual booking"} · {fmtDT(b.created_at)}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{b.source_order_id?`From order ${b.source_order_id}`:ts("Manual booking")} · {fmtDT(b.created_at)}</div>
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <span className="badge" style={{fontSize:11,
                       background:b.status==="invoiced"?"rgba(52,211,153,.12)":"rgba(96,165,250,.12)",
-                      color:b.status==="invoiced"?"var(--green)":"var(--blue)"}}>{b.status==="invoiced"?"🧾 Invoiced":"✅ Confirmed"}</span>
+                      color:b.status==="invoiced"?"var(--green)":"var(--blue)"}}>{b.status==="invoiced"?ts("🧾 Invoiced"):ts("✅ Confirmed")}</span>
                     {b.status==="confirmed"&&(
                       <button className="btn btn-ghost btn-xs" onClick={async()=>{
                         await onConvertToInvoice(b.id);
                         openSupplierBookingInvoice({...b,status:"invoiced",invoiced_at:new Date().toISOString()},its,
                           supplierName,supplierContactPerson,supplierPhone,supplierFullName,supplierAddress);
-                      }}>🧾 Convert to Invoice</button>
+                      }}>{ts("🧾 Convert to Invoice")}</button>
                     )}
                     {b.status==="invoiced"&&(
-                      <button className="btn btn-ghost btn-xs" onClick={()=>openSupplierBookingInvoice(b,its,supplierName,supplierContactPerson,supplierPhone,supplierFullName,supplierAddress)}>👁 View Invoice</button>
+                      <button className="btn btn-ghost btn-xs" onClick={()=>openSupplierBookingInvoice(b,its,supplierName,supplierContactPerson,supplierPhone,supplierFullName,supplierAddress)}>{ts("👁 View Invoice")}</button>
                     )}
                     {onDeleteBooking&&(
                       <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}}
                         onClick={()=>{if(window.confirm(`Delete this booking${b.status==="invoiced"?" and its invoice":""}? The ${its.reduce((s,it)=>s+it.qty,0)} unit(s) of stock it deducted will be restored.`)) onDeleteBooking(b.id);}}>
-                        🗑 Delete
+                        {ts("🗑 Delete")}
                       </button>
                     )}
                   </div>

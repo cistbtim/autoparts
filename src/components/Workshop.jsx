@@ -4760,6 +4760,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       job.date_in?`Date: ${job.date_in}`:"",
       job.complaint?`Complaint: ${job.complaint}`:"",
       job.notes?`Note: ${job.notes}`:"",
+      name&&sends.some(x=>(x.name||"").trim().toLowerCase()===name.trim().toLowerCase())
+        ?"This is the same job card link as before. Open it again to add new items or change your price.":
       role==="painter"?"Please check the damage and send me your price at the bottom of the page.":"Please do the inspection on this car — open the link below, tick each item OK / Issue, add photos, upload any report (PDF), then send your price at the bottom.",
       link?`📷 Car photos, details & inspection: ${link}`:"",
     ].filter(Boolean).join("\n");
@@ -4788,7 +4790,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
     const s=sendMech; const nm=s?.name?.trim();
     if(!nm) return;
     const now=new Date().toISOString();
-    const prev=sends.find(x=>(x.name||"").trim().toLowerCase()===nm.toLowerCase());
+    const prev=sends.find(x=>(x.name||"").trim().toLowerCase()===nm.toLowerCase()&&Date.now()-new Date(x.sent_at).getTime()<120000);
     try{
       if(prev) await api.patch("workshop_job_sends","id",prev.id,{sent_at:now,role:s.role,phone:s.phone.trim()||null});
       else await api.insert("workshop_job_sends",{id:makeId("JS"),job_id:job.id,name:nm,phone:s.phone.trim()||null,role:s.role,sent_at:now});
@@ -4796,6 +4798,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
     loadReplies();
   };
   const onSent=()=>{ saveNewContact(); logSend(); };
+  const replyAfter=(name,sentAt)=>replies.find(r=>(r.mechanic_name||"").trim().toLowerCase()===(name||"").trim().toLowerCase()&&new Date(r.created_at)>=new Date(sentAt)-60000);
   const openSendMech=async()=>{
     setSendMech({role:"mechanic",name:"",phone:"",contactId:"",contacts:[],save:false,link:"",msg:"",err:"",busy:true,copied:false});
     try{
@@ -6058,12 +6061,6 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             🗓️ New Booking
           </button>
         )}
-        <button onClick={openSendMech} title="Send this job card + car photos link to a mechanic or painter"
-          style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
-            background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.45)",
-            borderRadius:8,cursor:"pointer",color:"#16a34a",fontSize:11,fontWeight:700}}>
-          📤 Send Job Card
-        </button>
         {replies.length>0&&(
           <button onClick={()=>{setShowReplies(true);loadReplies();}} title="Names and prices sent back from the job card link"
             style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
@@ -6444,6 +6441,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         const CHAPTERS = [
           {id:"ch_car",  icon:"car", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
           {id:"ch_docs", icon:"camera", label:t.wsChDocs||"Photo & Doc", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
+          // Send this job card (details, photos, inspection, price form) to a mechanic or painter by WhatsApp
+          {id:"ch_send", icon:"send", label:"Send Job Card", color:"#16a34a", tabs:[], badge:wsRole!=="mechanic"?(replies.length>0?`${replies.length} ${replies.length===1?"reply":"replies"}`:sends.length>0?`Sent to ${new Set(sends.map(x=>(x.name||"").trim().toLowerCase())).size}`:null):null, onClick:openSendMech},
           ...(wsRole!=="mechanic"?[
             {id:"ch_partsq",icon:"clipboard", label:"Parts Quotation",         color:"#0f766e", tabs:[],              onClick:()=>{ setQuotePopupQuoteOnly(true);  setQuotePopup(true); setQuotePopupTab("quote"); }},
             {id:"ch_bill",icon:"file", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab(invoice?"invoice":"quote"); }},
@@ -6461,12 +6460,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         // ── Hub menu state: show tiles only ──
         if(jobTab==="menu"){
           const tileSize = isMobile ? {iconSize:28,labelSize:9,padding:"14px 4px",gap:4,borderRadius:12} : {iconSize:36,labelSize:12,padding:"20px 10px",gap:6,borderRadius:14};
-          const row1 = CHAPTERS.filter(ch=>["ch_car","ch_docs"].includes(ch.id));
-          const row2 = CHAPTERS.filter(ch=>!["ch_car","ch_docs"].includes(ch.id));
+          const row1 = CHAPTERS.filter(ch=>["ch_car","ch_docs","ch_send"].includes(ch.id));
+          const row2 = CHAPTERS.filter(ch=>!["ch_car","ch_docs","ch_send"].includes(ch.id));
           // Calm tiles: neutral surface with the chapter colour on the icon chip and
           // label only — five full-saturation blocks competed and nothing read primary.
           const renderTile = ch=>(
             <button key={ch.id} onClick={ch.onClick} style={{
+              position:"relative",
               display:"flex",flexDirection:"column",alignItems:"center",gap:tileSize.gap,
               padding:tileSize.padding,border:`1.5px solid ${ch.color}38`,borderRadius:tileSize.borderRadius,cursor:"pointer",
               background:"var(--surface)",color:"var(--text)",
@@ -6476,6 +6476,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             }}>
               <span style={{display:"inline-flex",background:`${ch.color}16`,borderRadius:12,padding:isMobile?"9px 16px":"11px 20px",color:ch.color}}><HubIcon name={ch.icon} size={Math.round(tileSize.iconSize*0.85)}/></span>
               <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em",color:ch.color}}>{ch.label}</span>
+              {ch.badge&&<span style={{position:"absolute",top:6,right:8,fontSize:10,fontWeight:800,background:"var(--accent)",color:"#fff",borderRadius:99,padding:"2px 8px"}}>{ch.badge}</span>}
             </button>
           );
           const hasSpareShop = !!wsProfile?.linked_branch_id && !!onGoToSpareShop;
@@ -9705,6 +9706,31 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           {sendMech.busy&&<div style={{padding:20,textAlign:"center",color:"var(--text3)"}}>Preparing link…</div>}
           {sendMech.err&&<div style={{color:"var(--red)",fontSize:13,marginBottom:12}}>⚠ {sendMech.err}</div>}
           {!sendMech.busy&&!sendMech.err&&(<>
+            {sends.length>0&&(
+              <div style={{border:"1px solid var(--border)",borderRadius:10,marginBottom:14,overflow:"hidden"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",padding:"8px 12px",background:"var(--surface2)"}}>Sent so far ({sends.length})</div>
+                <div style={{maxHeight:170,overflowY:"auto"}}>
+                  {sends.map(sd=>{
+                    const rp=replyAfter(sd.name,sd.sent_at);
+                    return (
+                      <div key={sd.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderTop:"1px solid var(--border)",fontSize:12}}>
+                        <span style={{fontSize:15}}>{sd.role==="painter"?"🎨":"🔧"}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sd.name} <span style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{sd.role==="painter"?"Painter":"Mechanic"}</span></div>
+                          <div style={{fontSize:11,color:"var(--text3)"}}>{sd.phone?`${sd.phone} · `:""}{fmtDT(sd.sent_at)}</div>
+                        </div>
+                        {rp
+                          ? <button onClick={()=>{setSendMech(null);setShowReplies(true);}} style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",flexShrink:0}}>✅ Replied · {fmtAmt(rp.total??0)}</button>
+                          : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ Waiting</span>}
+                        <button type="button" title="Send to this person again" className="btn btn-ghost btn-xs" style={{flexShrink:0}}
+                          onClick={()=>{const role=sd.role==="painter"?"painter":"mechanic";const c=sendMech.contacts.find(x=>(x.name||"").trim().toLowerCase()===(sd.name||"").trim().toLowerCase());
+                            setSendMech(s=>({...s,role,name:sd.name,phone:sd.phone||"",contactId:c?c.id:"",save:false,msg:buildJobMsg(role,withTo(s.link,sd.name,role),sd.name)}));}}>↻</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:8,marginBottom:14}}>
               {[["mechanic","🔧 Mechanic"],["painter","🎨 Painter"]].map(([r,lb])=>(
                 <button key={r} className={`btn btn-sm ${sendMech.role===r?"btn-primary":"btn-ghost"}`} style={{flex:1}}
@@ -9743,6 +9769,10 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 <input className="inp" type="tel" value={sendMech.phone} onChange={e=>setSendMech(s=>({...s,phone:e.target.value}))} placeholder="e.g. 27821234567"/>
               </div>
             </FG>
+            {(()=>{
+              const prev=sends.find(x=>(x.name||"").trim().toLowerCase()===sendMech.name.trim().toLowerCase()&&sendMech.name.trim());
+              return prev?<div style={{fontSize:12,color:"var(--green)",fontWeight:600,marginBottom:12}}>✓ Already sent to {prev.name} on {fmtDT(prev.sent_at)}. The same link is used again, so they can add new items to their reply.</div>:null;
+            })()}
             {!sendMech.contactId&&sendMech.name.trim()&&sendMech.phone.trim()&&(
               <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:12,cursor:"pointer"}}>
                 <input type="checkbox" checked={sendMech.save} onChange={e=>setSendMech(s=>({...s,save:e.target.checked}))} style={{accentColor:"var(--accent)"}}/>

@@ -382,6 +382,7 @@ export function JobCardPage({token}) {
   const [rNote,setRNote]=useState("");
   const [rBusy,setRBusy]=useState(false);
   const [rSent,setRSent]=useState(null); // {name,total} after a successful send
+  const [existing,setExisting]=useState(null); // this person's earlier reply on this job (the same link is reused to add new items)
   const [rErr,setRErr]=useState("");
   // Upload a report (PDF, e.g. a diagnostic report, or a photo). Saved as a normal job document, so it shows in the job's Docs tab.
   const [docFile,setDocFile]=useState(null);
@@ -421,6 +422,8 @@ export function JobCardPage({token}) {
       setLocked(JOBCARD_CLOSED.includes(j.status));
       setJob({...j,model_name:match?.model||j.vehicle_model||""});
       setPhotos(list);setState("ready");
+      const who=linkTo?linkTo.name:rName.trim();
+      if(who){ const ex=await fetchExisting(j.id,who); if(ex) applyExisting(ex); }
     })().catch(()=>setState("invalid"));
   },[token]);
   const car=job?[job.vehicle_year,job.vehicle_make,job.model_name].filter(Boolean).join(" "):"";
@@ -510,6 +513,17 @@ export function JobCardPage({token}) {
     }catch(e){ setDocErr(`Upload failed — please try again. (${e.message||e})`); }
     setDocBusy(false);
   };
+  const parseLines=r=>Array.isArray(r.lines)?r.lines:(()=>{try{return JSON.parse(r.lines||"[]");}catch{return[];}})();
+  const applyExisting=ex=>{
+    setExisting(ex);
+    setRLines([...parseLines(ex).map(l=>({description:l.description||"",price:String(l.price??"")})),{description:"",price:""}]);
+    setRNote(ex.note||"");
+  };
+  const fetchExisting=async(jobId,name)=>{
+    if(!name) return null;
+    const r=await api.fresh("workshop_job_replies",`job_id=eq.${encodeURIComponent(jobId)}&mechanic_name=eq.${encodeURIComponent(name)}&order=created_at.desc`).catch(()=>[]);
+    return Array.isArray(r)&&r[0]?r[0]:null;
+  };
   const rTotal=rLines.reduce((s,l)=>s+(+l.price||0),0);
   const setLine=(i,k,v)=>setRLines(ls=>ls.map((l,j)=>j===i?{...l,[k]:v}:l));
   const sendReply=async()=>{
@@ -521,10 +535,22 @@ export function JobCardPage({token}) {
     if(!(await stillOpen())){ setRBusy(false); return; }
     try{
       const total=lines.reduce((s,l)=>s+l.price,0);
-      const res=await api.insert("workshop_job_replies",{id:makeId("JR"),job_id:job.id,mechanic_name:name,role:rRole,lines,total,note:rNote.trim()||null,created_at:new Date().toISOString()});
-      if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      // Same link, same reply: if this person already replied, update that reply (new items are added to it) instead of making a second one
+      const now=new Date().toISOString();
+      const prev=existing||await fetchExisting(job.id,name);
+      let row;
+      if(prev){
+        row={...prev,role:rRole,lines,total,note:rNote.trim()||null,created_at:now};
+        const res=await api.patch("workshop_job_replies","id",prev.id,{role:rRole,lines,total,note:rNote.trim()||null,created_at:now});
+        if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      }else{
+        row={id:makeId("JR"),job_id:job.id,mechanic_name:name,role:rRole,lines,total,note:rNote.trim()||null,created_at:now};
+        const res=await api.insert("workshop_job_replies",row);
+        if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      }
+      setExisting(row);
       try{localStorage.setItem("jobcard_name",name);}catch{/* storage blocked */}
-      setRSent({name,total});
+      setRSent({name,total,updated:!!prev});
     }catch(e){ setRErr(`Could not send — please try again. (${e.message||e})`); }
     setRBusy(false);
   };
@@ -657,13 +683,13 @@ export function JobCardPage({token}) {
               {rSent?(
                 <div style={{textAlign:"center",padding:"14px 0"}}>
                   <div style={{fontSize:38}}>✅</div>
-                  <div style={{fontWeight:700,marginTop:6}}>Sent, thank you {rSent.name}!</div>
+                  <div style={{fontWeight:700,marginTop:6}}>{rSent.updated?"Updated":"Sent"}, thank you {rSent.name}!</div>
                   <div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Total sent: {fmtAmt(rSent.total)}</div>
-                  <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>{setRSent(null);setRLines([{description:"",price:""}]);setRNote("");}}>Send another reply</button>
+                  <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>{setRSent(null);if(existing) applyExisting(existing);else{setRLines([{description:"",price:""}]);setRNote("");}}}>Add or change items</button>
                 </div>
               ):(
                 <>
-                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>Enter your name and what the work will cost. Add a line for each job.</div>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>{existing?`You already replied on ${String(existing.created_at||"").slice(0,10)}. Your items are below: add new items or change any line, then press Update.`:"Enter your name and what the work will cost. Add a line for each job."}</div>
                   {linkTo&&<div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Replying as {linkTo.name} <span style={{color:"var(--text3)",fontWeight:600}}>({linkTo.role==="painter"?"Painter":"Mechanic"})</span></div>}
                   {!linkTo&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                     <div style={{flex:"2 1 180px"}}>
@@ -700,7 +726,7 @@ export function JobCardPage({token}) {
                     <textarea className="inp" rows={2} value={rNote} onChange={e=>setRNote(e.target.value)} placeholder="e.g. Parts not included, ready in 3 days" style={{resize:"vertical"}}/>
                   </div>
                   {rErr&&<div style={{color:"var(--red)",fontSize:13,marginTop:10}}>⚠ {rErr}</div>}
-                  <button className="btn btn-primary" style={{width:"100%",marginTop:14,padding:13}} disabled={rBusy} onClick={sendReply}>{rBusy?"Sending…":"Send reply"}</button>
+                  <button className="btn btn-primary" style={{width:"100%",marginTop:14,padding:13}} disabled={rBusy} onClick={sendReply}>{rBusy?"Sending…":existing?"Update reply":"Send reply"}</button>
                 </>
               )}
             </div>}

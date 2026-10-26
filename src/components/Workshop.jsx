@@ -9749,7 +9749,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                         {r.decision!=="accepted"&&<button className="btn btn-primary btn-sm" style={{background:"var(--green)",borderColor:"var(--green)"}} disabled={wsLocked} onClick={async()=>{ if(await decideReply(r,"accepted")) setDecUi({id:r.id,mode:"done",kind:"accepted"}); }}>✅ Accept</button>}
                         {r.decision!=="accepted"&&r.decision!=="rejected"&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={wsLocked} onClick={()=>setDecUi({id:r.id,mode:"reject",note:""})}>❌ Reject…</button>}
                         {r.decision==="accepted"&&<button className="btn btn-ghost btn-sm" disabled={wsLocked} onClick={async()=>{ if(window.confirm("Let him change his price again?")&&await decideReply(r,null)) setDecUi({id:r.id,mode:"done",kind:"reopened"}); }}>↩ Let him change it</button>}
-                        {decUi&&decUi.id===r.id&&decUi.mode==="done"&&<button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>tellMechDecision(r,decUi.kind,decUi.note)}>💬 Tell {r.mechanic_name} on WhatsApp</button>}
+                        {(r.decision==="accepted"||r.decision==="rejected"||(decUi&&decUi.id===r.id&&decUi.mode==="done"))&&<button className="btn btn-ghost btn-sm" style={{color:"#25D366"}}
+                          onClick={()=>{const fresh=decUi&&decUi.id===r.id&&decUi.mode==="done";tellMechDecision(r,fresh?decUi.kind:r.decision,fresh?decUi.note:r.decision_note);}}>
+                          💬 {r.decision==="rejected"?"Resend to":"Tell"} {r.mechanic_name} on WhatsApp</button>}
                       </div>
                     )}
                   </div>

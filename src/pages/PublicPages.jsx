@@ -419,7 +419,7 @@ export function MechanicStatementPage({token}) {
                 <tbody>{acct.jobRows.map(r=>(
                   <tr key={r.job.id}>
                     <td style={td}><b>{r.job.vehicle_reg||r.job.id}</b><div style={{fontSize:11,color:"var(--text3)"}}>{[r.job.vehicle_make,r.job.vehicle_model].filter(Boolean).join(" ")}{r.job.date_in?` · ${r.job.date_in}`:""}</div></td>
-                    <td style={td}>{r.done?<span style={{color:"var(--green)",fontWeight:700}}>✅ Finished</span>:<span style={{color:"var(--text3)"}}>⏳ In progress, not counted yet</span>}</td>
+                    <td style={td}>{r.rejected?<span style={{color:"var(--red)",fontWeight:700}}>❌ Price rejected, please send a new one</span>:r.done?<span style={{color:"var(--green)",fontWeight:700}}>✅ Finished{r.accepted?" · accepted":""}</span>:<span style={{color:"var(--text3)"}}>⏳ In progress, not counted yet</span>}</td>
                     <td style={{...td,textAlign:"right",fontFamily:"DM Mono,monospace"}}>{fmtAmt(r.total)}</td>
                   </tr>
                 ))}</tbody>
@@ -632,11 +632,18 @@ export function JobCardPage({token}) {
       const total=lines.reduce((s,l)=>s+l.price,0);
       // Same link, same reply: if this person already replied, update that reply (new items are added to it) instead of making a second one
       const now=new Date().toISOString();
-      const prev=existing||await fetchExisting(job.id,name);
+      const prev=await fetchExisting(job.id,name);
+      if(prev&&prev.decision==="accepted"){
+        setExisting(prev);setRBusy(false);
+        setRErr("Your price was already accepted, so it cannot be changed here. Ask the workshop if something needs to change.");
+        return;
+      }
       let row;
       if(prev){
-        row={...prev,role:rRole,lines,total,note:rNote.trim()||null,created_at:now};
-        const res=await api.patch("workshop_job_replies","id",prev.id,{role:rRole,lines,total,note:rNote.trim()||null,created_at:now});
+        // a changed price goes back to "waiting for the workshop" (only when the decision columns exist)
+        const resetDecision=("decision" in prev)?{decision:null,decision_note:null,decided_at:null}:{};
+        row={...prev,role:rRole,lines,total,note:rNote.trim()||null,created_at:now,...resetDecision};
+        const res=await api.patch("workshop_job_replies","id",prev.id,{role:rRole,lines,total,note:rNote.trim()||null,created_at:now,...resetDecision});
         if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
       }else{
         row={id:makeId("JR"),job_id:job.id,mechanic_name:name,role:rRole,lines,total,note:rNote.trim()||null,created_at:now};
@@ -775,7 +782,16 @@ export function JobCardPage({token}) {
             {/* ── Reply: name + priced lines (hidden once the job is done) ── */}
             {!locked&&<div className="card" style={{padding:16,marginTop:14}}>
               <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Your reply &amp; price</div>
-              {rSent?(
+              {existing&&existing.decision==="accepted"?(
+                <div>
+                  <div style={{padding:"12px 14px",borderRadius:10,background:"rgba(22,163,74,.1)",border:"1px solid var(--green)",marginBottom:12,fontSize:14,fontWeight:600}}>
+                    ✅ {wsProf?.name||"The workshop"} accepted your price of {fmtAmt(existing.total)}. It can no longer be changed here.
+                  </div>
+                  {parseLines(existing).map((l,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13,padding:"4px 0",borderTop:i?"1px dashed var(--border)":"none"}}><span>{l.description}</span><span style={{fontFamily:"DM Mono,monospace"}}>{fmtAmt(l.price)}</span></div>
+                  ))}
+                </div>
+              ):rSent?(
                 <div style={{textAlign:"center",padding:"14px 0"}}>
                   <div style={{fontSize:38}}>✅</div>
                   <div style={{fontWeight:700,marginTop:6}}>{rSent.updated?"Updated":"Sent"}, thank you {rSent.name}!</div>
@@ -784,6 +800,14 @@ export function JobCardPage({token}) {
                 </div>
               ):(
                 <>
+                  {existing&&existing.decision==="rejected"&&(
+                    <div style={{padding:"12px 14px",borderRadius:10,background:"rgba(220,38,38,.08)",border:"1px solid var(--red)",marginBottom:12,fontSize:14}}>
+                      <div style={{fontWeight:700}}>❌ {wsProf?.name||"The workshop"} asked you to change your price</div>
+                      {existing.decision_note&&<div style={{marginTop:4}}>“{existing.decision_note}”</div>}
+                      <div style={{marginTop:4,fontSize:12,color:"var(--text3)"}}>Change your lines below and press Update reply.</div>
+                    </div>
+                  )}
+                  {existing&&!existing.decision&&"decision" in existing&&<div style={{fontSize:12,color:"var(--text3)",marginBottom:8}}>⏳ Waiting for the workshop to accept your price. You can still change it.</div>}
                   <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>{existing?`You already replied on ${String(existing.created_at||"").slice(0,10)}. Your items are below: add new items or change any line, then press Update.`:"Enter your name and what the work will cost. Add a line for each job."}</div>
                   {linkTo&&<div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Replying as {linkTo.name} <span style={{color:"var(--text3)",fontWeight:600}}>({linkTo.role==="painter"?"Painter":"Mechanic"})</span></div>}
                   {!linkTo&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>

@@ -39,8 +39,9 @@ export function computeAccount({ replies = [], jobs = [], ledger = [] }) {
     if (!j) return;
     const done = MECH_DONE.includes(j.status);
     const total = +r.total || 0;
-    if (done) earned += total;
-    jobRows.push({ job: j, reply: r, total, done });
+    const rejected = r.decision === "rejected";   // the workshop rejected this price: not counted until he sends a new one
+    if (done && !rejected) earned += total;
+    jobRows.push({ job: j, reply: r, total, done, rejected, accepted: r.decision === "accepted" });
   });
   jobRows.sort((a, b) => String(b.job.date_in || "").localeCompare(String(a.job.date_in || "")));
   let credits = 0, deductions = 0, paid = 0;

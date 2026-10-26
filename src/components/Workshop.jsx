@@ -4783,6 +4783,31 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   };
   useEffect(()=>{ loadReplies(); },[job.id]);
   const replyLines=r=>Array.isArray(r.lines)?r.lines:(()=>{try{return JSON.parse(r.lines||"[]");}catch{return[];}})();
+  // Accept / reject a mechanic's price. Rejecting (with a note) lets him change it on the same link; accepting locks it.
+  const [decUi, setDecUi] = useState(null); // {id, mode:"reject"|"done", note, kind}
+  const jobBaseLink=async()=>{
+    const cur=await api.fresh("workshop_jobs",`id=eq.${encodeURIComponent(job.id)}&select=share_token`);
+    let tk=Array.isArray(cur)?cur[0]?.share_token:null;
+    if(!tk){ tk=makeToken()+makeToken(); await api.patch("workshop_jobs","id",job.id,{share_token:tk}); }
+    return `${window.location.origin}${window.location.pathname}?jobcard=${tk}`;
+  };
+  const decideReply=async(r,decision,note="")=>{
+    const patch={decision,decision_note:(note||"").trim()||null,decided_at:decision?new Date().toISOString():null};
+    const res=await api.patch("workshop_job_replies","id",r.id,patch);
+    if(res&&!Array.isArray(res)&&(res.code||res.message)){ alert(`❌ ${res.message||res.code}\n\nRun the reply-decision SQL in Supabase first.`); return false; }
+    await loadReplies(); return true;
+  };
+  const tellMechDecision=async(r,kind,note)=>{
+    let link=""; try{ link=(await jobBaseLink())+`&name=${encodeURIComponent(r.mechanic_name)}&role=${r.role==="painter"?"painter":"mechanic"}`; }catch{/* send without the link */}
+    const reg=job.vehicle_reg||job.id; const total=fmtAmt(r.total??0);
+    const msg=kind==="accepted"
+      ?`Hi ${r.mechanic_name}, your price ${total} for ${reg} is accepted. Thank you.`
+      :kind==="reopened"
+        ?`Hi ${r.mechanic_name}, you can change your price for ${reg} again. Open the same link and press Update reply:\n${link}`
+        :`Hi ${r.mechanic_name}, please change your price for ${reg}.${note?` ${note}`:""}\nOpen the same link and press Update reply:\n${link}`;
+    const ph=(sends.find(sd=>(sd.name||"").trim().toLowerCase()===(r.mechanic_name||"").trim().toLowerCase())||{}).phone||"";
+    window.open(ph?waLink(ph,msg):`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
+  };
   // "Save to my contacts" ticked for a new person: store name + WhatsApp + role once, pick them from a list next time
   const saveNewContact=()=>{
     const s=sendMech;
@@ -8561,10 +8586,15 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                     <button onClick={()=>setPayFor({name:p.name,role:p.role,phone:(sends.find(sd=>norm(sd.name)===norm(p.name))||{}).phone||""})} title="Payment and balance for this person"
                       style={{fontSize:10,fontWeight:700,color:"var(--accent)",background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:5,padding:"2px 8px",flexShrink:0,cursor:"pointer"}}>💼 Payment &amp; balance</button>
                     {p.reply
-                      ? <button onClick={()=>{setShowReplies(true);loadReplies();}} title="View the lines and price"
-                          style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",flexShrink:0,border:"none",cursor:"pointer"}}>
-                          ✅ Replied · {fmtAmt(p.reply.total??0)}
-                        </button>
+                      ? (()=>{
+                          const d=p.reply.decision;
+                          const col=d==="rejected"?"var(--red)":d==="accepted"?"var(--green)":"var(--accent)";
+                          const bg=d==="rejected"?"rgba(248,113,113,.12)":d==="accepted"?"rgba(52,211,153,.1)":"rgba(255,122,46,.12)";
+                          return <button onClick={()=>{setShowReplies(true);loadReplies();}} title="Open the reply to accept, reject or let him change it"
+                            style={{fontSize:10,fontWeight:700,color:col,background:bg,borderRadius:5,padding:"2px 8px",flexShrink:0,border:"none",cursor:"pointer"}}>
+                            {d==="accepted"?`✅ Accepted · ${fmtAmt(p.reply.total??0)}`:d==="rejected"?"❌ Rejected · waiting for new price":`💬 Replied · ${fmtAmt(p.reply.total??0)} · Accept / Reject`}
+                          </button>;
+                        })()
                       : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>
                           ⏳ Waiting{p.sentAt?` · sent ${fmtDT(p.sentAt)}`:""}
                         </span>}
@@ -9680,13 +9710,6 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           onClose={()=>setDeliveryModal(false)}/>
       )}
 
-      {payFor&&(
-        <Overlay wide onClose={()=>setPayFor(null)}>
-          <MHead title="💼 Payment & balance" sub={payFor.name} onClose={()=>setPayFor(null)}/>
-          <WsMechanicPayPage wsId={ownerWsId||wsId} wsProfile={wsProfile} wsLocked={wsLocked} focusName={payFor.name} focusRole={payFor.role} focusPhone={payFor.phone} embedded/>
-        </Overlay>
-      )}
-
       {showReplies&&(
         <Overlay onClose={()=>setShowReplies(false)}>
           <MHead title="💬 Replies & prices" sub={`${job.vehicle_reg||job.id} · from the job card link`} onClose={()=>setShowReplies(false)}/>
@@ -9708,6 +9731,29 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   <span>Total</span><span style={{color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:18}}>{fmtAmt(r.total??ls.reduce((s,l)=>s+(+l.price||0),0))}</span>
                 </div>
                 {r.note&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,whiteSpace:"pre-line"}}>📝 {r.note}</div>}
+                {wsRole!=="mechanic"&&(
+                  <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid var(--border)"}}>
+                    <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:r.decision==="accepted"?"var(--green)":r.decision==="rejected"?"var(--red)":"var(--text3)"}}>
+                      {r.decision==="accepted"?`✅ Accepted${r.decided_at?` · ${fmtDT(r.decided_at)}`:""}`:r.decision==="rejected"?`❌ Rejected, waiting for his new price${r.decision_note?` · “${r.decision_note}”`:""}`:"⏳ Not decided yet"}
+                    </div>
+                    {decUi&&decUi.id===r.id&&decUi.mode==="reject"?(
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        <input className="inp" autoFocus value={decUi.note} onChange={e=>setDecUi(u=>({...u,note:e.target.value}))} placeholder="What should he change? e.g. Please bring it down to R2,000"/>
+                        <div style={{display:"flex",gap:8}}>
+                          <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setDecUi(null)}>Cancel</button>
+                          <button className="btn btn-primary btn-sm" style={{flex:2,background:"var(--red)",borderColor:"var(--red)"}} onClick={async()=>{ if(await decideReply(r,"rejected",decUi.note)) setDecUi({id:r.id,mode:"done",kind:"rejected",note:decUi.note}); }}>❌ Reject and let him change</button>
+                        </div>
+                      </div>
+                    ):(
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {r.decision!=="accepted"&&<button className="btn btn-primary btn-sm" style={{background:"var(--green)",borderColor:"var(--green)"}} disabled={wsLocked} onClick={async()=>{ if(await decideReply(r,"accepted")) setDecUi({id:r.id,mode:"done",kind:"accepted"}); }}>✅ Accept</button>}
+                        {r.decision!=="accepted"&&r.decision!=="rejected"&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={wsLocked} onClick={()=>setDecUi({id:r.id,mode:"reject",note:""})}>❌ Reject…</button>}
+                        {r.decision==="accepted"&&<button className="btn btn-ghost btn-sm" disabled={wsLocked} onClick={async()=>{ if(window.confirm("Let him change his price again?")&&await decideReply(r,null)) setDecUi({id:r.id,mode:"done",kind:"reopened"}); }}>↩ Let him change it</button>}
+                        {decUi&&decUi.id===r.id&&decUi.mode==="done"&&<button className="btn btn-ghost btn-sm" style={{color:"#25D366"}} onClick={()=>tellMechDecision(r,decUi.kind,decUi.note)}>💬 Tell {r.mechanic_name} on WhatsApp</button>}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -9733,6 +9779,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                           <div style={{fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sd.name} <span style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{sd.role==="painter"?"Painter":"Mechanic"}</span></div>
                           <div style={{fontSize:11,color:"var(--text3)"}}>{sd.phone?`${sd.phone} · `:""}{fmtDT(sd.sent_at)}</div>
                         </div>
+                        <button type="button" onClick={()=>setPayFor({name:sd.name,role:sd.role,phone:sd.phone||""})} title="Payment and balance for this person"
+                          style={{fontSize:10,fontWeight:700,color:"var(--accent)",background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:5,padding:"2px 8px",flexShrink:0,cursor:"pointer",whiteSpace:"nowrap"}}>💼 Payment &amp; balance</button>
                         {rp
                           ? <button onClick={()=>{setSendMech(null);setShowReplies(true);}} style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",flexShrink:0}}>✅ Replied · {fmtAmt(rp.total??0)}</button>
                           : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ Waiting</span>}
@@ -9804,6 +9852,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 href={sendMech.phone.trim()?waLink(sendMech.phone,sendMech.msg):`https://wa.me/?text=${encodeURIComponent(sendMech.msg)}`}>💬 Send via WhatsApp</a>
             </div>
           </>)}
+        </Overlay>
+      )}
+
+      {payFor&&(
+        <Overlay wide onClose={()=>setPayFor(null)}>
+          <MHead title="💼 Payment & balance" sub={payFor.name} onClose={()=>setPayFor(null)}/>
+          <WsMechanicPayPage wsId={ownerWsId||wsId} wsProfile={wsProfile} wsLocked={wsLocked} focusName={payFor.name} focusRole={payFor.role} focusPhone={payFor.phone} embedded/>
         </Overlay>
       )}
 

@@ -159,7 +159,7 @@ export function WsMechanicPayPage({ wsId, wsProfile, wsLocked = false, focusName
                   <tr key={r.job.id}>
                     <td style={td}><b>{r.job.vehicle_reg || r.job.id}</b><div style={{ fontSize: 11, color: "var(--text3)" }}>{[r.job.vehicle_make, r.job.vehicle_model].filter(Boolean).join(" ")}</div></td>
                     <td style={td}>{r.job.date_in || ""}</td>
-                    <td style={td}>{r.done ? <span style={{ color: "var(--green)", fontWeight: 700 }}>✅ Finished · counted</span> : <span style={{ color: "var(--text3)" }}>⏳ {r.job.status || "In progress"} · not counted yet</span>}</td>
+                    <td style={td}>{r.rejected ? <span style={{ color: "var(--red)", fontWeight: 700 }}>❌ Price rejected · not counted</span> : r.done ? <span style={{ color: "var(--green)", fontWeight: 700 }}>✅ Finished · counted{r.accepted ? " · accepted" : ""}</span> : <span style={{ color: "var(--text3)" }}>⏳ {r.job.status || "In progress"} · not counted yet</span>}</td>
                     <td style={num}>{fmtAmt(r.total)}</td>
                   </tr>
                 ))}

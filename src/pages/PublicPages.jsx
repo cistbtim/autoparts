@@ -374,13 +374,22 @@ export function JobCardPage({token}) {
   const [clBusy,setClBusy]=useState({});    // { item_key: true } while a photo uploads
   const [openNote,setOpenNote]=useState({});
   // Reply with the mechanic's / painter's name and a priced list of work (descriptions + prices, as many lines as needed)
-  const [rName,setRName]=useState(()=>{try{return localStorage.getItem("jobcard_name")||"";}catch{return "";}});
-  const [rRole,setRRole]=useState("mechanic");
+  // The workshop puts the recipient's name + role in the link (&name=…&role=…); then nothing is asked
+  const linkTo=(()=>{try{const q=new URLSearchParams(window.location.search);const n=(q.get("name")||"").trim();const r=q.get("role");return n?{name:n,role:r==="painter"?"painter":"mechanic"}:null;}catch{return null;}})();
+  const [rName,setRName]=useState(()=>linkTo?linkTo.name:(()=>{try{return localStorage.getItem("jobcard_name")||"";}catch{return "";}})());
+  const [rRole,setRRole]=useState(linkTo?linkTo.role:"mechanic");
   const [rLines,setRLines]=useState([{description:"",price:""}]);
   const [rNote,setRNote]=useState("");
   const [rBusy,setRBusy]=useState(false);
   const [rSent,setRSent]=useState(null); // {name,total} after a successful send
   const [rErr,setRErr]=useState("");
+  // Upload a report (PDF, e.g. a diagnostic report, or a photo). Saved as a normal job document, so it shows in the job's Docs tab.
+  const [docFile,setDocFile]=useState(null);
+  const [docName,setDocName]=useState("");
+  const [docNote,setDocNote]=useState("");
+  const [docBusy,setDocBusy]=useState(false);
+  const [docErr,setDocErr]=useState("");
+  const [docsSent,setDocsSent]=useState([]); // uploaded during this visit
   useEffect(()=>{
     (async()=>{
       const r=await api.fresh("workshop_jobs",`share_token=eq.${encodeURIComponent(token)}&select=id,vehicle_reg,vehicle_make,vehicle_model,vehicle_year,complaint,notes,workshop_vehicle_id,workshop_id,created_at,date_in,mileage,status`);
@@ -464,6 +473,42 @@ export function JobCardPage({token}) {
     };
     fr.onerror=()=>setClBusy(p=>({...p,[key]:false}));
     fr.readAsDataURL(file);
+  };
+  const uploadDoc=async()=>{
+    if(!docFile){setDocErr("Choose a file first.");return;}
+    if(docFile.size>15*1024*1024){setDocErr("That file is too large (max 15 MB).");return;}
+    const name=(docName.trim()||docFile.name.replace(/\.[^.]+$/,"")).trim();
+    setDocErr("");setDocBusy(true);
+    if(!(await stillOpen())){setDocBusy(false);return;}
+    try{
+      const isPdf=docFile.type==="application/pdf"||/\.pdf$/i.test(docFile.name);
+      let blob=docFile,mime="application/pdf",ext="pdf";
+      if(!isPdf){
+        const src=URL.createObjectURL(docFile);
+        blob=await new Promise((res,rej)=>{
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=1600;let w=img.width,h=img.height;
+            if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+            const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
+            cv.toBlob(b=>b?res(b):rej(new Error("photo failed")),"image/jpeg",0.88);
+          };
+          img.onerror=()=>rej(new Error("could not read that file"));img.src=src;
+        });
+        URL.revokeObjectURL(src);mime="image/jpeg";ext="jpg";
+      }
+      const safe=name.replace(/\s+/g,"_").replace(/[^a-zA-Z0-9_-]/g,"")||"file";
+      const filename=`${safe}_${Date.now()}.${ext}`;
+      const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+      const url=await uploadToStorage("cars_parts",`documents/${reg}/${filename}`,blob,mime);
+      const who=rName.trim()?`Uploaded by ${rName.trim()} (${rRole==="painter"?"Painter":"Mechanic"})`:"Uploaded via job card link";
+      const rec={id:makeId("WSD"),job_id:job.id,workshop_id:job.workshop_id||null,name,notes:[who,docNote.trim()].filter(Boolean).join(" — "),
+        file_url:url,file_type:isPdf?"pdf":"image",mime_type:mime,filename,uploaded_at:new Date().toISOString()};
+      const res=await api.insert("workshop_documents",rec);
+      if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      setDocsSent(d=>[rec,...d]);setDocFile(null);setDocName("");setDocNote("");
+    }catch(e){ setDocErr(`Upload failed — please try again. (${e.message||e})`); }
+    setDocBusy(false);
   };
   const rTotal=rLines.reduce((s,l)=>s+(+l.price||0),0);
   const setLine=(i,k,v)=>setRLines(ls=>ls.map((l,j)=>j===i?{...l,[k]:v}:l));
@@ -578,6 +623,34 @@ export function JobCardPage({token}) {
               })}
             </div>
 
+            {/* ── Upload a report (PDF / photo) ── */}
+            {!locked&&<div className="card" style={{padding:16,marginTop:14}}>
+              <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Upload a report</div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>For example a diagnostic report. PDF or photo, up to 15 MB. It is added to this job.</div>
+              <label className="btn btn-ghost btn-sm" style={{display:"inline-flex",cursor:"pointer",maxWidth:"100%"}}>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📎 {docFile?docFile.name:"Choose PDF or photo"}</span>
+                <input type="file" accept="application/pdf,image/*" style={{display:"none"}} disabled={docBusy}
+                  onChange={e=>{const f=e.target.files&&e.target.files[0];if(f){setDocFile(f);setDocErr("");setDocName(n=>n||f.name.replace(/\.[^.]+$/,""));}e.target.value="";}}/>
+              </label>
+              {docFile&&(
+                <>
+                  <div style={{marginTop:10}}><FL label="Name of the report"/><input className="inp" value={docName} onChange={e=>setDocName(e.target.value)} placeholder="e.g. Diagnostic report"/></div>
+                  <div style={{marginTop:10}}><FL label="Note (optional)"/><input className="inp" value={docNote} onChange={e=>setDocNote(e.target.value)} placeholder="e.g. Fault codes P0300, P0420"/></div>
+                  <button className="btn btn-primary" style={{width:"100%",marginTop:12,padding:12}} disabled={docBusy} onClick={uploadDoc}>{docBusy?"Uploading…":"⬆️ Upload"}</button>
+                </>
+              )}
+              {docErr&&<div style={{color:"var(--red)",fontSize:13,marginTop:10}}>⚠ {docErr}</div>}
+              {docsSent.length>0&&(
+                <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:6}}>
+                  {docsSent.map(d=>(
+                    <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--surface2)",borderRadius:8,textDecoration:"none",color:"var(--text)",fontSize:13}}>
+                      <span>✅</span><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</span><span style={{color:"var(--blue)",fontWeight:700,fontSize:12}}>Open</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>}
+
             {/* ── Reply: name + priced lines (hidden once the job is done) ── */}
             {!locked&&<div className="card" style={{padding:16,marginTop:14}}>
               <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Your reply &amp; price</div>
@@ -591,7 +664,8 @@ export function JobCardPage({token}) {
               ):(
                 <>
                   <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>Enter your name and what the work will cost. Add a line for each job.</div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                  {linkTo&&<div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Replying as {linkTo.name} <span style={{color:"var(--text3)",fontWeight:600}}>({linkTo.role==="painter"?"Painter":"Mechanic"})</span></div>}
+                  {!linkTo&&<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
                     <div style={{flex:"2 1 180px"}}>
                       <FL label="Your name *"/>
                       <input className="inp" value={rName} onChange={e=>setRName(e.target.value)} placeholder="e.g. John"/>
@@ -604,7 +678,7 @@ export function JobCardPage({token}) {
                         <option value="other">Other</option>
                       </select>
                     </div>
-                  </div>
+                  </div>}
                   <div style={{display:"flex",gap:8,fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>
                     <div style={{flex:1}}>Description</div><div style={{width:96}}>Price</div><div style={{width:30}}/>
                   </div>

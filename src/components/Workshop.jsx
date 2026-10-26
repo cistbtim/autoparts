@@ -4744,10 +4744,14 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [newBooking,    setNewBooking]    = useState(null); // {complaint,preferred_date} while the modal is open
   // "Send job card" to a mechanic / painter: a short WhatsApp-ready message + a read-only link to this
   // job's details and car photos (public ?jobcard=<token> page, no prices or customer details).
-  const [sendMech, setSendMech] = useState(null); // {role,phone,link,msg,err,busy,copied}
-  const buildJobMsg=(role,link)=>{
+  const [sendMech, setSendMech] = useState(null); // {role,name,phone,contactId,contacts,save,link,msg,err,busy,copied}
+  const ownerWsId = job.workshop_id||wsProfile?.id||null;
+  // The recipient's name + role travel inside the link, so the mechanic / painter never has to type or choose them
+  const withTo=(base,name,role)=>base+(name?`&name=${encodeURIComponent(name)}&role=${role}`:"");
+  const buildJobMsg=(role,link,name="")=>{
     const car=[job.vehicle_year,job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ");
     return [
+      name?`Hi ${name},`:"",
       `${role==="painter"?"🎨":"🔧"} JOB CARD ${job.id}`,
       wsProfile?.name?`From: ${wsProfile.name}`:"",
       job.vehicle_reg?`Plate: ${job.vehicle_reg}`:"",
@@ -4756,7 +4760,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       job.date_in?`Date: ${job.date_in}`:"",
       job.complaint?`Complaint: ${job.complaint}`:"",
       job.notes?`Note: ${job.notes}`:"",
-      role==="painter"?"Please check the damage and send me your name and price at the bottom of the page.":"Please do the inspection on this car — open the link below, tick each item OK / Issue, add photos, then send your name and price at the bottom.",
+      role==="painter"?"Please check the damage and send me your price at the bottom of the page.":"Please do the inspection on this car — open the link below, tick each item OK / Issue, add photos, upload any report (PDF), then send your price at the bottom.",
       link?`📷 Car photos, details & inspection: ${link}`:"",
     ].filter(Boolean).join("\n");
   };
@@ -4767,8 +4771,15 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
     .then(r=>setReplies(Array.isArray(r)?r:[])).catch(()=>setReplies([]));
   useEffect(()=>{ loadReplies(); },[job.id]);
   const replyLines=r=>Array.isArray(r.lines)?r.lines:(()=>{try{return JSON.parse(r.lines||"[]");}catch{return[];}})();
+  // "Save to my contacts" ticked for a new person: store name + WhatsApp + role once, pick them from a list next time
+  const saveNewContact=()=>{
+    const s=sendMech;
+    if(!s||s.contactId||!s.save||!s.name.trim()||!s.phone.trim()||!ownerWsId) return;
+    api.insert("workshop_contacts",{id:makeId("WCT"),workshop_id:ownerWsId,name:s.name.trim(),phone:s.phone.trim(),role:s.role,created_at:new Date().toISOString()}).catch(()=>{});
+    setSendMech(x=>x&&({...x,save:false}));
+  };
   const openSendMech=async()=>{
-    setSendMech({role:"mechanic",phone:"",link:"",msg:"",err:"",busy:true,copied:false});
+    setSendMech({role:"mechanic",name:"",phone:"",contactId:"",contacts:[],save:false,link:"",msg:"",err:"",busy:true,copied:false});
     try{
       // reuse the job's existing token so a link sent earlier keeps working
       const cur=await api.fresh("workshop_jobs",`id=eq.${encodeURIComponent(job.id)}&select=share_token`);
@@ -4780,7 +4791,12 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
       }
       const link=`${window.location.origin}${window.location.pathname}?jobcard=${tk}`;
-      setSendMech(s=>({...s,busy:false,link,msg:buildJobMsg("mechanic",link)}));
+      let contacts=[];
+      if(ownerWsId){
+        const cr=await api.fresh("workshop_contacts",`workshop_id=eq.${encodeURIComponent(ownerWsId)}&order=name.asc`).catch(()=>[]);
+        contacts=Array.isArray(cr)?cr:[];
+      }
+      setSendMech(s=>({...s,busy:false,link,contacts,msg:buildJobMsg("mechanic",link)}));
     }catch(e){
       setSendMech(s=>({...s,busy:false,err:`${e.message||e} — has the share_token column been added to workshop_jobs?`}));
     }
@@ -9642,19 +9658,55 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             <div style={{display:"flex",gap:8,marginBottom:14}}>
               {[["mechanic","🔧 Mechanic"],["painter","🎨 Painter"]].map(([r,lb])=>(
                 <button key={r} className={`btn btn-sm ${sendMech.role===r?"btn-primary":"btn-ghost"}`} style={{flex:1}}
-                  onClick={()=>setSendMech(s=>({...s,role:r,msg:buildJobMsg(r,s.link)}))}>{lb}</button>
+                  onClick={()=>setSendMech(s=>({...s,role:r,msg:buildJobMsg(r,withTo(s.link,s.name,r),s.name)}))}>{lb}</button>
               ))}
             </div>
-            <FD><FL label="Their WhatsApp number (optional)"/>
-              <input className="inp" type="tel" value={sendMech.phone} onChange={e=>setSendMech(s=>({...s,phone:e.target.value}))} placeholder="Leave empty to pick the contact in WhatsApp"/>
-            </FD>
+            {sendMech.contacts.length>0&&(
+              <FD><FL label="Send to"/>
+                <div style={{display:"flex",gap:8}}>
+                  <select className="inp" style={{flex:1,minWidth:0}} value={sendMech.contactId}
+                    onChange={e=>{
+                      const c=sendMech.contacts.find(x=>x.id===e.target.value);
+                      setSendMech(s=>c
+                        ?{...s,contactId:c.id,name:c.name,phone:c.phone||"",role:c.role==="painter"?"painter":"mechanic",save:false,msg:buildJobMsg(c.role==="painter"?"painter":"mechanic",withTo(s.link,c.name,c.role==="painter"?"painter":"mechanic"),c.name)}
+                        :{...s,contactId:"",name:"",phone:"",msg:buildJobMsg(s.role,s.link)});
+                    }}>
+                    <option value="">+ New person</option>
+                    {sendMech.contacts.map(c=><option key={c.id} value={c.id}>{c.name} · {c.role==="painter"?"Painter":"Mechanic"}{c.phone?` · ${c.phone}`:""}</option>)}
+                  </select>
+                  {sendMech.contactId&&<button type="button" className="btn btn-ghost btn-sm" title="Remove this person from my contacts" style={{color:"var(--red)"}}
+                    onClick={async()=>{
+                      if(!window.confirm("Remove this person from your contacts?")) return;
+                      await api.delete("workshop_contacts","id",sendMech.contactId).catch(()=>{});
+                      setSendMech(s=>({...s,contactId:"",name:"",phone:"",contacts:s.contacts.filter(c=>c.id!==s.contactId),msg:buildJobMsg(s.role,s.link)}));
+                    }}>🗑</button>}
+                </div>
+              </FD>
+            )}
+            <FG>
+              <div><FL label="Name *"/>
+                <input className="inp" value={sendMech.name} placeholder="e.g. John"
+                  onChange={e=>setSendMech(s=>({...s,name:e.target.value,contactId:s.contactId&&s.contacts.find(c=>c.id===s.contactId)?.name===e.target.value?s.contactId:""}))}
+                  onBlur={()=>setSendMech(s=>({...s,msg:buildJobMsg(s.role,withTo(s.link,s.name.trim(),s.role),s.name.trim())}))}/>
+              </div>
+              <div><FL label="WhatsApp number"/>
+                <input className="inp" type="tel" value={sendMech.phone} onChange={e=>setSendMech(s=>({...s,phone:e.target.value}))} placeholder="e.g. 27821234567"/>
+              </div>
+            </FG>
+            {!sendMech.contactId&&sendMech.name.trim()&&sendMech.phone.trim()&&(
+              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:12,cursor:"pointer"}}>
+                <input type="checkbox" checked={sendMech.save} onChange={e=>setSendMech(s=>({...s,save:e.target.checked}))} style={{accentColor:"var(--accent)"}}/>
+                Save {sendMech.name.trim()} to my contacts for next time
+              </label>
+            )}
             <FD><FL label="Message (you can edit it)"/>
               <textarea className="inp" rows={9} value={sendMech.msg} onChange={e=>setSendMech(s=>({...s,msg:e.target.value}))} style={{resize:"vertical",fontSize:13,lineHeight:1.5}}/>
             </FD>
-            <div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>The link opens a page for this car only: details, photos and the inspection checklist (the mechanic can tick items and add photos). No prices or customer details are shown.</div>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>The link already knows who it is for, so they do not type their name. It opens a page for this car only: details, photos, the inspection checklist and a price form. No customer details are shown.</div>
             <div style={{display:"flex",gap:10}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{try{navigator.clipboard.writeText(sendMech.msg);setSendMech(s=>({...s,copied:true}));setTimeout(()=>setSendMech(s=>s&&({...s,copied:false})),1500);}catch{/* clipboard blocked */}}}>{sendMech.copied?"✓ Copied":"📋 Copy"}</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{saveNewContact();try{navigator.clipboard.writeText(sendMech.msg);setSendMech(s=>({...s,copied:true}));setTimeout(()=>setSendMech(s=>s&&({...s,copied:false})),1500);}catch{/* clipboard blocked */}}}>{sendMech.copied?"✓ Copied":"📋 Copy"}</button>
               <a className="btn btn-primary" style={{flex:2,textDecoration:"none",background:"#25D366",borderColor:"#25D366"}} target="_blank" rel="noreferrer"
+                onClick={saveNewContact}
                 href={sendMech.phone.trim()?waLink(sendMech.phone,sendMech.msg):`https://wa.me/?text=${encodeURIComponent(sendMech.msg)}`}>💬 Send via WhatsApp</a>
             </div>
           </>)}

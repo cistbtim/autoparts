@@ -12,6 +12,7 @@ import { WsServicesPage, WsServiceModal } from "./ws/Services.jsx";
 import { WsSuppliersPage, WsSupplierModal, CAR_BRANDS } from "./ws/WsSuppliers.jsx";
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
+import { WsMechanicPayPage } from "./ws/MechanicPay.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
@@ -558,6 +559,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     ["wssupinv",     "🧾 Supplier Inv",wsSupplierInvoices.length],
     ["wstransfer",   "🔄 Transfer",    null],
     ...(wsProfile?.linked_branch_id?[["spareshop",spareShopQuotedCount>0?`🏪 Spare Shop 🔔`:"🏪 Spare Shop",spareShopQuotedCount||null]]:[]),
+    ["wsmechpay",  "💼 Mechanic Pay", null],
     ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["wsmatch",    "🔎 Scrapyard Match"],
     ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
@@ -2379,6 +2381,8 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
 
       {/* ══════════════ WS DOCUMENTS TAB ══════════════ */}
       {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsVehicles={wsVehicles} initialJobId={scrapMatchJobId} onInitialJobConsumed={onScrapMatchConsumed} onOpenJob={onOpenJobFromMatch} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
+
+      {wsTab==="wsmechpay"&&<WsMechanicPayPage wsId={wsId} wsProfile={wsProfile} wsLocked={wsLocked}/>}
 
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}
@@ -4769,6 +4773,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   // Replies the mechanic / painter sent back from the job card link: name + priced lines
   const [replies, setReplies] = useState([]);
   const [showReplies, setShowReplies] = useState(false);
+  const [payFor, setPayFor] = useState(null); // {name,role,phone}: opens that mechanic's payment + balance account
   const [sends, setSends] = useState([]); // who the job card was sent to (so we can show "waiting" until they reply)
   const loadReplies=()=>{
     api.fresh("workshop_job_sends",`job_id=eq.${encodeURIComponent(job.id)}&order=sent_at.desc`)
@@ -8553,6 +8558,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 {rows.map(p=>(
                   <div key={norm(p.name)} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
                     <span style={{flex:1,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name} <span style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>{p.role==="painter"?"Painter":p.role==="other"?"":"Mechanic"}</span></span>
+                    <button onClick={()=>setPayFor({name:p.name,role:p.role,phone:(sends.find(sd=>norm(sd.name)===norm(p.name))||{}).phone||""})} title="Payment and balance for this person"
+                      style={{fontSize:10,fontWeight:700,color:"var(--accent)",background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:5,padding:"2px 8px",flexShrink:0,cursor:"pointer"}}>💼 Payment &amp; balance</button>
                     {p.reply
                       ? <button onClick={()=>{setShowReplies(true);loadReplies();}} title="View the lines and price"
                           style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",flexShrink:0,border:"none",cursor:"pointer"}}>
@@ -9671,6 +9678,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         <DeliveryLabelModal
           job={job} settings={settings}
           onClose={()=>setDeliveryModal(false)}/>
+      )}
+
+      {payFor&&(
+        <Overlay wide onClose={()=>setPayFor(null)}>
+          <MHead title="💼 Payment & balance" sub={payFor.name} onClose={()=>setPayFor(null)}/>
+          <WsMechanicPayPage wsId={ownerWsId||wsId} wsProfile={wsProfile} wsLocked={wsLocked} focusName={payFor.name} focusRole={payFor.role} focusPhone={payFor.phone} embedded/>
+        </Overlay>
       )}
 
       {showReplies&&(

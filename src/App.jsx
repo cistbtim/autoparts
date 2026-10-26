@@ -29,7 +29,7 @@ import { PartTags, SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, 
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, JobCardPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, JobCardPage, MechanicStatementPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -85,7 +85,7 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 // Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
 // the tablet-only compact-header logic (hides the big global brand strip and lets
 // WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
-const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch"];
+const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch","wsmechpay"];
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -163,6 +163,8 @@ export default function App() {
   if(rfqQuoteToken) return <RfqQuoteReplyPage token={rfqQuoteToken}/>;
   const rfqBatchToken = new URLSearchParams(window.location.search).get("rfq_batch");
   if(rfqBatchToken) return <RfqBatchReplyPage token={rfqBatchToken}/>;
+  const mechPayToken = new URLSearchParams(window.location.search).get("mechpay");
+  if(mechPayToken) return <MechanicStatementPage token={mechPayToken}/>;
   const jobCardToken = new URLSearchParams(window.location.search).get("jobcard");
   if(jobCardToken) return <JobCardPage token={jobCardToken}/>;
   const supplierSetupToken = new URLSearchParams(window.location.search).get("supplier_setup");
@@ -5194,6 +5196,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"wsstock",     icon:"📦",label:t.wsStock,                     roles:["admin","manager"]},
         {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
         {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
+        {id:"wsmechpay",   icon:"💼",label:"Mechanic Pay",                 roles:["admin","manager"]},
         {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents",          roles:["admin","manager"]},
         {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals", roles:["admin","manager"]},
         {id:"wsstatement", icon:"📄",label:t.wsStatement,                 roles:["admin","manager"]},
@@ -5235,6 +5238,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {
         id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
+          {id:"wsmechpay",   icon:"💼",label:"Mechanic Pay",         roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents", roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsmatch",     icon:"🔎",label:"Scrapyard Match",       roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
@@ -5947,7 +5951,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
               wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
               wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:t.wsSpareShop||"Spare Shop",
-              wsdocs:t.wsDocs||"Documents", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals", wsmatch:"Scrapyard Match",
+              wsdocs:t.wsDocs||"Documents", wsmechpay:"Mechanic Pay", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals", wsmatch:"Scrapyard Match",
             };
             return(<>
               <div className="velg-mainstrip-divider"/>
@@ -8784,7 +8788,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wslicencerenewal"?"wslicencerenewal":tab==="wsmatch"?"wsmatch":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wsmechpay"?"wsmechpay":tab==="wslicencerenewal"?"wslicencerenewal":tab==="wsmatch"?"wsmatch":"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}

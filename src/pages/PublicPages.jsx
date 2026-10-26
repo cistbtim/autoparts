@@ -8,6 +8,7 @@ import { ShopLogo, MHead, FG, FD, FL, ImgLightbox, Flag } from "../components/sh
 import { LogoUploader } from "../components/Modals.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
 import { CHECKLIST_ITEMS } from "../components/ws/Print.jsx";
+import { computeAccount, loadMechanicData, sameName, ENTRY_TYPES } from "../lib/mechanicPay.js";
 
 // Match the browser/device's preferred language against a list of configured
 // lang codes (arbitrary, admin-chosen — not guaranteed to be strict ISO 639-1).
@@ -353,6 +354,100 @@ export function SupplierSetupPage({token}) {
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// A mechanic's / painter's own payment statement: finished jobs, charges, supplier invoices paid for him, payments and the balance.
+// Read-only and permanent (?mechpay=<token>); it updates by itself as the workshop records things.
+export function MechanicStatementPage({token}) {
+  const [state,setState]=useState("loading"); // loading | ready | invalid
+  const [who,setWho]=useState(null);
+  const [wsProf,setWsProf]=useState(null);
+  const [acct,setAcct]=useState(null);
+  const [ledger,setLedger]=useState([]);
+  useEffect(()=>{
+    (async()=>{
+      const r=await api.fresh("workshop_contacts",`pay_token=eq.${encodeURIComponent(token)}&select=id,workshop_id,name,phone,role`);
+      const c=Array.isArray(r)?r[0]:null;
+      if(!c){setState("invalid");return;}
+      const [wp,d]=await Promise.all([
+        api.fresh("workshop_profiles",`id=eq.${encodeURIComponent(c.workshop_id)}&select=id,name,phone,whatsapp,address,logo_url,logo_data`).catch(()=>[]),
+        loadMechanicData(api,{wsId:c.workshop_id,contacts:[c],contactId:c.id}),
+      ]);
+      if(Array.isArray(wp)&&wp[0]) setWsProf(wp[0]);
+      setWho(c);
+      setLedger(d.ledger);
+      setAcct(computeAccount({replies:d.replies.filter(x=>sameName(x.mechanic_name,c.name)),jobs:d.jobs,ledger:d.ledger}));
+      setState("ready");
+    })().catch(()=>setState("invalid"));
+  },[token]);
+  const sg=n=>`${n<0?"−":n>0?"+":""}${fmtAmt(Math.abs(n))}`;
+  const th={textAlign:"left",fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",padding:"8px 8px",borderBottom:"1px solid var(--border)"};
+  const td={padding:"9px 8px",borderBottom:"1px solid var(--border)",fontSize:13};
+  return (
+    <div style={{background:"var(--bg)",minHeight:"100vh",padding:"20px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:720,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:18}}>
+          <ShopLogo settings={wsProf?{...getSettings(),...wsProf}:getSettings()} size="md" style={{maxWidth:"100%",maxHeight:80,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          {wsProf?.name&&<div style={{fontSize:20,fontWeight:800,marginTop:8}}>{wsProf.name}</div>}
+          <div style={{color:"var(--text3)",fontSize:12,marginTop:6}}>Payment statement</div>
+        </div>
+        {state==="loading"&&<p style={{color:"var(--text3)",textAlign:"center",padding:30}}>Loading...</p>}
+        {state==="invalid"&&<div className="card" style={{padding:26,textAlign:"center",color:"var(--red)"}}>⚠ This link is not valid. Please ask the workshop for your statement link.</div>}
+        {state==="ready"&&acct&&(<>
+          <div className="card" style={{padding:20,marginBottom:14}}>
+            <div style={{fontSize:18,fontWeight:800}}>{who.role==="painter"?"🎨":"🔧"} {who.name}</div>
+            <div style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text3)",marginTop:14}}>{acct.balance>0?"The workshop owes you":acct.balance<0?"You owe the workshop":"Settled"}</div>
+            <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:40,fontWeight:700,color:acct.balance>0?"var(--accent)":acct.balance<0?"var(--red)":"var(--text3)"}}>{fmtAmt(Math.abs(acct.balance))}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginTop:12}}>
+              {[["Earned (finished jobs)",acct.earned,"var(--text)"],["Credits",acct.credits,"var(--green)"],["Charges & deductions",-acct.deductions,"var(--red)"],["Paid to you",-acct.paid,"var(--blue)"]].map(([lb,v,col])=>(
+                <div key={lb} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{lb}</div>
+                  <div style={{fontWeight:700,color:col,fontFamily:"DM Mono,monospace",marginTop:2}}>{v===0?fmtAmt(0):sg(v)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{padding:0,marginBottom:14,overflowX:"auto"}}>
+            <div style={{padding:"12px 14px",fontWeight:700}}>Your jobs</div>
+            {acct.jobRows.length===0?<div style={{padding:"0 14px 14px",color:"var(--text3)",fontSize:13}}>No jobs yet.</div>:(
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr><th style={th}>Job</th><th style={th}>Status</th><th style={{...th,textAlign:"right"}}>Your price</th></tr></thead>
+                <tbody>{acct.jobRows.map(r=>(
+                  <tr key={r.job.id}>
+                    <td style={td}><b>{r.job.vehicle_reg||r.job.id}</b><div style={{fontSize:11,color:"var(--text3)"}}>{[r.job.vehicle_make,r.job.vehicle_model].filter(Boolean).join(" ")}{r.job.date_in?` · ${r.job.date_in}`:""}</div></td>
+                    <td style={td}>{r.done?<span style={{color:"var(--green)",fontWeight:700}}>✅ Finished</span>:<span style={{color:"var(--text3)"}}>⏳ In progress, not counted yet</span>}</td>
+                    <td style={{...td,textAlign:"right",fontFamily:"DM Mono,monospace"}}>{fmtAmt(r.total)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            )}
+          </div>
+          <div className="card" style={{padding:0,overflowX:"auto"}}>
+            <div style={{padding:"12px 14px",fontWeight:700}}>Charges, payments and adjustments</div>
+            {ledger.length===0?<div style={{padding:"0 14px 14px",color:"var(--text3)",fontSize:13}}>Nothing recorded yet.</div>:(
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr><th style={th}>Date</th><th style={th}>Details</th><th style={{...th,textAlign:"right"}}>Amount</th></tr></thead>
+                <tbody>{ledger.map(e=>{
+                  const t=ENTRY_TYPES[e.entry_type]||{icon:"•",short:e.entry_type};
+                  const v=(+e.direction||0)*(+e.amount||0);
+                  const det=[e.supplier_name&&`Supplier: ${e.supplier_name}`,e.invoice_no&&`Inv ${e.invoice_no}`,e.method,e.reference&&`Ref ${e.reference}`,e.description].filter(Boolean).join(" · ");
+                  return (
+                    <tr key={e.id}>
+                      <td style={td}>{e.entry_date||String(e.created_at||"").slice(0,10)}</td>
+                      <td style={td}><b>{t.icon} {t.short}</b>{det&&<div style={{fontSize:12,color:"var(--text2)"}}>{det}</div>}</td>
+                      <td style={{...td,textAlign:"right",fontFamily:"DM Mono,monospace",color:v<0?"var(--red)":"var(--green)"}}>{sg(v)}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            )}
+          </div>
+          <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginTop:12}}>Only finished jobs count towards what you are owed. This page updates by itself.</div>
+        </>)}
       </div>
     </div>
   );

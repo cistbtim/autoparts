@@ -1,4 +1,4 @@
-import { ts } from "../lib/i18n.js";
+import { ts, tsf } from "../lib/i18n.js";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api.js";
@@ -251,7 +251,7 @@ const openSupplierBookingInvoice=(booking, items, supplierLabel, contactPerson, 
 function ExportPartsPdfModal({rowCount, tabLabel, selected, onToggle, onExport, onClose}){
   return (
     <Overlay onClose={onClose}>
-      <MHead title={ts("📄 Export PDF")} sub={`${rowCount} part${rowCount!==1?"s":""} from "${tabLabel}" — matches your current search`} onClose={onClose}/>
+      <MHead title={ts("📄 Export PDF")} sub={tsf("{0} part{1} from \"{2}\" — matches your current search", rowCount, rowCount!==1?"s":"", tabLabel)} onClose={onClose}/>
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>{ts("Choose which columns to include:")}</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px",marginBottom:18}}>
         {EXPORT_FIELDS.map(f=>(
@@ -694,7 +694,7 @@ function CustomerDiscountCard({discountPct, maxDiscountPct=0, shopWideCap=0, onS
             <div style={{fontSize:20,fontWeight:800,color:"var(--text2)",fontFamily:"Rajdhani,sans-serif"}}>{maxDiscountPct>0?`${maxDiscountPct}%`:ts("No limit")}</div>
           )}
           <div style={{fontSize:10,color:"var(--text3)",marginTop:1}}>
-            {ts("Only affects your own catalogue")}{shopWideCap>0?` · shop ceiling ${shopWideCap}%`:""}
+            {ts("Only affects your own catalogue")}{shopWideCap>0?tsf(" · shop ceiling {0}%", shopWideCap):""}
           </div>
         </div>
       </div>
@@ -912,10 +912,10 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
 
   return (
     <Overlay onClose={onClose}>
-      <MHead title={isEdit?"Edit Part":"Add Part"} onClose={onClose}/>
+      <MHead title={isEdit?ts("Edit Part"):ts("Add Part")} onClose={onClose}/>
 
       <FD>
-        <FL label={`Part Code * — will show as ${supplierCode}-${f.part_code.trim()||"…"}`}/>
+        <FL label={tsf("Part Code * — will show as {0}-{1}", supplierCode, f.part_code.trim()||"…")}/>
         <input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={f.part_code}
           onChange={e=>s("part_code",e.target.value.toUpperCase().replace(/\s+/g,""))} placeholder="e.g. A1679066909R"/>
       </FD>
@@ -1070,7 +1070,7 @@ function SupplierPartModal({part, supplierCode, supplierMarginOptions=null, ownP
           border:`1px solid ${part.price?"rgba(52,211,153,.3)":"rgba(251,191,36,.3)"}`,
           color:part.price?"var(--green)":"var(--yellow)"}}>
           {part.price
-            ? `✅ Live — customers see this at ${fmtAmt(part.price)}`
+            ? tsf("✅ Live — customers see this at {0}", fmtAmt(part.price))
             : ts("⏳ Awaiting pricing — not visible to customers until priced")}
         </div>
       )}
@@ -1154,7 +1154,7 @@ export function SupplierPricingPage({allParts=[], suppliers=[], onSetPrice, cost
                     setApproving(false);
                     setSelectedCostUpdates(new Set());
                   }}>
-                  {approving?ts("Approving…"):`✅ Approve ${selectedCostUpdates.size||""} Selected`}
+                  {approving?ts("Approving…"):tsf("✅ Approve {0} Selected", selectedCostUpdates.size||"")}
                 </button>
               </div>
             )}
@@ -1406,7 +1406,7 @@ function SupplierQueryReplyModal({query, part, onReply, onClose}) {
       {lightbox&&img&&<ImgLightbox url={toImgUrl(img)} onClose={()=>setLightbox(false)}/>}
       <div style={{background:"var(--surface2)",borderRadius:10,padding:"12px 14px",marginBottom:14,fontSize:13,display:"flex",gap:12}}>
         <div style={{width:64,height:64,borderRadius:8,overflow:"hidden",background:"var(--surface3)",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",cursor:img?"zoom-in":"default"}}
-          onClick={()=>img&&setLightbox(true)} title={img?"Click to enlarge":undefined}>
+          onClick={()=>img&&setLightbox(true)} title={img?ts("Click to enlarge"):undefined}>
           {img
             ? <img src={toImgUrl(img)} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
             : <span style={{fontSize:22,opacity:.3}}>🖼</span>}
@@ -1786,8 +1786,8 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
 
   return (
     <Overlay onClose={handleClose}>
-      <MHead title={alreadyStocked?"✏️ Edit Stocked Invoice":editingInvoice?"📥 Continue Invoice":"📥 Receive Stock"}
-        sub={alreadyStocked?`Stock from ${editingInvoice.invoice_no||editingInvoice.id} is already in your system`:editingInvoice?`Add more items to ${editingInvoice.invoice_no||editingInvoice.id}`:"Record a purchase invoice into your own stock"} onClose={handleClose}/>
+      <MHead title={alreadyStocked?ts("✏️ Edit Stocked Invoice"):editingInvoice?ts("📥 Continue Invoice"):ts("📥 Receive Stock")}
+        sub={alreadyStocked?tsf("Stock from {0} is already in your system", editingInvoice.invoice_no||editingInvoice.id):editingInvoice?tsf("Add more items to {0}", editingInvoice.invoice_no||editingInvoice.id):ts("Record a purchase invoice into your own stock")} onClose={handleClose}/>
       {alreadyStocked&&(
         <div style={{background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.4)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--yellow)"}}>
           {ts("⚠️ This invoice's stock was already added to your system. Change a line's qty, remove one, or add a new one (e.g. splitting one part into left/right) — saving will adjust live stock by only what actually changed, and log it in My Stock Records.")}
@@ -1825,7 +1825,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                       </button>
                     )}
                     {p.extraPhotos?.length>0&&(
-                      <div title={`${p.extraPhotos.length} extra photo${p.extraPhotos.length>1?"s":""}`}
+                      <div title={tsf("{0} extra photo{1}", p.extraPhotos.length, p.extraPhotos.length>1?"s":"")}
                         style={{position:"absolute",bottom:0,left:0,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:8,fontWeight:700,padding:"0 3px",borderRadius:4}}>
                         +{p.extraPhotos.length}
                       </div>
@@ -1856,7 +1856,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
           <div style={{border:"1px solid var(--accent)",borderRadius:8,padding:10,marginTop:8}}>
             <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{ts("➕ New Part")}</div>
             <FG cols="1fr 1fr">
-              <div><FL label={`Part Code * — will show as ${supplierCode||"SUP"}-${newPartCode.trim()||"…"}`}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartCode} onChange={e=>setNewPartCode(e.target.value.toUpperCase())}/></div>
+              <div><FL label={tsf("Part Code * — will show as {0}-{1}", supplierCode||"SUP", newPartCode.trim()||"…")}/><input className="inp" style={{fontFamily:"DM Mono,monospace"}} value={newPartCode} onChange={e=>setNewPartCode(e.target.value.toUpperCase())}/></div>
               <div>
                 <FL label={ts("Cost Price")}/>
                 <input className="inp" type="number" min="0" value={newPartCost} onChange={e=>setNewPartCost(e.target.value)}/>
@@ -1946,7 +1946,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
                     </div>
                   )}
                   {it.extraPhotos?.length>0&&(
-                    <div title={`${it.extraPhotos.length} extra photo${it.extraPhotos.length>1?"s":""}`}
+                    <div title={tsf("{0} extra photo{1}", it.extraPhotos.length, it.extraPhotos.length>1?"s":"")}
                       style={{position:"absolute",top:0,left:0,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:8,fontWeight:700,padding:"0 3px",borderRadius:"0 0 4px 0"}}>
                       +{it.extraPhotos.length}
                     </div>
@@ -2048,7 +2048,7 @@ function SupplierPurchaseInvoiceModal({existingParts, ownParts, supplierCode="",
       <div style={{fontSize:12,color:"var(--text3)",marginBottom:14}}>
         {alreadyStocked
           ? ts("Only lines you actually change (qty, add, or remove) will move live stock — everything else is left untouched.")
-          : `This only records the invoice${printLabels?" and prints labels":""} — your stock stays unchanged until you count everything and click "Add Stock to System" on it back in Purchase Invoices.`}
+          : tsf("This only records the invoice{0} — your stock stays unchanged until you count everything and click \"Add Stock to System\" on it back in Purchase Invoices.", printLabels?" and prints labels":"")}
       </div>
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{ts("Cancel")}</button>
@@ -2124,7 +2124,7 @@ export function SupplierStockPage({existingParts=[], ownParts=[], supplierCode="
           {onRefresh&&<button className="btn btn-ghost btn-sm" onClick={onRefresh}>{ts("↺ Refresh")}</button>}
           {onZeroMainStock&&staleMainStockCount>0&&(
             <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} disabled={zeroing} onClick={runZeroMainStock}>
-              {zeroing?"…":`🧹 Zero VelGenius Stock (${staleMainStockCount})`}
+              {zeroing?"…":tsf("🧹 Zero VelGenius Stock ({0})", staleMainStockCount)}
             </button>
           )}
         </div>
@@ -2253,7 +2253,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                     <div style={{fontSize:11,color:"var(--text3)"}}>{inv.invoice_date||fmtDT(inv.created_at)} · {inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} {ts("units ·")} {fmtAmt(inv.total)}</div>
                     {diff!=null&&(
                       <div style={{fontSize:11,fontWeight:700,marginTop:2,color:hasMismatch?"var(--red)":"var(--green)"}}>
-                        {hasMismatch?`⚠️ Difference: ${diff>0?"+":""}${fmtAmt(diff)} vs invoice total ${fmtAmt(inv.invoice_total)}`:ts("✅ Matches invoice total")}
+                        {hasMismatch?tsf("⚠️ Difference: {0}{1} vs invoice total {2}", diff>0?"+":"", fmtAmt(diff), fmtAmt(inv.invoice_total)):ts("✅ Matches invoice total")}
                       </div>
                     )}
                   </div>
@@ -2264,7 +2264,7 @@ export function SupplierPurchaseInvoicesPage({existingParts=[], ownParts=[], sup
                     <button className="btn btn-ghost btn-xs" onClick={()=>setContinuingInvoice(inv)}>{pending?ts("✏️ Continue"):ts("✏️ Edit Items")}</button>
                     {pending&&onApplyPurchaseInvoiceStock&&(
                       <button className="btn btn-primary btn-xs" disabled={applyingId===inv.id||hasMismatch}
-                        title={hasMismatch?"Fix the difference (Continue → adjust items/costs) before adding stock":undefined}
+                        title={hasMismatch?ts("Fix the difference (Continue → adjust items/costs) before adding stock"):undefined}
                         onClick={async()=>{
                           if(!window.confirm(`Add ${inv.total_qty||its.reduce((s,it)=>s+it.qty,0)} units from this invoice to your stock? Do this once you've verified the physical count.`)) return;
                           setApplyingId(inv.id);
@@ -2323,7 +2323,7 @@ export function SupplierStockTakePage({stockTakes=[], items=[], onStart, onOpen,
       </div>
 
       <div className="card" style={{padding:14,marginBottom:16,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-        <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
+        <input className="inp" style={{flex:1,minWidth:180}} placeholder={tsf("Stock Take {0}", new Date().toLocaleDateString())} value={name} onChange={e=>setName(e.target.value)}/>
         <button className="btn btn-primary btn-sm" onClick={start} disabled={starting}>{starting?ts("Starting…"):ts("+ Start New Stock Take")}</button>
       </div>
 
@@ -2567,7 +2567,7 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
           </p>
         </div>
         <div className="card" style={{padding:14,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",maxWidth:420}}>
-          <input className="inp" style={{flex:1,minWidth:180}} placeholder={`Stock Take ${new Date().toLocaleDateString()}`} value={name} onChange={e=>setName(e.target.value)}/>
+          <input className="inp" style={{flex:1,minWidth:180}} placeholder={tsf("Stock Take {0}", new Date().toLocaleDateString())} value={name} onChange={e=>setName(e.target.value)}/>
           <button className="btn btn-primary btn-sm" onClick={startTake} disabled={starting}>{starting?ts("Starting…"):ts("▶ Start Stock Take")}</button>
         </div>
       </div>
@@ -2593,7 +2593,7 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
       </div>
 
       <div className="card" style={{padding:14,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-        <div style={{fontSize:13}}>{ts("📍 Active location:")} <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||"— scan a bin label —"}</strong></div>
+        <div style={{fontSize:13}}>{ts("📍 Active location:")} <strong style={{fontFamily:"DM Mono,monospace",color:activeLocation?"var(--accent)":"var(--text3)"}}>{activeLocation||ts("— scan a bin label —")}</strong></div>
         <button className="btn btn-primary btn-xs" onClick={()=>{setActiveLocation("");pushLog("📍 Ready — scan the next location","loc");}}>{ts("📍 Scan New Location")}</button>
       </div>
 
@@ -2621,9 +2621,9 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
       {pendingMismatch&&(
         <div className="card" style={{padding:14,marginBottom:14,border:"1.5px solid var(--red)",maxWidth:420}}>
           <div style={{fontWeight:700,marginBottom:6,color:"var(--red)"}}>⚠️ {pendingMismatch.item.item_name} ({pendingMismatch.item.sku})</div>
-          <div style={{fontSize:13,marginBottom:10}}>{ts("Should be at")} <strong>{pendingMismatch.item.counted_location??pendingMismatch.item.bin_location??"(no location on file)"}</strong> {ts("— found here at")} <strong style={{color:"var(--accent)"}}>{pendingMismatch.foundLocation}</strong>{ts(". Still counts either way.")}</div>
+          <div style={{fontSize:13,marginBottom:10}}>{ts("Should be at")} <strong>{pendingMismatch.item.counted_location??pendingMismatch.item.bin_location??ts("(no location on file)")}</strong> {ts("— found here at")} <strong style={{color:"var(--accent)"}}>{pendingMismatch.foundLocation}</strong>{ts(". Still counts either way.")}</div>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(false)}>{ts("Keep recorded at")} {pendingMismatch.item.bin_location||"(none)"}</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(false)}>{ts("Keep recorded at")} {pendingMismatch.item.bin_location||ts("(none)")}</button>
             <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={()=>resolveMismatch(true)}>{ts("Move to")} {pendingMismatch.foundLocation}</button>
           </div>
         </div>
@@ -2641,7 +2641,7 @@ export function SupplierScanStockPage({stockTakes=[], items=[], supplierCode="",
 
       <div className="card" style={{overflow:"hidden"}}>
         <div style={{padding:"10px 14px",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-          <div style={{fontWeight:700}}>{ts("📋 Still Short")} {loadingTake?"":`— ${countedN}/${takeItems.length} items counted`}</div>
+          <div style={{fontWeight:700}}>{ts("📋 Still Short")} {loadingTake?"":tsf("— {0}/{1} items counted", countedN, takeItems.length)}</div>
           <button className="btn btn-primary btn-sm" onClick={finish} disabled={finishing}>{finishing?ts("Finishing…"):ts("✅ Finish & Update Stock")}</button>
         </div>
         {loadingTake ? (
@@ -2795,9 +2795,9 @@ function PartVehicleCompareZoom({vehicleImages=[], vehicleTitle, partImages=[], 
   };
   return createPortal(
     <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.94)",zIndex:100000,display:"flex",alignItems:"stretch",justifyContent:"center",padding:"40px 8px"}}>
-      <Pane title={vehicleTitle||"Vehicle"} images={vehicleImages} idx={vIdx} setIdx={setVIdx}/>
+      <Pane title={vehicleTitle||ts("Vehicle")} images={vehicleImages} idx={vIdx} setIdx={setVIdx}/>
       <div style={{width:1,background:"rgba(255,255,255,.15)"}}/>
-      <Pane title={partTitle||"Part"} images={partImages} idx={pIdx} setIdx={setPIdx}/>
+      <Pane title={partTitle||ts("Part")} images={partImages} idx={pIdx} setIdx={setPIdx}/>
       <button onClick={onClose} style={{position:"fixed",top:16,right:16,background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:"50%",width:38,height:38,cursor:"pointer",fontSize:18,zIndex:100001}}>✕</button>
     </div>,
     document.body
@@ -2830,7 +2830,7 @@ function PartImageZoom({images=[], title, fits=[], onClose, onOpenVehicle}) {
               {fits.map((f,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center"}}>
                   {f.photo&&(
-                    <img src={toImgUrl(f.photo)} alt="" title={f.photos?.length?"Click to compare with the part":undefined}
+                    <img src={toImgUrl(f.photo)} alt="" title={f.photos?.length?ts("Click to compare with the part"):undefined}
                       onClick={e=>{
                         if(!f.photos?.length||!onOpenVehicle) return;
                         e.stopPropagation();
@@ -3009,7 +3009,7 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
             <input className="inp" style={{width:"100%"}} value={vModelInput}
               onChange={e=>{setVModelInput(e.target.value);setVModel("");setVModelDropdown(true);}}
               onFocus={()=>setVModelDropdown(true)} onBlur={()=>setTimeout(()=>setVModelDropdown(false),150)}
-              disabled={!vMake||!!keywords.length} placeholder={vMake?"All Models — type to search":"Pick a Make first"}/>
+              disabled={!vMake||!!keywords.length} placeholder={vMake?ts("All Models — type to search"):ts("Pick a Make first")}/>
             {vModelDropdown&&vMake&&!keywords.length&&(
               <div style={{position:"absolute",zIndex:10,left:0,right:0,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,marginTop:2,maxHeight:180,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,.15)"}}>
                 {vModelsForMake
@@ -3050,7 +3050,7 @@ function NewBookingForm({existingParts, ownParts, supplierCode="", customers=[],
                       </button>
                     )}
                     {p.extraPhotos?.length>0&&(
-                      <div title={`${p.extraPhotos.length} extra photo${p.extraPhotos.length>1?"s":""}`}
+                      <div title={tsf("{0} extra photo{1}", p.extraPhotos.length, p.extraPhotos.length>1?"s":"")}
                         style={{position:"absolute",bottom:4,left:4,background:"rgba(0,0,0,.65)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:10}}>
                         📷 +{p.extraPhotos.length}
                       </div>
@@ -3207,7 +3207,7 @@ export function SupplierOrdersPage({orders=[], bookings=[], bookingItems=[], exi
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:8}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{b.customer_name}{b.customer_phone?` · ${b.customer_phone}`:""}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{b.source_order_id?`From order ${b.source_order_id}`:ts("Manual booking")} · {fmtDT(b.created_at)}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{b.source_order_id?tsf("From order {0}", b.source_order_id):ts("Manual booking")} · {fmtDT(b.created_at)}</div>
                   </div>
                   <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <span className="badge" style={{fontSize:11,

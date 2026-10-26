@@ -449,3 +449,5 @@ export const tSt = (s) => {
 };
 // Translate a supplier-portal string (English text in, current language out; falls back to English)
 export const ts = (s) => T[_currentLang]?.["sp:" + s] || s;
+// Same as ts() for strings with {0} {1} ... placeholders filled from the extra arguments
+export const tsf = (s, ...args) => ts(s).replace(/\{(\d+)\}/g, (_, i) => args[i] ?? "");

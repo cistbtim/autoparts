@@ -132,7 +132,7 @@ export const T = {
     loginSupplierSub: "Manage your own parts catalogue", loginStaffSub: "Admin, manager and fulfilment access",
     loginLicAgentSub: "Manage licence renewals across all workshops", loginCarSalesSub: "Manage trade-in & used car listings",
     loginShop: "Catalogue", loginWorkshop: "Workshop", loginScrapyard: "Scrapyard", loginStaff: "Staff",
-    loginGroupBusiness: "Run Your Own Business", loginGroupBusinessSub: "Free 30-day trial, no credit card", loginGroupOther: "Team & Partners",
+    loginGroupBusiness: "Run Your Own Business", loginGroupStoreWorkshop: "Store & Workshop", loginGroupService: "Service", loginMgmt: "Management", loginGroupBusinessSub: "Free 30-day trial, no credit card", loginGroupOther: "Team & Partners",
     loginRental: "Rental", loginRentalSub: "Sign in to your rental business account", registerRental: "Register",
     companyNameHintRental: "Helps identify your account if multiple rental businesses share a username", rentalNameField: "Rental Business Name",
     bookInCar: "Book In Car", searchSpare: "Search Spare", sendBookingLink: "Send Booking Link", inviteWorkshop: "Invite Workshop",

@@ -491,25 +491,27 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   // agent, catalogue) shares one row now — they were three separate
   // single-purpose sections before, which read as more structure than the
   // five tiles actually needed.
+  // Two groups on the page; management (the "staff" login) is not a tab any more —
+  // it is a separate link in the top-right corner (see below).
   const TAB_GROUPS = [
     {
-      label: t.loginGroupBusiness||"Run Your Own Business",
+      label: t.loginGroupStoreWorkshop||"Store & Workshop",
       sub: t.loginGroupBusinessSub||"Free 30-day trial, no credit card",
       tabs: [
-        {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop"},
-        {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard"},
-        {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental"},
-        {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales"},
-        {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent"},
+        {id:"workshop", Icon:IcWrench, label:t.loginWorkshop||"Workshop", trial:true},
+        {id:"scrapyard",Icon:IcCar,    label:t.loginScrapyard||"Scrapyard", trial:true},
+        {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Store"},
+        {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
       ],
     },
     {
-      label: t.loginGroupOther||"Team & Partners",
+      label: t.loginGroupService||"Service",
+      sub: t.loginGroupBusinessSub||"Free 30-day trial, no credit card",
       tabs: [
-        {id:"staff",    Icon:IcStaff,  label:t.loginStaff||"Staff"},
-        {id:"branch",   Icon:IcBox,    label:t.loginSpareShop||"Store"},
         {id:"supplier", Icon:IcFactory,label:t.loginSupplier||"Supplier"},
-        {id:"customer", Icon:IcCart,   label:t.loginShop||"Catalogue"},
+        {id:"carsales", Icon:IcTag,    label:t.loginCarSales||"Car Sales", trial:true},
+        {id:"rental",   Icon:IcKey,    label:t.loginRental||"Rental", trial:true},
+        {id:"licagent", Icon:IcBadge,  label:t.loginLicAgent||"Licence Agent", trial:true},
       ],
     },
   ];
@@ -530,8 +532,18 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
   };
 
   return (
-    <div style={{background:"radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,122,46,.10), transparent), var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px"}}>
+    <div style={{background:"radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,122,46,.10), transparent), var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 16px",position:"relative"}}>
       <style>{CSS}</style>
+      {/* Management login — its own corner link instead of a tab, so staff find it
+          without it competing with the customer-facing tiles. */}
+      {!wsLoginOnly&&!catalogName&&(
+        <button onClick={()=>switchTab("staff")} title={t.loginStaffSub||"Admin, manager and fulfilment access"}
+          style={{position:"absolute",top:16,right:16,display:"inline-flex",alignItems:"center",gap:7,padding:"8px 14px",borderRadius:20,
+            border:`1px solid ${authTab==="staff"?"var(--accent)":"var(--border2)"}`,background:"var(--surface)",color:authTab==="staff"?"var(--accent)":"var(--text2)",
+            fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"var(--shadow)",fontFamily:"inherit"}}>
+          <span style={{display:"flex"}}><IcStaff/></span>{t.loginMgmt||"Management"}
+        </button>
+      )}
       <div style={{width:"100%",maxWidth:640}}>
 
         {/* Logo card */}
@@ -566,7 +578,7 @@ export function LoginPage({onLogin,t,lang,setLang,loadedSettings,langs=[],wsLogi
           </div>
           <div key={group.label}>
             <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8,paddingLeft:2}}>
-              {group.sub&&group.tabs.some(tb=>tb.id===hoverTab)&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
+              {group.sub&&group.tabs.some(tb=>tb.id===hoverTab&&tb.trial)&&<span style={{fontSize:11,color:"var(--text3)",opacity:.7}}>· {group.sub}</span>}
             </div>
             {/* A 1-2 tile group in the same stretching grid as the 3-4 tile
                 groups would blow up into one full-width button — flex+fixed

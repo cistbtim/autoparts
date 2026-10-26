@@ -2,7 +2,7 @@
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
-import { fmtAmt, fmtDT, fmtD, makeId, today, toImgUrl, partPhotoUrls, waLink, REF_NEWCOMER_BONUS_DAYS, REF_REFERRER_REWARD_DAYS, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
+import { fmtAmt, fmtDT, fmtD, makeId, makeToken, today, toImgUrl, partPhotoUrls, waLink, REF_NEWCOMER_BONUS_DAYS, REF_REFERRER_REWARD_DAYS, normMake, openLabelWindow, openPartLabelsWindow, openShelfLabelWindow, parseComboItems, justBrakesUrl, justBrakesHasMakePage, SAFELINE_BRAKES_URL, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, ShopLogo, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, CompareLightbox, AdBanner, RenewalDocsModal } from "../components/shared.jsx";
@@ -4730,6 +4730,49 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [supplierModal, setSupplierModal] = useState(false);
   const [createPoOpen,  setCreatePoOpen]  = useState(false);
   const [newBooking,    setNewBooking]    = useState(null); // {complaint,preferred_date} while the modal is open
+  // "Send job card" to a mechanic / painter: a short WhatsApp-ready message + a read-only link to this
+  // job's details and car photos (public ?jobcard=<token> page, no prices or customer details).
+  const [sendMech, setSendMech] = useState(null); // {role,phone,link,msg,err,busy,copied}
+  const buildJobMsg=(role,link)=>{
+    const car=[job.vehicle_year,job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ");
+    return [
+      `${role==="painter"?"🎨":"🔧"} JOB CARD ${job.id}`,
+      wsProfile?.name?`From: ${wsProfile.name}`:"",
+      job.vehicle_reg?`Plate: ${job.vehicle_reg}`:"",
+      car?`Car: ${car}`:"",
+      job.mileage?`KM: ${(+job.mileage).toLocaleString()} km`:"",
+      job.date_in?`Date: ${job.date_in}`:"",
+      job.complaint?`Complaint: ${job.complaint}`:"",
+      job.notes?`Note: ${job.notes}`:"",
+      role==="painter"?"Please check the damage and send me your name and price at the bottom of the page.":"Please do the inspection on this car — open the link below, tick each item OK / Issue, add photos, then send your name and price at the bottom.",
+      link?`📷 Car photos, details & inspection: ${link}`:"",
+    ].filter(Boolean).join("\n");
+  };
+  // Replies the mechanic / painter sent back from the job card link: name + priced lines
+  const [replies, setReplies] = useState([]);
+  const [showReplies, setShowReplies] = useState(false);
+  const loadReplies=()=>api.fresh("workshop_job_replies",`job_id=eq.${encodeURIComponent(job.id)}&order=created_at.desc`)
+    .then(r=>setReplies(Array.isArray(r)?r:[])).catch(()=>setReplies([]));
+  useEffect(()=>{ loadReplies(); },[job.id]);
+  const replyLines=r=>Array.isArray(r.lines)?r.lines:(()=>{try{return JSON.parse(r.lines||"[]");}catch{return[];}})();
+  const openSendMech=async()=>{
+    setSendMech({role:"mechanic",phone:"",link:"",msg:"",err:"",busy:true,copied:false});
+    try{
+      // reuse the job's existing token so a link sent earlier keeps working
+      const cur=await api.fresh("workshop_jobs",`id=eq.${encodeURIComponent(job.id)}&select=share_token`);
+      if(!Array.isArray(cur)) throw new Error(cur?.message||"Could not read the job");
+      let tk=cur[0]?.share_token;
+      if(!tk){
+        tk=makeToken()+makeToken();
+        const r=await api.patch("workshop_jobs","id",job.id,{share_token:tk});
+        if(r&&!Array.isArray(r)&&(r.code||r.message)) throw new Error(r.message||r.code);
+      }
+      const link=`${window.location.origin}${window.location.pathname}?jobcard=${tk}`;
+      setSendMech(s=>({...s,busy:false,link,msg:buildJobMsg("mechanic",link)}));
+    }catch(e){
+      setSendMech(s=>({...s,busy:false,err:`${e.message||e} — has the share_token column been added to workshop_jobs?`}));
+    }
+  };
   const [savingBooking, setSavingBooking] = useState(false);
   const [jobTab,        setJobTab]        = useState(initialTab||"menu");
   const [oeSearch,      setOeSearch]      = useState("");
@@ -5967,6 +6010,20 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               background:"rgba(96,165,250,.12)",border:"1px solid rgba(96,165,250,.4)",
               borderRadius:8,cursor:"pointer",color:"var(--blue)",fontSize:11,fontWeight:700}}>
             🗓️ New Booking
+          </button>
+        )}
+        <button onClick={openSendMech} title="Send this job card + car photos link to a mechanic or painter"
+          style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+            background:"rgba(37,211,102,.12)",border:"1px solid rgba(37,211,102,.45)",
+            borderRadius:8,cursor:"pointer",color:"#16a34a",fontSize:11,fontWeight:700}}>
+          📤 Send Job Card
+        </button>
+        {replies.length>0&&(
+          <button onClick={()=>{setShowReplies(true);loadReplies();}} title="Names and prices sent back from the job card link"
+            style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"4px 9px",
+              background:"rgba(255,122,46,.12)",border:"1px solid rgba(255,122,46,.45)",
+              borderRadius:8,cursor:"pointer",color:"var(--accent)",fontSize:11,fontWeight:700}}>
+            💬 Replies <span style={{background:"var(--accent)",color:"#fff",borderRadius:99,padding:"0 6px",fontSize:10}}>{replies.length}</span>
           </button>
         )}
         <div style={{flex:1}}/>
@@ -9535,6 +9592,61 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
         <DeliveryLabelModal
           job={job} settings={settings}
           onClose={()=>setDeliveryModal(false)}/>
+      )}
+
+      {showReplies&&(
+        <Overlay onClose={()=>setShowReplies(false)}>
+          <MHead title="💬 Replies & prices" sub={`${job.vehicle_reg||job.id} · from the job card link`} onClose={()=>setShowReplies(false)}/>
+          {replies.length===0&&<div style={{padding:20,textAlign:"center",color:"var(--text3)"}}>No replies yet.</div>}
+          {replies.map(r=>{
+            const ls=replyLines(r);
+            return (
+              <div key={r.id} style={{border:"1px solid var(--border)",borderRadius:10,padding:12,marginBottom:10,background:"var(--surface2)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:8}}>
+                  <div style={{fontWeight:700,fontSize:15}}>{r.mechanic_name} <span style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginLeft:4}}>{r.role||""}</span></div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{r.created_at?fmtDT(r.created_at):""}</div>
+                </div>
+                {ls.map((l,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:13,padding:"3px 0",borderTop:i?"1px dashed var(--border)":"none"}}>
+                    <span>{l.description}</span><span style={{fontFamily:"DM Mono,monospace",flexShrink:0}}>{fmtAmt(l.price)}</span>
+                  </div>
+                ))}
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)",fontWeight:700}}>
+                  <span>Total</span><span style={{color:"var(--accent)",fontFamily:"Rajdhani,sans-serif",fontSize:18}}>{fmtAmt(r.total??ls.reduce((s,l)=>s+(+l.price||0),0))}</span>
+                </div>
+                {r.note&&<div style={{fontSize:12,color:"var(--text2)",marginTop:6,whiteSpace:"pre-line"}}>📝 {r.note}</div>}
+              </div>
+            );
+          })}
+        </Overlay>
+      )}
+
+      {sendMech&&(
+        <Overlay onClose={()=>setSendMech(null)}>
+          <MHead title="📤 Send Job Card" sub={`${job.vehicle_reg||job.id} · to a mechanic or painter`} onClose={()=>setSendMech(null)}/>
+          {sendMech.busy&&<div style={{padding:20,textAlign:"center",color:"var(--text3)"}}>Preparing link…</div>}
+          {sendMech.err&&<div style={{color:"var(--red)",fontSize:13,marginBottom:12}}>⚠ {sendMech.err}</div>}
+          {!sendMech.busy&&!sendMech.err&&(<>
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              {[["mechanic","🔧 Mechanic"],["painter","🎨 Painter"]].map(([r,lb])=>(
+                <button key={r} className={`btn btn-sm ${sendMech.role===r?"btn-primary":"btn-ghost"}`} style={{flex:1}}
+                  onClick={()=>setSendMech(s=>({...s,role:r,msg:buildJobMsg(r,s.link)}))}>{lb}</button>
+              ))}
+            </div>
+            <FD><FL label="Their WhatsApp number (optional)"/>
+              <input className="inp" type="tel" value={sendMech.phone} onChange={e=>setSendMech(s=>({...s,phone:e.target.value}))} placeholder="Leave empty to pick the contact in WhatsApp"/>
+            </FD>
+            <FD><FL label="Message (you can edit it)"/>
+              <textarea className="inp" rows={9} value={sendMech.msg} onChange={e=>setSendMech(s=>({...s,msg:e.target.value}))} style={{resize:"vertical",fontSize:13,lineHeight:1.5}}/>
+            </FD>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>The link opens a page for this car only: details, photos and the inspection checklist (the mechanic can tick items and add photos). No prices or customer details are shown.</div>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{try{navigator.clipboard.writeText(sendMech.msg);setSendMech(s=>({...s,copied:true}));setTimeout(()=>setSendMech(s=>s&&({...s,copied:false})),1500);}catch{/* clipboard blocked */}}}>{sendMech.copied?"✓ Copied":"📋 Copy"}</button>
+              <a className="btn btn-primary" style={{flex:2,textDecoration:"none",background:"#25D366",borderColor:"#25D366"}} target="_blank" rel="noreferrer"
+                href={sendMech.phone.trim()?waLink(sendMech.phone,sendMech.msg):`https://wa.me/?text=${encodeURIComponent(sendMech.msg)}`}>💬 Send via WhatsApp</a>
+            </div>
+          </>)}
+        </Overlay>
       )}
 
       {newBooking&&(

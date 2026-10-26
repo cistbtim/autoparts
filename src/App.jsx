@@ -29,7 +29,7 @@ import { PartTags, SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, 
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
-import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
+import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, JobCardPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
 if(window.history.state?.appLoaded !== true){
@@ -163,6 +163,8 @@ export default function App() {
   if(rfqQuoteToken) return <RfqQuoteReplyPage token={rfqQuoteToken}/>;
   const rfqBatchToken = new URLSearchParams(window.location.search).get("rfq_batch");
   if(rfqBatchToken) return <RfqBatchReplyPage token={rfqBatchToken}/>;
+  const jobCardToken = new URLSearchParams(window.location.search).get("jobcard");
+  if(jobCardToken) return <JobCardPage token={jobCardToken}/>;
   const supplierSetupToken = new URLSearchParams(window.location.search).get("supplier_setup");
   if(supplierSetupToken) return <SupplierSetupPage token={supplierSetupToken}/>;
   const wsqToken = new URLSearchParams(window.location.search).get("wsq");

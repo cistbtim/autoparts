@@ -1,12 +1,13 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage } from "../lib/api.js";
-import { toImgUrl, waLink, makeId, isChineseVin, CHINACARMART_URL, groupedRowsHtml } from "../lib/helpers.js";
+import { toImgUrl, toFullUrl, fmtAmt, waLink, makeId, isChineseVin, CHINACARMART_URL, groupedRowsHtml } from "../lib/helpers.js";
 import { getSettings, curSym } from "../lib/settings.js";
 import { T } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ShopLogo, MHead, FG, FD, FL, ImgLightbox, Flag } from "../components/shared.jsx";
 import { LogoUploader } from "../components/Modals.jsx";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
+import { CHECKLIST_ITEMS } from "../components/ws/Print.jsx";
 
 // Match the browser/device's preferred language against a list of configured
 // lang codes (arbitrary, admin-chosen — not guaranteed to be strict ISO 639-1).
@@ -352,6 +353,270 @@ export function SupplierSetupPage({token}) {
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Read-only job card for a mechanic / painter: car details + photos, opened from the link the workshop sends.
+const JOBCARD_ANGLES=[["photo_front","Front"],["photo_front_left","Front-Left"],["photo_front_right","Front-Right"],["photo_left","Left"],["photo_right","Right"],["photo_rear","Rear"],["photo_rear_left","Rear-Left"],["photo_rear_right","Rear-Right"],["photo_side","Side"]];
+export function JobCardPage({token}) {
+  const [job,setJob]=useState(null);
+  const [wsProf,setWsProf]=useState(null); // the workshop that sent this job card
+  const [photos,setPhotos]=useState([]);
+  const [state,setState]=useState("loading"); // loading | ready | invalid
+  // Inspection: same workshop_job_checklist rows the workshop's own Inspect screen uses, for THIS job only
+  const [cl,setCl]=useState({});            // { item_key: {id,status,note,photo_urls} }
+  const [clErr,setClErr]=useState("");
+  const [clBusy,setClBusy]=useState({});    // { item_key: true } while a photo uploads
+  const [openNote,setOpenNote]=useState({});
+  // Reply with the mechanic's / painter's name and a priced list of work (descriptions + prices, as many lines as needed)
+  const [rName,setRName]=useState(()=>{try{return localStorage.getItem("jobcard_name")||"";}catch{return "";}});
+  const [rRole,setRRole]=useState("mechanic");
+  const [rLines,setRLines]=useState([{description:"",price:""}]);
+  const [rNote,setRNote]=useState("");
+  const [rBusy,setRBusy]=useState(false);
+  const [rSent,setRSent]=useState(null); // {name,total} after a successful send
+  const [rErr,setRErr]=useState("");
+  useEffect(()=>{
+    (async()=>{
+      const r=await api.fresh("workshop_jobs",`share_token=eq.${encodeURIComponent(token)}&select=id,vehicle_reg,vehicle_make,vehicle_model,vehicle_year,complaint,notes,workshop_vehicle_id,workshop_id,created_at,date_in,mileage`);
+      const j=Array.isArray(r)?r[0]:null;
+      if(!j){setState("invalid");return;}
+      const [jp,veh,cat]=await Promise.all([
+        api.fresh("workshop_job_photos",`job_id=eq.${encodeURIComponent(j.id)}&order=created_at.asc&select=url`).catch(()=>[]),
+        j.workshop_vehicle_id?api.fresh("workshop_vehicles",`id=eq.${encodeURIComponent(j.workshop_vehicle_id)}&select=*`).catch(()=>[]):Promise.resolve([]),
+        api.fresh("vehicles","select=code,make,model").catch(()=>[]),
+      ]);
+      const v=Array.isArray(veh)?veh[0]:null;
+      const list=[
+        ...(v?JOBCARD_ANGLES.map(([f,l])=>({url:v[f],label:l})).filter(p=>p.url):[]),
+        ...(Array.isArray(jp)?jp.map((p,i)=>({url:p.url,label:`Photo ${i+1}`})).filter(p=>p.url):[]),
+      ];
+      const match=Array.isArray(cat)?cat.find(c=>(c.code===j.vehicle_model||c.model===j.vehicle_model)):null;
+      if(j.workshop_id){
+        const wp=await api.fresh("workshop_profiles",`id=eq.${encodeURIComponent(j.workshop_id)}&select=id,name,phone,whatsapp,address,logo_url,logo_data`).catch(()=>[]);
+        if(Array.isArray(wp)&&wp[0]) setWsProf(wp[0]);
+      }
+      const rows=await api.fresh("workshop_job_checklist",`job_id=eq.${encodeURIComponent(j.id)}`).catch(()=>[]);
+      const map={};
+      (Array.isArray(rows)?rows:[]).forEach(x=>{
+        let urls=Array.isArray(x.photo_urls)?x.photo_urls:(()=>{try{return JSON.parse(x.photo_urls||"[]");}catch{return[];}})();
+        if(!urls.length&&x.photo_url) urls=[x.photo_url];
+        map[x.item_key]={id:x.id,status:x.status||"pending",note:x.note||"",photo_urls:urls};
+      });
+      setCl(map);
+      setJob({...j,model_name:match?.model||j.vehicle_model||""});
+      setPhotos(list);setState("ready");
+    })().catch(()=>setState("invalid"));
+  },[token]);
+  const car=job?[job.vehicle_year,job.vehicle_make,job.model_name].filter(Boolean).join(" "):"";
+  const saveItem=async(key,patch)=>{
+    const cur=cl[key]||{status:"pending",note:"",photo_urls:[]};
+    const upd={...cur,...patch};
+    const id=upd.id||makeId("CL");
+    setCl(p=>({...p,[key]:{...upd,id}}));
+    try{
+      const urls=upd.photo_urls||[];
+      const res=await api.upsert("workshop_job_checklist",{id,job_id:job.id,item_key:key,status:upd.status,note:upd.note||"",photo_urls:urls,photo_url:urls[0]||""});
+      if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      setClErr("");
+    }catch(e){ setClErr(`Could not save — check your connection and try again. (${e.message||e})`); }
+  };
+  const addPhoto=(key,file)=>{
+    if(!file) return;
+    setClBusy(p=>({...p,[key]:true}));
+    const fr=new FileReader();
+    fr.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const MAX=1200;let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          const cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);
+          cv.toBlob(async b=>{
+            try{
+              if(!b) throw new Error("photo failed");
+              const reg=(job.vehicle_reg||"REG").replace(/[\s/\\]/g,"_").toUpperCase();
+              const path=`checklist/${reg}/${Date.now()}_${Math.random().toString(36).slice(2,6)}_${key}.jpg`;
+              const url=await uploadToStorage("cars_parts",path,b);
+              await saveItem(key,{photo_urls:[...((cl[key]||{}).photo_urls||[]),url]});
+            }catch(e){ setClErr(`Photo upload failed (${e.message||e})`); }
+            setClBusy(p=>({...p,[key]:false}));
+          },"image/jpeg",0.85);
+        }catch(e){ setClErr(`Photo failed (${e.message||e})`); setClBusy(p=>({...p,[key]:false})); }
+      };
+      img.onerror=()=>{ setClErr("Could not read that photo."); setClBusy(p=>({...p,[key]:false})); };
+      img.src=fr.result;
+    };
+    fr.onerror=()=>setClBusy(p=>({...p,[key]:false}));
+    fr.readAsDataURL(file);
+  };
+  const rTotal=rLines.reduce((s,l)=>s+(+l.price||0),0);
+  const setLine=(i,k,v)=>setRLines(ls=>ls.map((l,j)=>j===i?{...l,[k]:v}:l));
+  const sendReply=async()=>{
+    const name=rName.trim();
+    const lines=rLines.map(l=>({description:l.description.trim(),price:+l.price||0})).filter(l=>l.description||l.price);
+    if(!name){setRErr("Please enter your name.");return;}
+    if(!lines.length||lines.some(l=>!l.description||!(l.price>0))){setRErr("Each line needs a description and a price.");return;}
+    setRErr("");setRBusy(true);
+    try{
+      const total=lines.reduce((s,l)=>s+l.price,0);
+      const res=await api.insert("workshop_job_replies",{id:makeId("JR"),job_id:job.id,mechanic_name:name,role:rRole,lines,total,note:rNote.trim()||null,created_at:new Date().toISOString()});
+      if(res&&!Array.isArray(res)&&(res.code||res.message)) throw new Error(res.message||res.code);
+      try{localStorage.setItem("jobcard_name",name);}catch{/* storage blocked */}
+      setRSent({name,total});
+    }catch(e){ setRErr(`Could not send — please try again. (${e.message||e})`); }
+    setRBusy(false);
+  };
+  const clDone=CHECKLIST_ITEMS.filter(i=>(cl[i.key]?.status||"pending")!=="pending").length;
+  const STATUS_BTNS=[["ok","✓ OK","#16a34a"],["issue","⚠ Issue","#dc2626"],["na","N/A","#6b7280"]];
+  return (
+    <div style={{background:"var(--bg)",minHeight:"100vh",padding:"20px 16px"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:720,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:18}}>
+          <ShopLogo settings={wsProf?{...getSettings(),...wsProf}:getSettings()} size="md" style={{maxWidth:"100%",maxHeight:80,objectFit:"contain",height:"auto",margin:"0 auto"}}/>
+          {wsProf?.name&&<div style={{fontSize:20,fontWeight:800,marginTop:8}}>{wsProf.name}</div>}
+          {(wsProf?.phone||wsProf?.whatsapp||wsProf?.address)&&<div style={{color:"var(--text3)",fontSize:12,marginTop:2}}>{[wsProf.address,wsProf.phone||wsProf.whatsapp].filter(Boolean).join(" · ")}</div>}
+          <div style={{color:"var(--text3)",fontSize:12,marginTop:6}}>Job Card{wsProf?.name?` · from ${wsProf.name}`:""}</div>
+        </div>
+        {state==="loading"&&<p style={{color:"var(--text3)",textAlign:"center",padding:30}}>Loading...</p>}
+        {state==="invalid"&&<div className="card" style={{padding:26,textAlign:"center",color:"var(--red)"}}>⚠ This link is invalid or no longer available. Please ask the workshop for a new one.</div>}
+        {state==="ready"&&(
+          <>
+            <div className="card" style={{padding:20,marginBottom:14}}>
+              <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,letterSpacing:".06em"}}>JOB {job.id}</div>
+              {job.vehicle_reg&&<div style={{fontFamily:"DM Mono,monospace",fontSize:28,fontWeight:800,letterSpacing:".04em",marginTop:4}}>{job.vehicle_reg}</div>}
+              {car&&<div style={{fontSize:16,fontWeight:700,marginTop:2}}>{car}</div>}
+              {(job.date_in||job.mileage)&&(
+                <div style={{display:"flex",gap:18,flexWrap:"wrap",marginTop:12,fontSize:14}}>
+                  {job.date_in&&<div><div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Job card date</div><div style={{fontWeight:600,marginTop:1}}>{job.date_in}</div></div>}
+                  {job.mileage&&<div><div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Current km</div><div style={{fontWeight:600,marginTop:1}}>{(+job.mileage||0).toLocaleString()} km</div></div>}
+                </div>
+              )}
+              {job.complaint&&<div style={{marginTop:14}}><div style={{fontSize:11,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Complaint</div><div style={{fontSize:15,marginTop:2}}>{job.complaint}</div></div>}
+              {job.notes&&<div style={{marginTop:12}}><div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Note</div><div style={{fontSize:14,marginTop:2,whiteSpace:"pre-line"}}>{job.notes}</div></div>}
+            </div>
+            <div className="card" style={{padding:16}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Car photos {photos.length>0&&<span style={{color:"var(--text3)",fontWeight:400}}>· {photos.length}</span>}</div>
+              {photos.length===0?<div style={{color:"var(--text3)",fontSize:13,padding:"10px 0"}}>No photos yet.</div>:(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
+                  {photos.map((p,i)=>(
+                    <a key={i} href={toFullUrl(p.url)||p.url} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none",color:"inherit"}}>
+                      <div style={{aspectRatio:"4/3",borderRadius:10,overflow:"hidden",background:"var(--surface2)",border:"1px solid var(--border)"}}>
+                        <img src={toImgUrl(p.url)} alt={p.label} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} onError={e=>{e.target.style.display="none";}}/>
+                      </div>
+                      <div style={{fontSize:11,color:"var(--text3)",textAlign:"center",marginTop:3}}>{p.label}</div>
+                    </a>
+                  ))}
+                </div>
+              )}
+              <div style={{fontSize:11,color:"var(--text3)",marginTop:10}}>Tap a photo to open it full size.</div>
+            </div>
+
+            {/* ── Inspection for this vehicle only ── */}
+            <div className="card" style={{padding:16,marginTop:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
+                <div style={{fontWeight:700,fontSize:15}}>Inspection</div>
+                <div style={{fontSize:12,fontWeight:700,color:clDone===CHECKLIST_ITEMS.length?"var(--green)":"var(--text3)"}}>{clDone}/{CHECKLIST_ITEMS.length} done</div>
+              </div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>Mark each item OK, Issue or N/A. Add a note or photo for anything wrong. Saved automatically.</div>
+              {clErr&&<div style={{color:"var(--red)",fontSize:12,marginBottom:10}}>⚠ {clErr}</div>}
+              {CHECKLIST_ITEMS.map(it=>{
+                const c=cl[it.key]||{status:"pending",note:"",photo_urls:[]};
+                const photos=c.photo_urls||[];
+                const showNote=openNote[it.key]||!!c.note||c.status==="issue";
+                return (
+                  <div key={it.key} style={{padding:"10px 0",borderTop:"1px solid var(--border)"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                      <div style={{flex:"1 1 160px",fontSize:14,fontWeight:600}}>{it.label}</div>
+                      <div style={{display:"flex",gap:5}}>
+                        {STATUS_BTNS.map(([v,lb,col])=>{
+                          const on=c.status===v;
+                          return <button key={v} type="button" onClick={()=>saveItem(it.key,{status:on?"pending":v})}
+                            style={{padding:"6px 11px",borderRadius:8,border:`1.5px solid ${on?col:"var(--border2)"}`,background:on?col:"var(--surface)",color:on?"#fff":"var(--text2)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{lb}</button>;
+                        })}
+                      </div>
+                    </div>
+                    {(showNote||photos.length>0)&&(
+                      <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
+                        {showNote&&<input className="inp" value={c.note} placeholder="Note (what is wrong?)" style={{fontSize:13,padding:"7px 10px"}}
+                          onChange={e=>setCl(p=>({...p,[it.key]:{...(p[it.key]||{status:"pending",photo_urls:[]}),note:e.target.value}}))}
+                          onBlur={e=>saveItem(it.key,{note:e.target.value})}/>}
+                        {photos.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                          {photos.map((u,i)=><a key={i} href={toFullUrl(u)||u} target="_blank" rel="noopener noreferrer"><img src={toImgUrl(u)} alt="" style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:"1px solid var(--border)"}}/></a>)}
+                        </div>}
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                      <label style={{fontSize:12,fontWeight:700,color:"var(--blue)",cursor:"pointer"}}>
+                        {clBusy[it.key]?"Uploading…":"📷 Photo"}
+                        <input type="file" accept="image/*" capture="environment" style={{display:"none"}} disabled={!!clBusy[it.key]}
+                          onChange={e=>{addPhoto(it.key,e.target.files&&e.target.files[0]);e.target.value="";}}/>
+                      </label>
+                      {!showNote&&<button type="button" onClick={()=>setOpenNote(p=>({...p,[it.key]:true}))}
+                        style={{background:"none",border:"none",padding:0,fontSize:12,fontWeight:700,color:"var(--text3)",cursor:"pointer",fontFamily:"inherit"}}>+ Note</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Reply: name + priced lines ── */}
+            <div className="card" style={{padding:16,marginTop:14}}>
+              <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Your reply &amp; price</div>
+              {rSent?(
+                <div style={{textAlign:"center",padding:"14px 0"}}>
+                  <div style={{fontSize:38}}>✅</div>
+                  <div style={{fontWeight:700,marginTop:6}}>Sent, thank you {rSent.name}!</div>
+                  <div style={{color:"var(--text3)",fontSize:13,marginTop:2}}>Total sent: {fmtAmt(rSent.total)}</div>
+                  <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>{setRSent(null);setRLines([{description:"",price:""}]);setRNote("");}}>Send another reply</button>
+                </div>
+              ):(
+                <>
+                  <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>Enter your name and what the work will cost. Add a line for each job.</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                    <div style={{flex:"2 1 180px"}}>
+                      <FL label="Your name *"/>
+                      <input className="inp" value={rName} onChange={e=>setRName(e.target.value)} placeholder="e.g. John"/>
+                    </div>
+                    <div style={{flex:"1 1 120px"}}>
+                      <FL label="You are a"/>
+                      <select className="inp" value={rRole} onChange={e=>setRRole(e.target.value)}>
+                        <option value="mechanic">Mechanic</option>
+                        <option value="painter">Painter</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:8,fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4}}>
+                    <div style={{flex:1}}>Description</div><div style={{width:96}}>Price</div><div style={{width:30}}/>
+                  </div>
+                  {rLines.map((l,i)=>(
+                    <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                      <input className="inp" style={{flex:1,minWidth:0}} value={l.description} onChange={e=>setLine(i,"description",e.target.value)} placeholder="e.g. Replace front bumper"/>
+                      <input className="inp" style={{width:96}} type="number" inputMode="decimal" min="0" value={l.price} onChange={e=>setLine(i,"price",e.target.value)} placeholder="0"/>
+                      <button type="button" aria-label="Remove line" disabled={rLines.length===1} onClick={()=>setRLines(ls=>ls.filter((_,j)=>j!==i))}
+                        style={{width:30,height:36,border:"none",background:"none",color:"var(--red)",fontSize:18,cursor:rLines.length===1?"default":"pointer",opacity:rLines.length===1?.3:1}}>✕</button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setRLines(ls=>[...ls,{description:"",price:""}])}>+ Add line</button>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+                    <span style={{fontWeight:700}}>Total</span>
+                    <span style={{fontFamily:"Rajdhani,sans-serif",fontSize:24,fontWeight:700,color:"var(--accent)"}}>{fmtAmt(rTotal)}</span>
+                  </div>
+                  <div style={{marginTop:12}}>
+                    <FL label="Note (optional)"/>
+                    <textarea className="inp" rows={2} value={rNote} onChange={e=>setRNote(e.target.value)} placeholder="e.g. Parts not included, ready in 3 days" style={{resize:"vertical"}}/>
+                  </div>
+                  {rErr&&<div style={{color:"var(--red)",fontSize:13,marginTop:10}}>⚠ {rErr}</div>}
+                  <button className="btn btn-primary" style={{width:"100%",marginTop:14,padding:13}} disabled={rBusy} onClick={sendReply}>{rBusy?"Sending…":"Send reply"}</button>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

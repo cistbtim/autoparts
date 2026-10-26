@@ -360,9 +360,12 @@ export function SupplierSetupPage({token}) {
 
 // Read-only job card for a mechanic / painter: car details + photos, opened from the link the workshop sends.
 const JOBCARD_ANGLES=[["photo_front","Front"],["photo_front_left","Front-Left"],["photo_front_right","Front-Right"],["photo_left","Left"],["photo_right","Right"],["photo_rear","Rear"],["photo_rear_left","Rear-Left"],["photo_rear_right","Rear-Right"],["photo_side","Side"]];
+// The link never expires: the mechanic can keep editing until the workshop marks the job Done (or it is invoiced / paid).
+const JOBCARD_CLOSED=["Done","Invoiced","Payment Received","Completed","Closed"];
 export function JobCardPage({token}) {
   const [job,setJob]=useState(null);
   const [wsProf,setWsProf]=useState(null); // the workshop that sent this job card
+  const [locked,setLocked]=useState(false);  // job marked done -> view only
   const [photos,setPhotos]=useState([]);
   const [state,setState]=useState("loading"); // loading | ready | invalid
   // Inspection: same workshop_job_checklist rows the workshop's own Inspect screen uses, for THIS job only
@@ -380,7 +383,7 @@ export function JobCardPage({token}) {
   const [rErr,setRErr]=useState("");
   useEffect(()=>{
     (async()=>{
-      const r=await api.fresh("workshop_jobs",`share_token=eq.${encodeURIComponent(token)}&select=id,vehicle_reg,vehicle_make,vehicle_model,vehicle_year,complaint,notes,workshop_vehicle_id,workshop_id,created_at,date_in,mileage`);
+      const r=await api.fresh("workshop_jobs",`share_token=eq.${encodeURIComponent(token)}&select=id,vehicle_reg,vehicle_make,vehicle_model,vehicle_year,complaint,notes,workshop_vehicle_id,workshop_id,created_at,date_in,mileage,status`);
       const j=Array.isArray(r)?r[0]:null;
       if(!j){setState("invalid");return;}
       const [jp,veh,cat]=await Promise.all([
@@ -406,12 +409,22 @@ export function JobCardPage({token}) {
         map[x.item_key]={id:x.id,status:x.status||"pending",note:x.note||"",photo_urls:urls};
       });
       setCl(map);
+      setLocked(JOBCARD_CLOSED.includes(j.status));
       setJob({...j,model_name:match?.model||j.vehicle_model||""});
       setPhotos(list);setState("ready");
     })().catch(()=>setState("invalid"));
   },[token]);
   const car=job?[job.vehicle_year,job.vehicle_make,job.model_name].filter(Boolean).join(" "):"";
+  // Re-check the job right before every write, so a page left open can't change a job the workshop already closed
+  const stillOpen=async()=>{
+    try{
+      const r=await api.fresh("workshop_jobs",`id=eq.${encodeURIComponent(job.id)}&select=status`);
+      if(Array.isArray(r)&&r[0]&&JOBCARD_CLOSED.includes(r[0].status)){ setLocked(true); return false; }
+    }catch{/* if the check itself fails, let the write try and report its own error */}
+    return true;
+  };
   const saveItem=async(key,patch)=>{
+    if(locked||!(await stillOpen())) return;
     const cur=cl[key]||{status:"pending",note:"",photo_urls:[]};
     const upd={...cur,...patch};
     const id=upd.id||makeId("CL");
@@ -460,6 +473,7 @@ export function JobCardPage({token}) {
     if(!name){setRErr("Please enter your name.");return;}
     if(!lines.length||lines.some(l=>!l.description||!(l.price>0))){setRErr("Each line needs a description and a price.");return;}
     setRErr("");setRBusy(true);
+    if(!(await stillOpen())){ setRBusy(false); return; }
     try{
       const total=lines.reduce((s,l)=>s+l.price,0);
       const res=await api.insert("workshop_job_replies",{id:makeId("JR"),job_id:job.id,mechanic_name:name,role:rRole,lines,total,note:rNote.trim()||null,created_at:new Date().toISOString()});
@@ -498,6 +512,7 @@ export function JobCardPage({token}) {
               {job.complaint&&<div style={{marginTop:14}}><div style={{fontSize:11,color:"var(--red)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Complaint</div><div style={{fontSize:15,marginTop:2}}>{job.complaint}</div></div>}
               {job.notes&&<div style={{marginTop:12}}><div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".05em"}}>Note</div><div style={{fontSize:14,marginTop:2,whiteSpace:"pre-line"}}>{job.notes}</div></div>}
             </div>
+            {locked&&<div className="card" style={{padding:14,marginBottom:14,borderColor:"var(--green)",background:"rgba(22,163,74,.08)",color:"var(--text)",fontSize:14,fontWeight:600}}>✅ This job is finished. The page is now view-only, thank you.</div>}
             <div className="card" style={{padding:16}}>
               <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>Car photos {photos.length>0&&<span style={{color:"var(--text3)",fontWeight:400}}>· {photos.length}</span>}</div>
               {photos.length===0?<div style={{color:"var(--text3)",fontSize:13,padding:"10px 0"}}>No photos yet.</div>:(
@@ -534,14 +549,14 @@ export function JobCardPage({token}) {
                       <div style={{display:"flex",gap:5}}>
                         {STATUS_BTNS.map(([v,lb,col])=>{
                           const on=c.status===v;
-                          return <button key={v} type="button" onClick={()=>saveItem(it.key,{status:on?"pending":v})}
+                          return <button key={v} type="button" disabled={locked} onClick={()=>saveItem(it.key,{status:on?"pending":v})}
                             style={{padding:"6px 11px",borderRadius:8,border:`1.5px solid ${on?col:"var(--border2)"}`,background:on?col:"var(--surface)",color:on?"#fff":"var(--text2)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{lb}</button>;
                         })}
                       </div>
                     </div>
                     {(showNote||photos.length>0)&&(
                       <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}>
-                        {showNote&&<input className="inp" value={c.note} placeholder="Note (what is wrong?)" style={{fontSize:13,padding:"7px 10px"}}
+                        {showNote&&<input className="inp" disabled={locked} value={c.note} placeholder="Note (what is wrong?)" style={{fontSize:13,padding:"7px 10px"}}
                           onChange={e=>setCl(p=>({...p,[it.key]:{...(p[it.key]||{status:"pending",photo_urls:[]}),note:e.target.value}}))}
                           onBlur={e=>saveItem(it.key,{note:e.target.value})}/>}
                         {photos.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -549,7 +564,7 @@ export function JobCardPage({token}) {
                         </div>}
                       </div>
                     )}
-                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                    {!locked&&<div style={{display:"flex",gap:8,marginTop:8}}>
                       <label style={{fontSize:12,fontWeight:700,color:"var(--blue)",cursor:"pointer"}}>
                         {clBusy[it.key]?"Uploading…":"📷 Photo"}
                         <input type="file" accept="image/*" capture="environment" style={{display:"none"}} disabled={!!clBusy[it.key]}
@@ -557,14 +572,14 @@ export function JobCardPage({token}) {
                       </label>
                       {!showNote&&<button type="button" onClick={()=>setOpenNote(p=>({...p,[it.key]:true}))}
                         style={{background:"none",border:"none",padding:0,fontSize:12,fontWeight:700,color:"var(--text3)",cursor:"pointer",fontFamily:"inherit"}}>+ Note</button>}
-                    </div>
+                    </div>}
                   </div>
                 );
               })}
             </div>
 
-            {/* ── Reply: name + priced lines ── */}
-            <div className="card" style={{padding:16,marginTop:14}}>
+            {/* ── Reply: name + priced lines (hidden once the job is done) ── */}
+            {!locked&&<div className="card" style={{padding:16,marginTop:14}}>
               <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Your reply &amp; price</div>
               {rSent?(
                 <div style={{textAlign:"center",padding:"14px 0"}}>
@@ -614,7 +629,7 @@ export function JobCardPage({token}) {
                   <button className="btn btn-primary" style={{width:"100%",marginTop:14,padding:13}} disabled={rBusy} onClick={sendReply}>{rBusy?"Sending…":"Send reply"}</button>
                 </>
               )}
-            </div>
+            </div>}
           </>
         )}
       </div>

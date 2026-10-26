@@ -61,6 +61,21 @@ function HubIcon({name,size=28}){
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:"block"}}>{HUB_ICON_PATHS[name]}</svg>;
 }
 
+// The customer booking link never expires. Its token is created ONCE: this reads the saved token from the
+// database first and only makes a new one when the workshop truly has none. (Before, a click made while the
+// profile was still loading, or an out-of-date cached profile, generated a fresh token and overwrote the
+// saved one, which silently killed every booking link already sent out.)
+async function ensureBookingToken(wsId) {
+  const cur = await api.fresh("workshop_profiles", `id=eq.${encodeURIComponent(wsId)}&select=booking_token`);
+  if (!Array.isArray(cur)) throw new Error(cur?.message || "Could not read the workshop profile");
+  if (cur[0]?.booking_token) return cur[0].booking_token;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const tok = Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const res = await api.patch("workshop_profiles", "id", wsId, {booking_token: tok});
+  if (Array.isArray(res) && res[0]?.booking_token) return res[0].booking_token;
+  throw new Error(res?.message || "Save failed");
+}
+
 function quoteExpiry(q) {
   if (!q || !q.valid_until || ["accepted","declined","converted"].includes(q.status)) return null;
   const v = String(q.valid_until).slice(0,10), today = todayYmd();
@@ -1705,12 +1720,9 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
         const bToken=bookingToken||wsProfile?.booking_token||"";
         const bookingUrl=bToken?`${window.location.origin}${window.location.pathname}?wsbooking=${bToken}`:"";
         const genToken=async()=>{
-          const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-          const tok=Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
-          const res=await api.patch("workshop_profiles","id",wsId,{booking_token:tok}).catch(e=>({error:e.message}));
-          if(res&&Array.isArray(res)&&res[0]?.booking_token){
-            setBookingToken(res[0].booking_token);
-          } else {
+          try{
+            setBookingToken(await ensureBookingToken(wsId));
+          }catch{
             alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again.");
           }
         };
@@ -13297,12 +13309,14 @@ ${bookingUrl}`;
     setOpen("booking");
     if(token) return;
     setBusy(true);
-    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const tok=Array.from({length:8},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
-    const res=await api.patch("workshop_profiles","id",wsId,{booking_token:tok}).catch(()=>null);
+    try{
+      const tok=await ensureBookingToken(wsId);
+      setToken(tok); onTokenSaved&&onTokenSaved(tok);
+    }catch{
+      setOpen(null);
+      alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again.");
+    }
     setBusy(false);
-    if(Array.isArray(res)&&res[0]?.booking_token){ setToken(res[0].booking_token); onTokenSaved&&onTokenSaved(res[0].booking_token); }
-    else { setOpen(null); alert("❌ Save failed — run this SQL in Supabase first:\n\nALTER TABLE workshop_profiles ADD COLUMN IF NOT EXISTS booking_token text;\n\nThen try again."); }
   };
   const btn={fontSize:13,padding:"7px 14px",flexShrink:0,...style};
   // compact (mobile): one joined pill of two icon-only buttons — calendar = booking link, person+ = invite workshop

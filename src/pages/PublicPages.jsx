@@ -403,7 +403,7 @@ export function MechanicStatementPage({token}) {
             <div style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text3)",marginTop:14}}>{acct.balance>0?"The workshop owes you":acct.balance<0?"You owe the workshop":"Settled"}</div>
             <div style={{fontFamily:"Rajdhani,sans-serif",fontSize:40,fontWeight:700,color:acct.balance>0?"var(--accent)":acct.balance<0?"var(--red)":"var(--text3)"}}>{fmtAmt(Math.abs(acct.balance))}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginTop:12}}>
-              {[["Earned (finished jobs)",acct.earned,"var(--text)"],["Credits",acct.credits,"var(--green)"],["Charges & deductions",-acct.deductions,"var(--red)"],["Paid to you",-acct.paid,"var(--blue)"]].map(([lb,v,col])=>(
+              {[...(acct.opening?[["Opening balance",acct.opening,"var(--text)"]]:[]),["Earned (finished jobs)",acct.earned,"var(--text)"],["Credits",acct.credits,"var(--green)"],["Charges & deductions",-acct.deductions,"var(--red)"],["Paid to you",-acct.paid,"var(--blue)"]].map(([lb,v,col])=>(
                 <div key={lb} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px"}}>
                   <div style={{fontSize:11,color:"var(--text3)"}}>{lb}</div>
                   <div style={{fontWeight:700,color:col,fontFamily:"DM Mono,monospace",marginTop:2}}>{v===0?fmtAmt(0):sg(v)}</div>

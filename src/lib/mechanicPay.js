@@ -12,6 +12,7 @@
 export const MECH_DONE = ["Done", "Invoiced", "Payment Received", "Completed", "Closed"];
 
 export const ENTRY_TYPES = {
+  opening:          { label: "Opening balance (from before the system)", icon: "📒", short: "Opening balance" },
   payment:          { label: "Payment to mechanic",              icon: "💵", short: "Payment" },
   charge:           { label: "Charge (I sold him something)",    icon: "🛒", short: "Charge" },
   supplier_invoice: { label: "Supplier invoice paid for him",    icon: "🧾", short: "Supplier invoice" },
@@ -20,7 +21,7 @@ export const ENTRY_TYPES = {
 };
 
 // Which way an entry moves the balance by default (refund / discount let the user pick).
-export const DEFAULT_DIRECTION = { payment: -1, charge: -1, supplier_invoice: -1, refund: 1, discount: 1 };
+export const DEFAULT_DIRECTION = { opening: 1, payment: -1, charge: -1, supplier_invoice: -1, refund: 1, discount: 1 };
 
 const norm = (x) => (x || "").trim().toLowerCase();
 export const sameName = (a, b) => norm(a) === norm(b);
@@ -44,15 +45,16 @@ export function computeAccount({ replies = [], jobs = [], ledger = [] }) {
     jobRows.push({ job: j, reply: r, total, done, rejected, accepted: r.decision === "accepted" });
   });
   jobRows.sort((a, b) => String(b.job.date_in || "").localeCompare(String(a.job.date_in || "")));
-  let credits = 0, deductions = 0, paid = 0;
+  let credits = 0, deductions = 0, paid = 0, opening = 0;
   ledger.forEach((e) => {
     const v = (+e.direction || 0) * (+e.amount || 0);
-    if (e.entry_type === "payment") paid += (+e.amount || 0) * (+e.direction === 1 ? -1 : 1);
+    if (e.entry_type === "opening") opening += v;   // what was already owed either way before the system started
+    else if (e.entry_type === "payment") paid += (+e.amount || 0) * (+e.direction === 1 ? -1 : 1);
     else if (v >= 0) credits += v;
     else deductions += -v;
   });
-  const balance = earned + credits - deductions - paid;
-  return { earned, credits, deductions, paid, balance, jobRows };
+  const balance = opening + earned + credits - deductions - paid;
+  return { opening, earned, credits, deductions, paid, balance, jobRows };
 }
 
 // Loads everything needed to compute accounts. Bulk mode (workshop page): all contacts of one workshop.

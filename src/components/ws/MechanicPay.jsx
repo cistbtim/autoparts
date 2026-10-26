@@ -132,7 +132,7 @@ export function WsMechanicPayPage({ wsId, wsProfile, wsLocked = false, focusName
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginTop: 14 }}>
-            {[["Earned (finished jobs)", a.earned, "var(--text)"], ["Credits (refund / discount)", a.credits, "var(--green)"], ["Charges & deductions", -a.deductions, "var(--red)"], ["Paid to him", -a.paid, "var(--blue)"]].map(([lb, v, col]) => (
+            {[...(a.opening ? [["Opening balance", a.opening, "var(--text)"]] : []), ["Earned (finished jobs)", a.earned, "var(--text)"], ["Credits (refund / discount)", a.credits, "var(--green)"], ["Charges & deductions", -a.deductions, "var(--red)"], ["Paid to him", -a.paid, "var(--blue)"]].map(([lb, v, col]) => (
               <div key={lb} style={{ background: "var(--surface2)", borderRadius: 10, padding: "10px 12px" }}>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{lb}</div>
                 <div style={{ fontWeight: 700, color: col, fontFamily: "DM Mono,monospace", marginTop: 2 }}>{v === 0 ? fmtAmt(0) : signed(v)}</div>
@@ -293,16 +293,19 @@ export function WsMechanicPayPage({ wsId, wsProfile, wsLocked = false, focusName
                 <div><FL label="Invoice no." /><input className="inp" value={entry.invoice_no} onChange={(e) => set("invoice_no", e.target.value)} placeholder="e.g. INV-1042" /></div>
               </FG>
             )}
-            {(entry.type === "refund" || entry.type === "discount") && (
-              <FD><FL label="Effect on his balance" />
+            {(entry.type === "refund" || entry.type === "discount" || entry.type === "opening") && (
+              <FD><FL label={entry.type === "opening" ? "Who owes whom?" : "Effect on his balance"} />
                 <select className="inp" value={entry.direction} onChange={(e) => set("direction", +e.target.value)}>
-                  {entry.type === "refund"
-                    ? [<option key="1" value={1}>Refund to the mechanic (adds to what I owe him)</option>, <option key="-1" value={-1}>Mechanic refunds me (reduces what I owe him)</option>]
-                    : [<option key="1" value={1}>Discount I give him on his charges (adds to what I owe him)</option>, <option key="-1" value={-1}>Discount taken off his labour price (reduces what I owe him)</option>]}
+                  {entry.type === "opening"
+                    ? [<option key="1" value={1}>I owe him this amount (he is owed from before)</option>, <option key="-1" value={-1}>He owes me this amount (from before)</option>]
+                    : entry.type === "refund"
+                      ? [<option key="1" value={1}>Refund to the mechanic (adds to what I owe him)</option>, <option key="-1" value={-1}>Mechanic refunds me (reduces what I owe him)</option>]
+                      : [<option key="1" value={1}>Discount I give him on his charges (adds to what I owe him)</option>, <option key="-1" value={-1}>Discount taken off his labour price (reduces what I owe him)</option>]}
                 </select>
               </FD>
             )}
-            <FD><FL label={entry.type === "charge" ? "What did I sell him? *" : "Description (optional)"} /><input className="inp" value={entry.description} onChange={(e) => set("description", e.target.value)} placeholder={entry.type === "charge" ? "e.g. Brake pads, spray cans, tools" : "e.g. Part of last week's work"} /></FD>
+            {entry.type === "opening" && <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10 }}>Enter what was owed on the day you start using the system. Set the date to that day. Do this once per person.</div>}
+            <FD><FL label={entry.type === "charge" ? "What did I sell him? *" : "Description (optional)"} /><input className="inp" value={entry.description} onChange={(e) => set("description", e.target.value)} placeholder={entry.type === "charge" ? "e.g. Brake pads, spray cans, tools" : entry.type === "opening" ? "e.g. Balance brought forward" : "e.g. Part of last week's work"} /></FD>
             {myJobs.length > 0 && (
               <FD><FL label="For a job (optional)" />
                 <select className="inp" value={entry.job_id} onChange={(e) => set("job_id", e.target.value)}>

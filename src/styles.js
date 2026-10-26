@@ -147,7 +147,12 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
 .fu{animation:fadeUp .2s ease}
 .cp-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 7px;font-family:"DM Sans",sans-serif;transition:all .18s;white-space:nowrap;flex-shrink:0}
 .cp-btn:hover{background:var(--surface3);color:var(--text)}
-.sidebar{background:var(--sidebar-bg)!important;border-right:1px solid rgba(255,255,255,.06)!important;--surface:rgba(255,255,255,.05);--surface2:rgba(255,255,255,.07);--surface3:rgba(255,255,255,.13);--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);--text:rgba(255,255,255,.92);--text2:rgba(255,255,255,.7);--text3:rgba(255,255,255,.38)}
+.sidebar{background:var(--sidebar-bg)!important;border-right:1px solid rgba(255,255,255,.06)!important;--surface:rgba(255,255,255,.05);--surface2:rgba(255,255,255,.07);--surface3:rgba(255,255,255,.13);--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);--text:rgba(255,255,255,.92);--text2:rgba(255,255,255,.78);--text3:rgba(255,255,255,.6)}
+/* Sidebar nav (DESIGN.md): readable contrast, visible hover and keyboard focus, orange only for the active item */
+.sb-grp{background:none;color:var(--text2)}.sb-grp:hover{background:rgba(255,255,255,.06);color:var(--text)}.sb-grp.has-active{background:var(--surface2);color:var(--text)}
+.sb-sub{background:transparent;color:var(--text3)}.sb-sub:hover{background:rgba(255,255,255,.07);color:var(--text)}.sb-sub.on{background:var(--accent);color:#fff}
+.sidebar button:focus-visible,.sidebar a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sb-icon{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin:0 auto}
 .sidebar .lang{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}.sidebar .lang.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .sidebar .btn-ghost{background:rgba(255,255,255,.07);color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.1)}.sidebar .btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff}
 .tbl th{background:var(--sidebar-bg);color:rgba(255,255,255,.78);border-bottom:none}

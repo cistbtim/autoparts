@@ -5618,10 +5618,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <div style={{maxWidth:"100%",overflow:"hidden",marginBottom:4}}>
             <ShopLogo settings={wsDisplaySettings} size="sm"/>
           </div>
-          <div style={{fontSize:9.5,color:"var(--text3)",letterSpacing:".02em",marginBottom:8}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></div>
-          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}>
-            <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
-            <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:10}}>
+            <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".02em"}}>Powered by <span style={{color:"var(--accent)",fontWeight:700}}>VelGenius</span></span>
+            <span style={{display:"inline-flex",alignItems:"center",gap:5}}>
+              <span style={{width:6,height:6,borderRadius:"50%",background:"var(--green)",display:"inline-block",flexShrink:0}}/>
+              <span style={{fontSize:10,color:"var(--text3)",letterSpacing:".03em"}}>{t.connected||"Connected"}</span>
+            </span>
           </div>
           {langs.length>1&&<LangPicker langs={langs} lang={lang} setLang={setLang}/>}
         </div>
@@ -5654,7 +5656,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             return (
               <div key={g.id} style={{marginBottom:2}}>
                 {/* Group header */}
-                <button onClick={()=>toggleGroup(g.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",background:hasActiveChild?"var(--surface2)":"none",border:"none",borderRadius:9,color:hasActiveChild?"var(--text)":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:600,textAlign:"left",transition:"all .18s"}}>
+                <button className={`sb-grp${hasActiveChild?" has-active":""}`} aria-expanded={!!isExpanded} onClick={()=>toggleGroup(g.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"9px 10px",border:"none",borderRadius:9,cursor:"pointer",fontSize:12.5,fontFamily:"inherit",fontWeight:600,textAlign:"left",transition:"background .18s,color .18s"}}>
                   <span style={{fontSize:14}}>{g.icon}</span>
                   <span style={{flex:1,letterSpacing:".02em"}}>{g.label}</span>
                   {g.badge>0&&!isExpanded&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,padding:"0 4px"}}>{g.badge}</span>}
@@ -5664,7 +5666,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 {isExpanded&&(
                   <div style={{marginLeft:8,marginTop:1,borderLeft:"2px solid var(--surface3)",paddingLeft:8}}>
                     {g.children.map(n=>(
-                      <button key={n.id} data-tour-id={n.id} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 10px",background:tab===n.id?"var(--accent)":"transparent",border:"none",borderRadius:7,color:tab===n.id?"#fff":"var(--text3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"all .18s"}}>
+                      <button key={n.id} data-tour-id={n.id} className={`sb-sub${tab===n.id?" on":""}`} aria-current={tab===n.id?"page":undefined} onClick={()=>setTab(n.id)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"8px 10px",border:"none",borderRadius:7,cursor:"pointer",fontSize:12.5,fontFamily:"inherit",fontWeight:tab===n.id?600:400,marginBottom:1,textAlign:"left",transition:"background .18s,color .18s"}}>
                         <span style={{fontSize:13}}>{n.icon}</span>
                         <span style={{flex:1}}>{n.label}</span>
                         {n.badge>0&&<span style={{background:"var(--accent)",color:"#fff",borderRadius:99,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,padding:"0 3px"}}>{n.badge}</span>}
@@ -5684,14 +5686,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           )}
           <div style={{display:"flex",gap:6,justifyContent:"center"}}>
             {role==="workshop"&&(
-              <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>setTourActive(true)} title="Take a Tour">🧭</button>
+              <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"8px 0"}} onClick={()=>setTourActive(true)} title="Take a Tour" aria-label="Take a Tour"><svg className="sb-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.2 7.8-2.1 6.3-6.3 2.1 2.1-6.3z"/></svg></button>
             )}
             {(role==="workshop"||role==="admin")&&(
-              <a className="btn btn-ghost btn-sm" href={helpUrl()} target="_blank" rel="noopener noreferrer" style={{flex:1,padding:"7px 0",fontSize:15,textDecoration:"none"}} title="Help & tutorials — search and learn how to use VelGenius">❓</a>
+              <a className="btn btn-ghost btn-sm" href={helpUrl()} target="_blank" rel="noopener noreferrer" style={{flex:1,padding:"8px 0",textDecoration:"none"}} title="Help & tutorials — search and learn how to use VelGenius" aria-label="Help & tutorials"><svg className="sb-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></a>
             )}
-            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={()=>openM("changePassword")} title={t.changePassword||"Change Password"}>🔑</button>
-            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15}} onClick={clearAppCache} title="Clear Cache — force a fresh reload if the app looks out of date">🧹</button>
-            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"7px 0",fontSize:15,color:"rgba(248,113,113,.85)"}} onClick={onLogout} title={t.logout||"Sign Out"}>🚪</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"8px 0"}} onClick={()=>openM("changePassword")} title={t.changePassword||"Change Password"} aria-label={t.changePassword||"Change Password"}><svg className="sb-icon" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M16 7l3 3M14 9l2 2"/></svg></button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"8px 0"}} onClick={clearAppCache} title="Clear Cache — force a fresh reload if the app looks out of date" aria-label="Clear cache"><svg className="sb-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M8 16H3v5"/></svg></button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,padding:"8px 0",color:"rgba(248,113,113,.9)"}} onClick={onLogout} title={t.logout||"Sign Out"} aria-label={t.logout||"Sign Out"}><svg className="sb-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></button>
           </div>
           <div style={{fontSize:10,color:"var(--text3)",textAlign:"center",marginTop:2,letterSpacing:".03em"}}>v{APP_VERSION} · {APP_UPDATE_DATE}</div>
         </div>

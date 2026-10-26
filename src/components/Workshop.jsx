@@ -47,6 +47,20 @@ const todayYmd = () => _ymd(new Date());
 const addDaysYmd = (ymd, n) => { const [y,m,d]=String(ymd).slice(0,10).split("-").map(Number); return _ymd(new Date(y,m-1,d+n)); };
 // Returns a badge descriptor when an open (not accepted/declined/converted) quotation is past
 // or on its valid-until date, else null. Compared as local calendar dates, so it flips at midnight.
+// Line icons for the job hub tiles (DESIGN.md: one consistent line-icon set instead of emoji)
+const HUB_ICON_PATHS={
+  car:<><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></>,
+  camera:<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>,
+  clipboard:<><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></>,
+  file:<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></>,
+  card:<><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></>,
+  send:<><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></>,
+  store:<><path d="m2 7 1.5-4h17L22 7"/><path d="M2 7v1a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0V7"/><path d="M4 11v9h16v-9"/><path d="M9 20v-5h6v5"/></>,
+};
+function HubIcon({name,size=28}){
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:"block"}}>{HUB_ICON_PATHS[name]}</svg>;
+}
+
 function quoteExpiry(q) {
   if (!q || !q.valid_until || ["accepted","declined","converted"].includes(q.status)) return null;
   const v = String(q.valid_until).slice(0,10), today = todayYmd();
@@ -6325,19 +6339,19 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           ]:[]),
         ];
         const CHAPTERS = [
-          {id:"ch_car",  icon:"🚗", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
-          {id:"ch_docs", icon:"📷", label:t.wsChDocs||"Photo & Doc", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
+          {id:"ch_car",  icon:"car", label:t.wsChCar||"Car",        color:"#2563eb", tabs:["car"],          onClick:()=>setCarPopup(true)},
+          {id:"ch_docs", icon:"camera", label:t.wsChDocs||"Photo & Doc", color:"#7c3aed", tabs:["photos","docs"],onClick:()=>{setDocsPopup(true);setDocsPopupTab("photos");}},
           ...(wsRole!=="mechanic"?[
-            {id:"ch_partsq",icon:"📋", label:"Parts Quotation",         color:"#0f766e", tabs:[],              onClick:()=>{ setQuotePopupQuoteOnly(true);  setQuotePopup(true); setQuotePopupTab("quote"); }},
-            {id:"ch_bill",icon:"📝", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab(invoice?"invoice":"quote"); }},
-            {id:"ch_pay", icon:"💳", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
+            {id:"ch_partsq",icon:"clipboard", label:"Parts Quotation",         color:"#0f766e", tabs:[],              onClick:()=>{ setQuotePopupQuoteOnly(true);  setQuotePopup(true); setQuotePopupTab("quote"); }},
+            {id:"ch_bill",icon:"file", label:t.wsChBill||"Quote & Invoice",  color:"#ea580c", tabs:["quote","invoice"],onClick:()=>{ setQuotePopupQuoteOnly(false); setQuotePopup(true); setQuotePopupTab(invoice?"invoice":"quote"); }},
+            {id:"ch_pay", icon:"card", label:t.wsChPay||"Payment",     color:"#059669", tabs:["payment"],      onClick:()=>setPayPopup(true)},
           ]:[
             // Mechanics can't open "Parts Quotation" (it's inside the money-gated
             // Quote/Invoice popup, which also shows priced job items) — but they still
             // need a way to send a parts list to a supplier, so give them a direct tile
             // straight to SupplierSendModal, which is itself already mechanic-safe
             // (its price-showing "Send History" half is fed empty data for this role).
-            {id:"ch_supplier",icon:"📤", label:"Send to Supplier", color:"#16a34a", tabs:[], onClick:()=>setSupplierModal(true)},
+            {id:"ch_supplier",icon:"send", label:"Send to Supplier", color:"#16a34a", tabs:[], onClick:()=>setSupplierModal(true)},
           ]),
         ];
 
@@ -6357,7 +6371,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               transition:"transform .12s,box-shadow .12s,border-color .12s",
               WebkitTapHighlightColor:"transparent",flex:1,
             }}>
-              <span style={{fontSize:tileSize.iconSize,lineHeight:1,background:`${ch.color}16`,borderRadius:10,padding:"7px 16px"}}>{ch.icon}</span>
+              <span style={{display:"inline-flex",background:`${ch.color}16`,borderRadius:12,padding:isMobile?"9px 16px":"11px 20px",color:ch.color}}><HubIcon name={ch.icon} size={Math.round(tileSize.iconSize*0.85)}/></span>
               <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",letterSpacing:".01em",color:ch.color}}>{ch.label}</span>
             </button>
           );
@@ -6378,7 +6392,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       background:"var(--surface)",color:"var(--text)",boxShadow:"0 2px 10px rgba(0,0,0,.10)",
                       WebkitTapHighlightColor:"transparent",flex:1,minWidth:0,
                     }}>
-                    <span style={{fontSize:tileSize.iconSize,lineHeight:1,background:"#1d4ed816",borderRadius:10,padding:"7px 16px"}}>🏪</span>
+                    <span style={{display:"inline-flex",background:"#1d4ed816",borderRadius:12,padding:isMobile?"9px 16px":"11px 20px",color:"#1d4ed8"}}><HubIcon name="store" size={Math.round(tileSize.iconSize*0.85)}/></span>
                     <span style={{fontSize:tileSize.labelSize,fontWeight:700,lineHeight:1.2,textAlign:"center",color:"#1d4ed8",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{job.vehicle_make} · {_linkedV.model}</span>
                     <span style={{fontSize:tileSize.labelSize-1,color:"var(--text3)",lineHeight:1}}>{_linkedV.code}</span>
                     {spareShopPartsCount>0&&<span style={{position:"absolute",top:6,right:8,fontSize:10,fontWeight:800,background:"#1d4ed8",color:"#fff",borderRadius:99,padding:"2px 7px"}}>{spareShopPartsCount} parts</span>}

@@ -4767,8 +4767,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   // Replies the mechanic / painter sent back from the job card link: name + priced lines
   const [replies, setReplies] = useState([]);
   const [showReplies, setShowReplies] = useState(false);
-  const loadReplies=()=>api.fresh("workshop_job_replies",`job_id=eq.${encodeURIComponent(job.id)}&order=created_at.desc`)
-    .then(r=>setReplies(Array.isArray(r)?r:[])).catch(()=>setReplies([]));
+  const [sends, setSends] = useState([]); // who the job card was sent to (so we can show "waiting" until they reply)
+  const loadReplies=()=>{
+    api.fresh("workshop_job_sends",`job_id=eq.${encodeURIComponent(job.id)}&order=sent_at.desc`)
+      .then(r=>setSends(Array.isArray(r)?r:[])).catch(()=>setSends([]));
+    return api.fresh("workshop_job_replies",`job_id=eq.${encodeURIComponent(job.id)}&order=created_at.desc`)
+      .then(r=>setReplies(Array.isArray(r)?r:[])).catch(()=>setReplies([]));
+  };
   useEffect(()=>{ loadReplies(); },[job.id]);
   const replyLines=r=>Array.isArray(r.lines)?r.lines:(()=>{try{return JSON.parse(r.lines||"[]");}catch{return[];}})();
   // "Save to my contacts" ticked for a new person: store name + WhatsApp + role once, pick them from a list next time
@@ -4778,6 +4783,19 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
     api.insert("workshop_contacts",{id:makeId("WCT"),workshop_id:ownerWsId,name:s.name.trim(),phone:s.phone.trim(),role:s.role,created_at:new Date().toISOString()}).catch(()=>{});
     setSendMech(x=>x&&({...x,save:false}));
   };
+  // Remember who the job card went to, so the quote screen can show "waiting" until their reply arrives
+  const logSend=async()=>{
+    const s=sendMech; const nm=s?.name?.trim();
+    if(!nm) return;
+    const now=new Date().toISOString();
+    const prev=sends.find(x=>(x.name||"").trim().toLowerCase()===nm.toLowerCase());
+    try{
+      if(prev) await api.patch("workshop_job_sends","id",prev.id,{sent_at:now,role:s.role,phone:s.phone.trim()||null});
+      else await api.insert("workshop_job_sends",{id:makeId("JS"),job_id:job.id,name:nm,phone:s.phone.trim()||null,role:s.role,sent_at:now});
+    }catch{/* table missing: the send still goes out, it just will not show as waiting */}
+    loadReplies();
+  };
+  const onSent=()=>{ saveNewContact(); logSend(); };
   const openSendMech=async()=>{
     setSendMech({role:"mechanic",name:"",phone:"",contactId:"",contacts:[],save:false,link:"",msg:"",err:"",busy:true,copied:false});
     try{
@@ -8515,6 +8533,38 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               </div>
             );
           })()}
+          {/* ── Labour quotes: mechanic / painter replies to the job card link — replied or still waiting ── */}
+          {wsRole!=="mechanic"&&(sends.length>0||replies.length>0)&&(()=>{
+            const norm=x=>(x||"").trim().toLowerCase();
+            const people=new Map();
+            sends.forEach(sd=>{ const k=norm(sd.name); if(k&&!people.has(k)) people.set(k,{name:sd.name,role:sd.role,sentAt:sd.sent_at,reply:null}); });
+            replies.forEach(rp=>{
+              const k=norm(rp.mechanic_name); if(!k) return;
+              const p=people.get(k)||{name:rp.mechanic_name,role:rp.role,sentAt:null,reply:null};
+              const afterSend=!p.sentAt||new Date(rp.created_at)>=new Date(p.sentAt)-60000;
+              if(afterSend&&(!p.reply||new Date(rp.created_at)>new Date(p.reply.created_at))) p.reply=rp;
+              people.set(k,p);
+            });
+            const rows=[...people.values()];
+            return (
+              <div style={{borderTop:"1px solid var(--border)",padding:"8px 16px",display:"flex",flexDirection:"column",gap:5}}>
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>Labour quotes · mechanic / painter</div>
+                {rows.map(p=>(
+                  <div key={norm(p.name)} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                    <span style={{flex:1,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name} <span style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase"}}>{p.role==="painter"?"Painter":p.role==="other"?"":"Mechanic"}</span></span>
+                    {p.reply
+                      ? <button onClick={()=>{setShowReplies(true);loadReplies();}} title="View the lines and price"
+                          style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",flexShrink:0,border:"none",cursor:"pointer"}}>
+                          ✅ Replied · {fmtAmt(p.reply.total??0)}
+                        </button>
+                      : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>
+                          ⏳ Waiting{p.sentAt?` · sent ${fmtDT(p.sentAt)}`:""}
+                        </span>}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div style={{padding:"12px 16px",borderTop:"1px solid var(--border)"}}>
             <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".07em",marginBottom:8}}>Actions</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8}}>
@@ -9704,9 +9754,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             </FD>
             <div style={{fontSize:11,color:"var(--text3)",marginBottom:12}}>The link already knows who it is for, so they do not type their name. It opens a page for this car only: details, photos, the inspection checklist and a price form. No customer details are shown.</div>
             <div style={{display:"flex",gap:10}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{saveNewContact();try{navigator.clipboard.writeText(sendMech.msg);setSendMech(s=>({...s,copied:true}));setTimeout(()=>setSendMech(s=>s&&({...s,copied:false})),1500);}catch{/* clipboard blocked */}}}>{sendMech.copied?"✓ Copied":"📋 Copy"}</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{onSent();try{navigator.clipboard.writeText(sendMech.msg);setSendMech(s=>({...s,copied:true}));setTimeout(()=>setSendMech(s=>s&&({...s,copied:false})),1500);}catch{/* clipboard blocked */}}}>{sendMech.copied?"✓ Copied":"📋 Copy"}</button>
               <a className="btn btn-primary" style={{flex:2,textDecoration:"none",background:"#25D366",borderColor:"#25D366"}} target="_blank" rel="noreferrer"
-                onClick={saveNewContact}
+                onClick={onSent}
                 href={sendMech.phone.trim()?waLink(sendMech.phone,sendMech.msg):`https://wa.me/?text=${encodeURIComponent(sendMech.msg)}`}>💬 Send via WhatsApp</a>
             </div>
           </>)}

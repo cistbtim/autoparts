@@ -5805,6 +5805,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           },{
             label:t.wsAdmin,
             items:[
+              {id:"wsmechpay",  icon:"💼", label:"Mechanic Pay"},
               {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
               {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},
               ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:t.wsSettings||"Settings"}]:[]),

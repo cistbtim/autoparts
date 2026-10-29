@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api.js";
 import { fmtD } from "../../lib/helpers.js";
+import { Overlay, MHead } from "../shared.jsx";
 
 const normReg = (r) => (r || "").toUpperCase().replace(/\s+/g, "");
 const money = (n) => `R${(+n || 0).toLocaleString()}`;
@@ -32,7 +33,7 @@ export function carSalesList(kind, rows, jobs) {
       .filter((l) => regs.has(normReg(l.vehicle_reg)))
       .filter((l) => (kind === "sold" ? l.status === "sold" : FOR_SALE.includes(l.status)))
       .map((l) => ({
-        id: l.id, job: jobOf(l.vehicle_reg), reg: l.vehicle_reg,
+        id: l.id, job: jobOf(l.vehicle_reg), reg: l.vehicle_reg, views: +l.view_count || 0, listed: l.status !== "pending_confirmation" && l.status !== "pending_review",
         title: [l.year, l.make, l.model].filter(Boolean).join(" "),
         photo: Array.isArray(l.photos) ? l.photos[0] : null,
         status: l.status, km: l.mileage, price: l.status === "sold" ? (+l.sold_price || +l.price) : l.price,
@@ -46,6 +47,7 @@ export function carSalesList(kind, rows, jobs) {
 // One car row/card — used by the Car Sales pages and the Jobs board columns.
 export function CarSalesRow({ c, onOpenJob, compact = false }) {
   const st = STATUS_TXT[c.status];
+  const [showViews, setShowViews] = useState(false);
   return (
     <div onClick={() => c.job && onOpenJob && onOpenJob(c.job)}
       style={{ display: "flex", gap: 10, alignItems: "center", padding: 10, marginBottom: compact ? 8 : 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: c.job ? "pointer" : "default" }}>
@@ -59,12 +61,60 @@ export function CarSalesRow({ c, onOpenJob, compact = false }) {
         </div>
         {c.note && <div style={{ fontSize: 11, color: "var(--red)" }}>⚠️ {c.note}</div>}
         {compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
+        {c.status && (
+          <button onClick={(e) => { e.stopPropagation(); setShowViews(true); }}
+            style={{ marginTop: 3, fontSize: 11, fontWeight: 700, padding: "1px 8px", borderRadius: 99, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text2)", cursor: "pointer" }}>
+            👁 {c.views} view{c.views === 1 ? "" : "s"}
+          </button>
+        )}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         {c.price != null && <div style={{ fontWeight: 800, fontSize: 15 }}>{money(c.price)}</div>}
         {!compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
       </div>
+      {showViews && <CarViewsModal c={c} onClose={() => setShowViews(false)} />}
     </div>
+  );
+}
+
+const tally = (rows, f) => {
+  const m = {};
+  rows.forEach((r) => { const k = f(r) || "Unknown"; m[k] = (m[k] || 0) + 1; });
+  return Object.entries(m).sort((a, b) => b[1] - a[1]);
+};
+
+// Who looked at the car and where from: tallies of the visits logged by the public car page.
+function CarViewsModal({ c, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    api.fresh("car_listing_views", `listing_id=eq.${encodeURIComponent(c.id)}&select=*&order=created_at.desc`)
+      .then((r) => { if (Array.isArray(r)) setRows(r); else setErr(r?.message || "Could not load the visits."); })
+      .catch(() => setErr("Could not load the visits."));
+  }, [c.id]);
+  const Block = ({ title, data }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text3)", marginBottom: 4 }}>{title}</div>
+      {data.map(([k, n]) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0", borderBottom: "1px solid var(--border)" }}><span>{k}</span><b>{n}</b></div>
+      ))}
+    </div>
+  );
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title={`👁 ${c.reg || "Car"} — who viewed`} sub={`${c.views} total page views`} onClose={onClose} />
+      {!c.listed && <div style={{ fontSize: 12, color: "var(--orange)", marginBottom: 8 }}>Not public yet — views start once Car Sales lists the car.</div>}
+      {err && <div style={{ color: "var(--red)", fontSize: 13 }}>{err} (the car_listing_views table may not exist yet)</div>}
+      {rows === null && !err ? <div style={{ color: "var(--text3)" }}>Loading…</div> : rows && (
+        rows.length === 0 ? <div style={{ color: "var(--text3)" }}>No tracked visits yet.</div> : (<>
+          <Block title="Country" data={tally(rows, (r) => r.country)} />
+          <Block title="City" data={tally(rows, (r) => r.city)} />
+          <Block title="Came from" data={tally(rows, (r) => r.src || r.referrer || "Direct / WhatsApp link")} />
+          <Block title="Device" data={tally(rows, (r) => r.device)} />
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>Last visit: {fmtD(String(rows[0].created_at).slice(0, 10))}</div>
+        </>)
+      )}
+    </Overlay>
   );
 }
 

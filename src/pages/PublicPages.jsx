@@ -3020,6 +3020,21 @@ export function CarListingPage({id}) {
       // Fire-and-forget view counter — not exact under concurrent viewers,
       // but good enough for "how many buyers looked at this car".
       if(visible) api.patch("car_sales_listings","id",id,{view_count:(+visible.view_count||0)+1}).catch(()=>{});
+      // Where the visit came from (country/city from the visitor's IP, the site/app that linked here, or a ?src= tag
+      // put on the shared link). One row per visitor per car per 30 min, so refreshes don't inflate it.
+      if(visible){
+        try{
+          const k="carview_"+id; const last=+localStorage.getItem(k)||0;
+          if(Date.now()-last>30*60*1000){
+            localStorage.setItem(k,String(Date.now()));
+            let geo={}; try{ geo=await (await fetch("https://ipapi.co/json/")).json(); }catch{}
+            let ref=""; try{ ref=document.referrer?new URL(document.referrer).hostname:""; }catch{}
+            const src=new URLSearchParams(window.location.search).get("src")||"";
+            const ua=navigator.userAgent||"";
+            api.insert("car_listing_views",{listing_id:id,country:geo.country_name||"",city:geo.city||"",referrer:ref,src,device:/Android|iPhone|iPad|iPod/i.test(ua)?"mobile":"desktop"}).catch(()=>{});
+          }
+        }catch{}
+      }
     })();
   },[id]);
 

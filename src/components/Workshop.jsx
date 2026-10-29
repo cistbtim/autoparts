@@ -13,7 +13,7 @@ import { WsSuppliersPage, WsSupplierModal, CAR_BRANDS } from "./ws/WsSuppliers.j
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { WsMechanicPayPage } from "./ws/MechanicPay.jsx";
-import { WsCarSalesPage } from "./ws/CarSales.jsx";
+import { WsCarSalesPage, CarSalesRow, carSalesList, loadBuyoutListings } from "./ws/CarSales.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
@@ -234,6 +234,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
+  const [buyoutRows, setBuyoutRows] = useState([]); // this workshop's "sell car" listings, for the board's car-sale columns
+  useEffect(()=>{ if(wsRole==="mechanic"||wsTab!=="jobs") return; let live=true; loadBuyoutListings().then(r=>{ if(live) setBuyoutRows(r); }).catch(()=>{}); return ()=>{ live=false; }; },[wsTab,wsRole]);
   const [kanbanNoteEdit,  setKanbanNoteEdit]  = useState(null);
   const [kanbanDueEdit,   setKanbanDueEdit]   = useState(null);
   const [kanbanAssignEdit,setKanbanAssignEdit]= useState(null);
@@ -988,6 +990,11 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             {id:"paid",     label:t.wsColPaid||"Payment Received",  hint:t.wsColPaidHint||"Job complete ✓",          color:"#10b981", items:paidCol, type:"job"},
             {id:"problem",  label:t.wsColProblem||"Problem Job",       hint:t.wsColProblemHint||"Needs attention",         color:"#f87171", items:probCol, type:"job"},
             {id:"cancelled",label:t.wsColCancelled||"Cancelled",         hint:t.wsColCancelledHint||"Customer didn't proceed", color:"#ef4444", items:cancelCol, type:"job"},
+            ...(wsRole==="mechanic"?[]:[
+              {id:"carforsale",  label:"For Sale Cars",   hint:"Offers to buy — on sale",   color:"#0ea5e9", items:carSalesList("forsale",buyoutRows,jobs).filter(c=>matchesSearch(c.job||{})||!c.job), type:"car"},
+              {id:"carsold",     label:"Sold Cars",       hint:"Sale completed",            color:"#22c55e", items:carSalesList("sold",buyoutRows,jobs).filter(c=>matchesSearch(c.job||{})||!c.job), type:"car"},
+              {id:"carcancelled",label:"Cancelled Sales", hint:"Customer didn't sell",      color:"#f43f5e", items:carSalesList("cancelled",buyoutRows,jobs).filter(c=>matchesSearch(c.job)), type:"car"},
+            ]),
           ];
 
           const BkCard = ({b}) => (
@@ -1498,6 +1505,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           </div>
                       )}
                       {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
+                      {col.type==="car"&&col.items.map(c=><CarSalesRow key={c.id} c={c} compact onOpenJob={setActiveJob}/>)}
                       {col.type==="job"&&(()=>{
                         const shown=colVisibleCount[col.id]||KANBAN_PAGE_SIZE;
                         const remaining=col.items.length-shown;

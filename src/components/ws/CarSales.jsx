@@ -18,26 +18,7 @@ const STATUS_TXT = {
 // workshop by the registrations on its jobs). kind: "forsale" | "sold" | "cancelled".
 // Cancelled = cancelled workshop jobs whose complaint is "Sell car" — a declined offer deletes the listing,
 // so the job is the only record left.
-export function WsCarSalesPage({ kind, jobs = [], onOpenJob }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(kind !== "cancelled");
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    if (kind === "cancelled") return;
-    let live = true;
-    setLoading(true); setErr("");
-    api.fresh("car_sales_listings", "source=eq.workshop_buyout&select=*&order=created_at.desc")
-      .then((r) => {
-        if (!live) return;
-        if (!Array.isArray(r)) { setErr(r?.message || "Could not load the cars."); setRows([]); }
-        else setRows(r);
-        setLoading(false);
-      })
-      .catch(() => { if (live) { setErr("Could not load the cars."); setLoading(false); } });
-    return () => { live = false; };
-  }, [kind]);
-
+export function carSalesList(kind, rows, jobs) {
   const regs = new Set(jobs.map((j) => normReg(j.vehicle_reg)).filter(Boolean));
   const jobOf = (reg) => jobs.find((j) => normReg(j.vehicle_reg) === normReg(reg));
 
@@ -59,6 +40,61 @@ export function WsCarSalesPage({ kind, jobs = [], onOpenJob }) {
       }));
   }
 
+  return list;
+}
+
+// One car row/card — used by the Car Sales pages and the Jobs board columns.
+export function CarSalesRow({ c, onOpenJob, compact = false }) {
+  const st = STATUS_TXT[c.status];
+  return (
+    <div onClick={() => c.job && onOpenJob && onOpenJob(c.job)}
+      style={{ display: "flex", gap: 10, alignItems: "center", padding: 10, marginBottom: compact ? 8 : 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: c.job ? "pointer" : "default" }}>
+      {c.photo ? <img src={c.photo} alt="" style={{ width: compact ? 56 : 72, height: compact ? 42 : 54, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+        : <div style={{ width: compact ? 56 : 72, height: compact ? 42 : 54, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🚗</div>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.reg || "—"}</div>
+        <div style={{ fontSize: 12, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text3)" }}>
+          {[c.who, c.km ? `${(+c.km).toLocaleString()} km` : "", c.date ? fmtD(String(c.date).slice(0, 10)) : ""].filter(Boolean).join(" · ")}
+        </div>
+        {c.note && <div style={{ fontSize: 11, color: "var(--red)" }}>⚠️ {c.note}</div>}
+        {compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
+      </div>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        {c.price != null && <div style={{ fontWeight: 800, fontSize: 15 }}>{money(c.price)}</div>}
+        {!compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Workshop's own buyout listings (matched to the workshop by job registrations in carSalesList).
+export async function loadBuyoutListings() {
+  const r = await api.fresh("car_sales_listings", "source=eq.workshop_buyout&select=*&order=created_at.desc");
+  return Array.isArray(r) ? r : [];
+}
+
+export function WsCarSalesPage({ kind, jobs = [], onOpenJob }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(kind !== "cancelled");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (kind === "cancelled") return;
+    let live = true;
+    setLoading(true); setErr("");
+    api.fresh("car_sales_listings", "source=eq.workshop_buyout&select=*&order=created_at.desc")
+      .then((r) => {
+        if (!live) return;
+        if (!Array.isArray(r)) { setErr(r?.message || "Could not load the cars."); setRows([]); }
+        else setRows(r);
+        setLoading(false);
+      })
+      .catch(() => { if (live) { setErr("Could not load the cars."); setLoading(false); } });
+    return () => { live = false; };
+  }, [kind]);
+
+  const list = carSalesList(kind, rows, jobs);
   const head = { forsale: "🏷️ For Sale Cars", sold: "🏁 Sold Cars", cancelled: "❌ Cancelled Sales" }[kind];
   const total = kind === "cancelled" ? 0 : list.reduce((s, c) => s + (+c.price || 0), 0);
 
@@ -74,28 +110,7 @@ export function WsCarSalesPage({ kind, jobs = [], onOpenJob }) {
         : list.length === 0 ? <div style={{ color: "var(--text3)", padding: 20, textAlign: "center" }}>Nothing here yet.</div>
         : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {list.map((c) => {
-              const st = STATUS_TXT[c.status];
-              return (
-                <div key={c.id} onClick={() => c.job && onOpenJob && onOpenJob(c.job)}
-                  style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: c.job ? "pointer" : "default" }}>
-                  {c.photo ? <img src={c.photo} alt="" style={{ width: 72, height: 54, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-                    : <div style={{ width: 72, height: 54, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🚗</div>}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{c.reg || "—"}</div>
-                    <div style={{ fontSize: 12, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "—"}</div>
-                    <div style={{ fontSize: 11, color: "var(--text3)" }}>
-                      {[c.who, c.km ? `${(+c.km).toLocaleString()} km` : "", c.date ? fmtD(String(c.date).slice(0, 10)) : ""].filter(Boolean).join(" · ")}
-                    </div>
-                    {c.note && <div style={{ fontSize: 11, color: "var(--red)" }}>⚠️ {c.note}</div>}
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    {c.price != null && <div style={{ fontWeight: 800, fontSize: 15 }}>{money(c.price)}</div>}
-                    {st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
-                  </div>
-                </div>
-              );
-            })}
+            {list.map((c) => <CarSalesRow key={c.id} c={c} onOpenJob={onOpenJob} />)}
           </div>
         )}
     </div>

@@ -5962,7 +5962,10 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 <span style={{display:"flex",alignItems:"center",gap:4}}>
                   <input type="number" min="0" autoFocus value={mileageVal} onChange={e=>setMileageVal(e.target.value)}
                     style={{width:90,fontSize:12,padding:"2px 6px",borderRadius:5,border:"1px solid var(--border)",background:"var(--surface)",color:"var(--text)"}}/>
-                  <button disabled={savingMileage} onClick={async()=>{setSavingMileage(true);await onSaveJob({...job,mileage:mileageVal?+mileageVal:null});setSavingMileage(false);setMileageEdit(false);}}
+                  <button disabled={savingMileage} onClick={async()=>{setSavingMileage(true);await onSaveJob({...job,mileage:mileageVal?+mileageVal:null});
+                    // keep a pending Car Sales offer for this car in step with the corrected km
+                    if(buyoutOffer?.id){ const km=mileageVal?+mileageVal:null; api.patch("car_sales_listings","id",buyoutOffer.id,{mileage:km}).catch(()=>{}); }
+                    setSavingMileage(false);setMileageEdit(false);}}
                     style={{fontSize:11,padding:"2px 8px",background:"var(--accent)",color:"#fff",border:"none",borderRadius:5,cursor:"pointer",fontWeight:700}}>
                     {savingMileage?"...":"💾"}
                   </button>

@@ -13,6 +13,7 @@ import { WsSuppliersPage, WsSupplierModal, CAR_BRANDS } from "./ws/WsSuppliers.j
 import { WsTransferPage } from "./ws/Transfer.jsx";
 import { WsDocumentsPage } from "./ws/Documents.jsx";
 import { WsMechanicPayPage } from "./ws/MechanicPay.jsx";
+import { WsCarSalesPage } from "./ws/CarSales.jsx";
 import { printChecklistReport, printJobCardSheet, printWorkshopInvoice, printWorkshopQuote, CHECKLIST_ITEMS } from "./ws/Print.jsx";
 import { BookInModal } from "./ws/BookIn.jsx";
 import { WsCustomerMessageModal } from "./ws/CustomerMessage.jsx";
@@ -560,6 +561,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
     ["wstransfer",   "🔄 Transfer",    null],
     ...(wsProfile?.linked_branch_id?[["spareshop",spareShopQuotedCount>0?`🏪 Spare Shop 🔔`:"🏪 Spare Shop",spareShopQuotedCount||null]]:[]),
     ["wsmechpay",  "💼 Mechanic Pay", null],
+    ["wscarforsale",  "🏷️ For Sale Cars", null],
+    ["wscarsold",     "🏁 Sold Cars", null],
+    ["wscarcancelled","❌ Cancelled Sales", null],
     ["wsdocs",     "📎 Documents",   wsDocs.length],
     ["wsmatch",    "🔎 Scrapyard Match"],
     ["wslicencerenewal", "🪪 Licence Renewals", wsLicenceRenewals.length||null],
@@ -2383,6 +2387,10 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       {wsTab==="wsmatch"&&<WsScrapyardMatchPage wsId={wsId} wsProfile={wsProfile} jobs={jobs} wsVehicles={wsVehicles} initialJobId={scrapMatchJobId} onInitialJobConsumed={onScrapMatchConsumed} onOpenJob={onOpenJobFromMatch} resolveModel={(mk,md)=>resolveCarModel(vehicles,mk,md)}/>}
 
       {wsTab==="wsmechpay"&&<WsMechanicPayPage wsId={wsId} wsProfile={wsProfile} wsLocked={wsLocked}/>}
+
+      {(wsTab==="wscarforsale"||wsTab==="wscarsold"||wsTab==="wscarcancelled")&&(
+        <WsCarSalesPage key={wsTab} kind={wsTab==="wscarforsale"?"forsale":wsTab==="wscarsold"?"sold":"cancelled"} jobs={jobs} onOpenJob={setActiveJob}/>
+      )}
 
       {wsTab==="wsdocs"&&(
         <WsDocumentsPage docs={wsDocs} settings={settings}

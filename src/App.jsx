@@ -85,7 +85,7 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 // Every tab id rendered by <WorkshopPage> — shared between the tab gate below and
 // the tablet-only compact-header logic (hides the big global brand strip and lets
 // WorkshopPage show its own combined logo+ad row instead, see .ws-compact-header).
-const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch","wsmechpay"];
+const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch","wsmechpay","wscarforsale","wscarsold","wscarcancelled"];
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -5197,6 +5197,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"wstransfer",  icon:"🔄",label:t.wsTransfer,                  roles:["admin","manager"]},
         {id:"wsservices",  icon:"🔧",label:t.wsServices,                  roles:["admin","manager"]},
         {id:"wsmechpay",   icon:"💼",label:"Mechanic Pay",                 roles:["admin","manager"]},
+        {id:"wscarforsale",icon:"🏷️",label:"For Sale Cars",                roles:["admin","manager"]},
+        {id:"wscarsold",   icon:"🏁",label:"Sold Cars",                    roles:["admin","manager"]},
+        {id:"wscarcancelled",icon:"❌",label:"Cancelled Sales",            roles:["admin","manager"]},
         {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents",          roles:["admin","manager"]},
         {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals", roles:["admin","manager"]},
         {id:"wsstatement", icon:"📄",label:t.wsStatement,                 roles:["admin","manager"]},
@@ -5239,6 +5242,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         id:"grp_ws_admin", icon:"📊", label:t.wsAdmin, roles:["workshop"],
         children:[
           {id:"wsmechpay",   icon:"💼",label:"Mechanic Pay",         roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wscarforsale",icon:"🏷️",label:"For Sale Cars",        roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wscarsold",   icon:"🏁",label:"Sold Cars",            roles:["workshop"], wsRoles:["main","manager"]},
+          {id:"wscarcancelled",icon:"❌",label:"Cancelled Sales",    roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsdocs",      icon:"📎",label:t.wsDocs||"Documents", roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wsmatch",     icon:"🔎",label:"Scrapyard Match",       roles:["workshop"], wsRoles:["main","manager"]},
           {id:"wslicencerenewal",icon:"🪪",label:t.wsLicenceRenewal||"Licence Renewals",roles:["workshop"], wsRoles:["main","manager"]},
@@ -5806,6 +5812,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             label:t.wsAdmin,
             items:[
               {id:"wsmechpay",  icon:"💼", label:"Mechanic Pay"},
+              {id:"wscarforsale",icon:"🏷️", label:"For Sale Cars"},
+              {id:"wscarsold",  icon:"🏁", label:"Sold Cars"},
+              {id:"wscarcancelled",icon:"❌", label:"Cancelled Sales"},
               {id:"wsstatement",icon:"📄", label:t.wsStatement||"Statement"},
               {id:"wsreport",   icon:"📊", label:t.wsReport||"Report"},
               ...(wsRole==="main"?[{id:"wsprofile",icon:"⚙️",label:t.wsSettings||"Settings"}]:[]),
@@ -5952,7 +5961,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               wsstock:t.wsStock||"WS Stock", wsservices:t.wsServices||"Services", wssuppliers:t.wsSuppliers||"Suppliers",
               wssuporders:t.wsPurchaseOrders||"Purchase Orders", wssupinv:t.wsSupInvoices||"Supplier Inv", wstransfer:t.wsTransfer||"Transfer",
               wsstatement:t.wsStatement||"Statement", wsreport:t.wsReport||"Report", wsspareshop:t.wsSpareShop||"Spare Shop",
-              wsdocs:t.wsDocs||"Documents", wsmechpay:"Mechanic Pay", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals", wsmatch:"Scrapyard Match",
+              wsdocs:t.wsDocs||"Documents", wsmechpay:"Mechanic Pay", wscarforsale:"For Sale Cars", wscarsold:"Sold Cars", wscarcancelled:"Cancelled Sales", wslicencerenewal:t.wsLicenceRenewal||"Licence Renewals", wsmatch:"Scrapyard Match",
             };
             return(<>
               <div className="velg-mainstrip-divider"/>
@@ -8789,7 +8798,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {WS_TAB_IDS.includes(tab)&&(role==="admin"||role==="manager"||role==="workshop")&&(
           <WorkshopPage
             key={tab}
-            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wsmechpay"?"wsmechpay":tab==="wslicencerenewal"?"wslicencerenewal":tab==="wsmatch"?"wsmatch":"report"}
+            initialTab={tab==="workshop"?"jobs":tab==="wscustomers"?"customers":tab==="wsbookings"?"wsbookings":tab==="wsreminders"?"wsreminders":tab==="wsquotations"?"quotations":tab==="wsinvoices"?"invoices":tab==="wspayments"?"payments":tab==="wsstock"?"wsstock":tab==="wsservices"?"wsservices":tab==="wssuppliers"?"wssuppliers":tab==="wssuporders"?"wssuporders":tab==="wssupinv"?"wssupinv":tab==="wstransfer"?"wstransfer":tab==="wsstatement"?"statement":tab==="wsspareshop"?"spareshop":tab==="wsdocs"?"wsdocs":tab==="wsmechpay"?"wsmechpay":tab==="wslicencerenewal"?"wslicencerenewal":tab==="wsmatch"?"wsmatch":tab==="wscarforsale"||tab==="wscarsold"||tab==="wscarcancelled"?tab:"report"}
             initialJobFilter={tab==="workshop"?workshopJobFilter:null}
             onConsumeInitialJobFilter={()=>setWorkshopJobFilter(null)}
             headerBookInTrigger={headerBookInTrigger}

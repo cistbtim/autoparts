@@ -4983,6 +4983,30 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
       else alert(r?.message||"Failed to confirm the offer.");
     } finally { setBuyoutConfirming(false); }
   };
+  // Main/manager can correct the price on their own pending offer (the Car Sales
+  // team sees the new price on the same listing row).
+  const [buyoutPriceEdit,   setBuyoutPriceEdit]   = useState(null); // null = not editing, else the input text
+  const [buyoutPriceSaving, setBuyoutPriceSaving] = useState(false);
+  const saveBuyoutPrice = async () => {
+    const p = parseFloat(buyoutPriceEdit);
+    if(!buyoutOffer||buyoutPriceSaving||!(p>0)) return;
+    setBuyoutPriceSaving(true);
+    try{
+      const res = await api.patch("car_sales_listings","id",buyoutOffer.id,{price:p});
+      if(res&&!Array.isArray(res)&&res.message) alert(res.message);
+      else { setBuyoutOffer(o=>o?{...o,price:p}:o); setBuyoutPriceEdit(null); }
+    } catch(e){ alert("Failed to change the price — check your connection and try again."); }
+    finally { setBuyoutPriceSaving(false); }
+  };
+  const buyoutPriceEditor = wsRole==="mechanic" ? null : (
+    buyoutPriceEdit===null
+      ? <button className="btn btn-ghost btn-sm" style={{marginTop:8}} onClick={()=>setBuyoutPriceEdit(String(buyoutOffer?.price||""))}>✏️ Change price</button>
+      : <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
+          <input className="inp" type="number" autoFocus style={{flex:1,minWidth:0}} value={buyoutPriceEdit} onChange={e=>setBuyoutPriceEdit(e.target.value)}/>
+          <button className="btn btn-primary btn-sm" disabled={buyoutPriceSaving||!(parseFloat(buyoutPriceEdit)>0)} onClick={saveBuyoutPrice}>{buyoutPriceSaving?"Saving…":"Save"}</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setBuyoutPriceEdit(null)}>Cancel</button>
+        </div>
+  );
   const [docsPopup,     setDocsPopup]     = useState(false);
   const [docsPopupTab,  setDocsPopupTab]  = useState("photos");
   const [payPopup,      setPayPopup]      = useState(false);
@@ -6551,7 +6575,10 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                           <div style={{fontWeight:700,fontSize:13}}>⏳ Offer of R{(+buyoutOffer.price||0).toLocaleString()} sent to main/manager for confirmation — don't tell the customer yet.</div>
                         )
                       ) : (
-                        <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+                        <>
+                          <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+                          {buyoutPriceEditor}
+                        </>
                       )}
                     </div>
                   : <button onClick={()=>setBuyoutModal(true)}
@@ -6680,7 +6707,10 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   <div style={{fontWeight:700,fontSize:13}}>⏳ Offer of R{(+buyoutOffer.price||0).toLocaleString()} sent to main/manager for confirmation — don't tell the customer yet.</div>
                 )
               ) : (
-                <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+                <>
+                  <div style={{fontWeight:700,fontSize:13}}>✅ You may offer R{(+buyoutOffer.price||0).toLocaleString()} to the customer — awaiting Car Sales review.</div>
+                  {buyoutPriceEditor}
+                </>
               )}
             </div>
           )}

@@ -232,6 +232,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [deleteWsBusy,   setDeleteWsBusy]   = useState(false);
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
+  const [kanbanFrom,setKanbanFrom]=useState(""); const [kanbanTo,setKanbanTo]=useState(""); // date_in range filter for the board
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
   const [buyoutRows, setBuyoutRows] = useState([]); // this workshop's "sell car" listings, for the board's car-sale columns
@@ -696,6 +697,13 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
                   <span className="hide-mobile">{t?.wsPhotos||"Photos"}</span>
                 </button>
+                <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,padding:"3px 8px",border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,fontSize:12,fontWeight:600,color:"var(--text2)",whiteSpace:"nowrap"}} title="Show only jobs booked in between these dates">
+                  <span>📅</span>
+                  <input type="date" value={kanbanFrom} max={kanbanTo||undefined} onChange={e=>setKanbanFrom(e.target.value)} aria-label="From date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
+                  <span>→</span>
+                  <input type="date" value={kanbanTo} min={kanbanFrom||undefined} onChange={e=>setKanbanTo(e.target.value)} aria-label="To date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
+                  {(kanbanFrom||kanbanTo)&&<button onClick={()=>{setKanbanFrom("");setKanbanTo("");}} title="Clear dates" style={{border:"none",background:"transparent",cursor:"pointer",color:"var(--red)",fontWeight:700,fontSize:13,padding:0}}>✕</button>}
+                </div>
                 <button title={hideFinished?(t?.wsShowFinishedTip||"Show Payment Received & Cancelled columns"):(t?.wsHideFinishedTip||"Collapse Payment Received & Cancelled columns — focus on active work")}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:hideFinished?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
                   onClick={()=>{const v=!hideFinished;setHideFinished(v);try{localStorage.setItem("ws_kanban_hidefinished",v?"1":"0");}catch{}}}>
@@ -896,7 +904,8 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             const v = j.vehicle_model&&j.vehicle_make ? vehicles.find(v=>(v.code===j.vehicle_model||v.model===j.vehicle_model)&&normMake(v.make)===normMake(j.vehicle_make)) : null;
             return v ? v.model : j.vehicle_model;
           };
-          const matchesSearch = j => matchesWs(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,resolvedModelOf(j),j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
+          const matchesDates = j => (!kanbanFrom||(j.date_in||"")>=kanbanFrom) && (!kanbanTo||(j.date_in||"")<=kanbanTo);
+          const matchesSearch = j => matchesWs(j) && matchesDates(j) && (!kq || [j.customer_name,j.vehicle_reg,j.vehicle_make,j.vehicle_model,resolvedModelOf(j),j.complaint,j.notes,j.assigned_to].some(f=>(f||"").toLowerCase().includes(kq)));
 
           const highlight = (text) => {
             if(!kq||!text) return text;

@@ -435,6 +435,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   const invId    = invoice?.id||"—";
   const invDate  = invoice?.invoice_date||new Date().toISOString().slice(0,10);
   const status   = invoice?.status||"unpaid";
+  const amountPaid = +invoice?.paid_amount||0;
 
   const rowsHtml = groupedRowsHtml(items,(i,idx)=>`
     <tr style="background:${idx%2===0?"#fff":"#f9f9f9"}">
@@ -495,7 +496,7 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
       <div class="inv-meta">
         Date: ${invDate}<br/>
         ${invoice?.due_date?`Due: ${invoice.due_date}<br/>`:""}
-        <span class="status" style="background:${status==="paid"?"#d1e7dd":"#fff3cd"};color:${status==="paid"?"#0a3622":"#856404"}">${status==="paid"?"✅ PAID":"⏳ UNPAID"}</span>
+        <span class="status" style="background:${status==="paid"?"#d1e7dd":"#fff3cd"};color:${status==="paid"?"#0a3622":"#856404"}">${status==="paid"?"✅ PAID":amountPaid>0?"💛 PART PAID":"⏳ UNPAID"}</span>
       </div>
     </div>
   </div>
@@ -557,6 +558,8 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
     ${discount>0?`<div class="t-row" style="color:#b91c1c"><span>Discount</span><span>- ${fmt(discount)}</span></div>`:""}
     ${settings.vat_number&&(settings.tax_rate||0)>0?`<div class="t-row"><span>VAT (${settings.tax_rate}%)</span><span>${fmt(taxAmt)}</span></div>`:""}
     <div class="t-total"><span>TOTAL</span><span>${fmt(total)}</span></div>
+    ${amountPaid>0?`<div class="t-row" style="color:#166534;font-weight:700;margin-top:6px"><span>Amount Paid${invoice?.payment_date?` (${invoice.payment_date})`:""}</span><span>- ${fmt(amountPaid)}</span></div>
+    <div class="t-row" style="font-weight:800;font-size:16px;color:${total-amountPaid>0.005?"#b91c1c":"#166534"};border-top:2px solid #333;padding-top:6px;margin-top:4px"><span>BALANCE DUE</span><span>${fmt(Math.max(0,total-amountPaid))}</span></div>`:""}
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}
   </div>
 

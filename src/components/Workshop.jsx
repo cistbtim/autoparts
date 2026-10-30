@@ -9076,7 +9076,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 const body=`Dear ${name},\n\nPlease find your workshop invoice details below.\n\n`+
                   `Invoice: ${invoice.id}\nDate: ${invoice.invoice_date}\n`+
                   `Vehicle: ${job.vehicle_reg||""}${job.vehicle_make?` — ${job.vehicle_make} ${job.vehicle_model||""}`:""}\n\n`+
-                  `Items:\n${itemLines}\n\nTotal: ${fmt(invoice.total)}\nStatus: ${invoice.status==="paid"?"PAID":"UNPAID"}\n\n`+
+                  `Items:\n${itemLines}\n\nTotal: ${fmt(invoice.total)}\n${(+invoice.paid_amount||0)>0?`Paid: ${fmt(invoice.paid_amount)}\nBalance: ${fmt((+invoice.total||0)-(+invoice.paid_amount||0))}\n`:""}Status: ${invoice.status==="paid"?"PAID":(+invoice.paid_amount||0)>0?"PART PAID":"UNPAID"}\n\n`+
                   `${settings.shop_name||"Workshop"}${settings.phone?`\nPhone: ${settings.phone}`:""}${settings.email?`\nEmail: ${settings.email}`:""}`;
                 window.location.href=`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
               }}>✉️ Email</button>

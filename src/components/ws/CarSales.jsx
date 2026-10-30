@@ -48,29 +48,36 @@ export function carSalesList(kind, rows, jobs) {
 export function CarSalesRow({ c, onOpenJob, compact = false }) {
   const st = STATUS_TXT[c.status];
   const [showViews, setShowViews] = useState(false);
+  // A public car page exists once Car Sales has listed it; before that (and for cancelled sales) the job card is the page.
+  const pageUrl = ["available", "reserved", "sold"].includes(c.status) ? `${window.location.origin}${window.location.pathname}?car=${c.id}` : null;
+  const open = () => {
+    if (pageUrl) window.open(pageUrl, "_blank", "noopener");
+    else if (c.job && onOpenJob) onOpenJob(c.job);
+  };
+  const imgSt = compact ? { width: "100%", height: 120 } : { width: 72, height: 54 };
+  const btn = { fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text2)", cursor: "pointer" };
   return (
-    <div onClick={() => c.job && onOpenJob && onOpenJob(c.job)}
-      style={{ display: "flex", gap: 10, alignItems: "center", padding: 10, marginBottom: compact ? 8 : 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: c.job ? "pointer" : "default" }}>
-      {c.photo ? <img src={c.photo} alt="" style={{ width: compact ? 56 : 72, height: compact ? 42 : 54, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-        : <div style={{ width: compact ? 56 : 72, height: compact ? 42 : 54, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🚗</div>}
+    <div onClick={open}
+      style={{ display: "flex", flexDirection: compact ? "column" : "row", gap: 8, alignItems: compact ? "stretch" : "center", padding: 10, marginBottom: compact ? 8 : 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: pageUrl || c.job ? "pointer" : "default" }}>
+      {c.photo ? <img src={c.photo} alt="" style={{ ...imgSt, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+        : <div style={{ ...imgSt, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>🚗</div>}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>{c.reg || "—"}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{c.reg || "—"}</div>
+          {c.price != null && <div style={{ fontWeight: 800, fontSize: 15, whiteSpace: "nowrap" }}>{money(c.price)}</div>}
+        </div>
         <div style={{ fontSize: 12, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title || "—"}</div>
         <div style={{ fontSize: 11, color: "var(--text3)" }}>
           {[c.who, c.km ? `${(+c.km).toLocaleString()} km` : "", c.date ? fmtD(String(c.date).slice(0, 10)) : ""].filter(Boolean).join(" · ")}
         </div>
         {c.note && <div style={{ fontSize: 11, color: "var(--red)" }}>⚠️ {c.note}</div>}
-        {compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
+        {st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
         {c.status && (
-          <button onClick={(e) => { e.stopPropagation(); setShowViews(true); }}
-            style={{ marginTop: 3, fontSize: 11, fontWeight: 700, padding: "1px 8px", borderRadius: 99, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text2)", cursor: "pointer" }}>
-            👁 {c.views} view{c.views === 1 ? "" : "s"}
-          </button>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 5 }}>
+            <button onClick={(e) => { e.stopPropagation(); setShowViews(true); }} style={btn}>👁 {c.views} view{c.views === 1 ? "" : "s"}</button>
+            {c.job && pageUrl && <button onClick={(e) => { e.stopPropagation(); onOpenJob && onOpenJob(c.job); }} style={btn}>🔧 Job card</button>}
+          </div>
         )}
-      </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {c.price != null && <div style={{ fontWeight: 800, fontSize: 15 }}>{money(c.price)}</div>}
-        {!compact && st && <div style={{ fontSize: 11, fontWeight: 700, color: st[1] }}>{st[0]}</div>}
       </div>
       {showViews && <CarViewsModal c={c} onClose={() => setShowViews(false)} />}
     </div>

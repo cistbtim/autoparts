@@ -106,7 +106,7 @@ export function WorkshopFeedbackButton({page,userCtx,onSubmit}) {
     <>
       <button
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        title="Send feedback — drag to move" className={pos?"":"ws-feedback-btn"}
+        title="Send feedback — drag to move" className={pos?"ws-feedback-pos":"ws-feedback-btn"}
         style={pos
           ?{position:"fixed",left:pos.x,top:pos.y,right:"auto",bottom:"auto",zIndex:500,width:BTN_SIZE,height:BTN_SIZE,borderRadius:"50%",
             background:"linear-gradient(135deg,#ff7a2e,#ea580c)",color:"#fff",border:"none",touchAction:"none",

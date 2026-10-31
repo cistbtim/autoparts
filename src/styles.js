@@ -88,7 +88,9 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .hide-mobile{display:none!important}
   .show-mobile{display:block!important}
   .toast{bottom:80px}
-  .ws-feedback-btn{bottom:82px!important;left:18px!important;right:auto!important}
+  /* tucked into the right-hand corner on phones; a dragged position keeps its height but stays on the right edge */
+  .ws-feedback-btn{bottom:82px!important;right:8px!important;left:auto!important}
+  .ws-feedback-btn,.ws-feedback-pos{right:8px!important;left:auto!important;width:40px!important;height:40px!important;font-size:18px!important;opacity:.92}
   .modal{border-radius:var(--radius) var(--radius) 0 0;max-height:88vh}
   .tbl th,.tbl td{padding:9px 10px;font-size:13px}
   /* Workshop header: tighter, single-column, full-width toolbar on phones */

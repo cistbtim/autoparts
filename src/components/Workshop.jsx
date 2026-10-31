@@ -103,6 +103,9 @@ function quoteSync(q, items) {
   return {changed: removed>0 || subtotalChanged, removed, notOn, nowSub, quoteSub:+q.subtotal||0};
 }
 
+// Voice message toolbar button is hidden for now (feature kept intact) — set to true to bring it back.
+const SHOW_VOICE_BUTTON = false;
+
 export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[],parts=[],partFitments=[],vehicles=[],onRefreshVehicles,wsCustomers=[],wsVehicles=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsSupplierInvoices=[],wsSupplierInvItems=[],wsSupplierPayments=[],wsSupplierReturns=[],wsDocs=[],settings,initialTab,ads=[],userCtx=null,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,suppliers=[],onSaveWsCustomer,onDeleteWsCustomer,onSaveWsVehicle,onPatchWsVehicle,onDeleteWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,onSaveWsStock,onDeleteWsStock,onAdjustWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onDeleteWsSupplier,onImportWsSuppliers,onApplySupplierPrice,onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsSupplierInvoice,onDeleteWsSupplierInvoice,onSaveWsSupplierPayment,onDeleteWsSupplierPayment,onSaveWsSupplierReturn,onSaveWsTransfer,onSaveWsDoc,onDeleteWsDoc,wsRole="main",wsId=null,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,wsSqReplies=[],wsPurchaseOrders=[],wsPoItems=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onDeleteWsPurchaseOrder,onReceiveWsPurchaseOrder,wsLicenceRenewals=[],onSaveWsLicenceRenewal,onUpdateWsLicenceRenewal,wsBookings=[],onPatchWsBooking,onSaveWsBooking,onDeleteWsBooking,onRefreshBookings,onRefresh,onRefreshJobsBoard,onSubmitFeedback,wsProfile={},onSaveWsProfile,subActive=false,branches=[],onPlaceShopOrder,wsShopRequests=[],onSaveWsShopRequest,t,lang,wsLocked=false,wsDaysLeft=null,wsExpiresAt=null,wsSubStatus=null,onGoToSpareShopTab,onEditPart,onDeletePart,onAddPart,role=null,actingAsWsId="",onSwitchActingAsWorkshop,onDeleteWorkshopAccount,users=[],initialJobFilter=null,onConsumeInitialJobFilter,onReturnToVehicle,headerBookInTrigger=0,onFitmentsRemoved,onGoToScrapMatch,scrapMatchJobId=null,onScrapMatchConsumed,onOpenJobFromMatch,initialOpenJobId=null,onOpenJobConsumed}) {
   const [view,           setView]           = useState("list");
   const [activeJob,      setActiveJob]      = useState(null);
@@ -682,20 +685,20 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               <button title="Board view" style={{padding:"7px 11px",border:"none",cursor:"pointer",background:kanbanView?"var(--accent)":"transparent",color:kanbanView?"#fff":"var(--text3)",fontSize:14,lineHeight:1}} onClick={()=>setKanbanView(true)}>⬜</button>
             </div>
             {kanbanView&&(
-              <div style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
+              <div className="ws-search" style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
                 <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
                 <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
                   placeholder={t?.wsSearchBoard||"Search board…"} style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                 {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
               </div>
             )}
-            <button className="btn btn-ghost" title={t?.wsRefreshJobs||"Refresh jobs"} disabled={jobsRefreshing}
+            <button className="btn btn-ghost ws-refresh" title={t?.wsRefreshJobs||"Refresh jobs"} disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
               style={{opacity:jobsRefreshing?.6:1}}>
               <span style={{display:"inline-block",animation:jobsRefreshing?"spin 0.8s linear infinite":"none",fontSize:15,lineHeight:1}}>🔄</span>
             </button>
-            <button className="btn btn-ghost" title="Voice message — say who to notify and what" aria-label="Voice message" onClick={()=>setVoiceOpen(true)}
-              style={{fontSize:15,lineHeight:1}}>🎤</button>
+            {SHOW_VOICE_BUTTON&&<button className="btn btn-ghost" title="Voice message — say who to notify and what" aria-label="Voice message" onClick={()=>setVoiceOpen(true)}
+              style={{fontSize:15,lineHeight:1}}>🎤</button>}
             {kanbanView&&(
               <div className="hide-mobile" style={{display:"contents"}}>
                 <div style={{display:"flex",gap:2,marginLeft:4,border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}>
@@ -725,7 +728,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </div>
             )}
             {kanbanView&&(
-              <button onClick={()=>{ const iso=d=>d.toLocaleDateString("en-CA"); const now=new Date(); const wk=new Date(now); wk.setDate(wk.getDate()-7); setDateDraft({from:kanbanFrom||iso(wk),to:kanbanTo||iso(now)}); setDateOpen(true); }}
+              <button className="ws-datebtn" onClick={()=>{ const iso=d=>d.toLocaleDateString("en-CA"); const now=new Date(); const wk=new Date(now); wk.setDate(wk.getDate()-7); setDateDraft({from:kanbanFrom||iso(wk),to:kanbanTo||iso(now)}); setDateOpen(true); }}
                 title="Show only jobs booked in between two dates"
                 style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",marginLeft:4,border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,background:kanbanFrom||kanbanTo?"rgba(255,122,46,.12)":"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"var(--text2)",whiteSpace:"nowrap"}}>
                 <span>📅</span>

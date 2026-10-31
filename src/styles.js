@@ -99,6 +99,11 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .ws-head p{font-size:11px!important;margin-top:1px!important}
   .ws-head-side{width:100%;align-items:stretch!important;gap:6px!important}
   .ws-toolbar{width:100%;flex-wrap:wrap}
+  /* phone toolbar: actions on top, then search + refresh sharing one row, then a full-width date button */
+  .ws-toolbar{gap:8px!important;margin-bottom:10px!important}
+  .ws-toolbar .ws-search{order:20;flex:1 1 0!important;min-width:0!important;max-width:none!important;margin-left:0!important}
+  .ws-toolbar .ws-refresh{order:21;flex:0 0 46px;min-height:42px;padding:0!important;justify-content:center}
+  .ws-toolbar .ws-datebtn{order:22;flex:1 1 100%;justify-content:center;margin-left:0!important;min-height:40px}
   .ws-toolbar>button.btn-primary{flex:1 1 auto;min-height:40px;padding:8px 10px!important}
   .ws-subnav-m{margin-bottom:10px!important}
   .ws-subnav-m select{padding:9px 12px;font-size:14px}

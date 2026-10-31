@@ -101,9 +101,17 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
   .ws-toolbar{width:100%;flex-wrap:wrap}
   /* phone toolbar: actions on top, then search + refresh sharing one row, then a full-width date button */
   .ws-toolbar{gap:8px!important;margin-bottom:10px!important}
-  .ws-toolbar .ws-search{order:20;flex:1 1 0!important;min-width:0!important;max-width:none!important;margin-left:0!important}
-  .ws-toolbar .ws-refresh{order:21;flex:0 0 46px;min-height:42px;padding:0!important;justify-content:center}
-  .ws-toolbar .ws-datebtn{order:22;flex:1 1 100%;justify-content:center;margin-left:0!important;min-height:40px}
+  .ws-toolbar .ws-bookin{order:-4}
+  .ws-toolbar .ws-spare{order:-3}
+  .ws-toolbar .ws-search{display:none!important}
+  .ws-toolbar .ws-tabsel-wrap{order:1;flex:1 1 90px;min-width:0}
+  .ws-toolbar .ws-tabsel{width:100%}
+  .ws-toolbar .ws-searchbtn{order:23;flex:1 1 calc(50% - 4px);min-width:calc(50% - 8px);min-height:40px;margin-left:0!important;padding:0 10px!important}
+  .ws-toolbar .ws-refresh{order:-1;flex:0 0 46px;min-height:42px;padding:0!important;justify-content:center}
+  .ws-toolbar .ws-search-inp{font-size:16px!important;min-height:46px;padding-top:11px!important;padding-bottom:11px!important}
+  .ws-toolbar .ws-datebtn{order:22;flex:1 1 calc(50% - 4px);min-width:calc(50% - 8px);justify-content:center;margin-left:0!important;min-height:40px}
+  .ws-toolbar .ws-feedback-inline{order:23;flex:0 0 44px;margin-left:0!important;min-height:40px;padding:0!important}
+  .ws-toolbar .ws-feedback-label{display:none}
   .ws-toolbar>button.btn-primary{flex:1 1 auto;min-height:40px;padding:8px 10px!important}
   .ws-subnav-m{margin-bottom:10px!important}
   .ws-subnav-m select{padding:9px 12px;font-size:14px}
@@ -247,6 +255,10 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:72px}
      side-by-side layout but looked off once logo and title were stacked). */
   .velg-mainstrip--ws-tab{flex-wrap:wrap;justify-content:center;text-align:center}
   .velg-mainstrip--ws-tab .velg-mainstrip-text{text-align:center}
+  /* feedback 💬 sits in the top-right corner beside the ?, not on a row of its own */
+  .velg-mainstrip--ws-tab{position:relative}
+  .velg-mainstrip--ws-tab .help-icon{position:absolute;right:36px;top:12px;transform:none;margin:0!important}
+  .velg-mainstrip--ws-tab .help-icon.ws-fb-head{right:6px}
   .velg-mainstrip-divider{display:none}
   /* Follow-up: screen is too narrow for logo + title both — drop the page title
      on mobile, it's redundant with the section selector shown right below. */

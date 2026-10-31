@@ -238,6 +238,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   // Ads can be hidden while working; kept for this login only (sessionStorage, cleared on logout) so they are back next login.
   const [adsHidden,setAdsHidden]=useState(()=>{try{return sessionStorage.getItem("ws_ads_hidden")==="1";}catch{return false;}});
   const toggleAds=v=>{setAdsHidden(v);try{if(v)sessionStorage.setItem("ws_ads_hidden","1");else sessionStorage.removeItem("ws_ads_hidden");}catch{}};
+  const [searchOpen,setSearchOpen]=useState(false); // phone: "Search job card" popup
   const [dateOpen,setDateOpen]=useState(false); const [dateDraft,setDateDraft]=useState({from:"",to:""}); // "Select date" popup
   const [kanbanFrom,setKanbanFrom]=useState(""); const [kanbanTo,setKanbanTo]=useState(""); // date_in range filter for the board
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
@@ -588,6 +589,17 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
   return (
     <div className="fu">
+      {searchOpen&&(
+        <Overlay onClose={()=>setSearchOpen(false)}>
+          <MHead title="🔍 Search job card" sub="Plate, customer, car, complaint, mechanic…" onClose={()=>setSearchOpen(false)}/>
+          <input className="inp" autoFocus value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter")setSearchOpen(false);}} placeholder="Type to search…" style={{width:"100%",fontSize:16,padding:"12px 14px",marginBottom:14}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setKanbanSearch("");setSearchOpen(false);}}>Clear</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>setSearchOpen(false)}>Search</button>
+          </div>
+        </Overlay>
+      )}
       {dateOpen&&(
         <Overlay onClose={()=>setDateOpen(false)}>
           <MHead title="📅 Select date" sub="Show jobs booked in between" onClose={()=>setDateOpen(false)}/>
@@ -603,7 +615,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           </div>
         </Overlay>
       )}
-      <WorkshopFeedbackButton page={WS_TABS.find(([v])=>v===wsTab)?.[1]?.replace(/^\S+\s/,"")||wsTab} userCtx={userCtx} onSubmit={onSubmitFeedback}/>
+      {wsTab!=="jobs"&&<WorkshopFeedbackButton page={WS_TABS.find(([v])=>v===wsTab)?.[1]?.replace(/^\S+\s/,"")||wsTab} userCtx={userCtx} onSubmit={onSubmitFeedback}/>}
       {wsLocked&&(
         <div style={{marginBottom:8,padding:"6px 12px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:14,flexShrink:0}}>🔒</span>
@@ -670,9 +682,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                 ))}
               </select>
             )}
-            <button className="btn btn-primary hide-desktop" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 {t?.bookInCar||"Book In Car"}</button>
+            <button className="btn btn-primary hide-desktop ws-bookin" style={{fontSize:14,padding:"9px 18px"}} onClick={()=>setBookIn(true)}>📷 {t?.bookInCar||"Book In Car"}</button>
             {wsProfile?.linked_branch_id&&onGoToSpareShopTab&&(
-              <button className="btn btn-ghost hide-desktop" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 {t?.searchSpare||"Search Spare"}</button>
+              <button className="btn btn-ghost hide-desktop ws-spare" style={{fontSize:14,padding:"9px 14px",border:"1px solid rgba(96,165,250,.4)",color:"var(--blue)"}} onClick={()=>onGoToSpareShopTab()}>🔍 {t?.searchSpare||"Search Spare"}</button>
             )}
             <WsShareButtons t={t} wsId={wsId} wsRole={wsRole} wsProfile={wsProfile} onTokenSaved={setBookingToken} className="hide-desktop" compact/>
             <HelpIcon topic="book-in-car" className="hide-desktop"/>
@@ -688,9 +700,23 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               <div className="ws-search" style={{position:"relative",marginLeft:4,flex:1,minWidth:160,maxWidth:420}}>
                 <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text3)",pointerEvents:"none"}}>🔍</span>
                 <input value={kanbanSearch} onChange={e=>setKanbanSearch(e.target.value)}
-                  placeholder={t?.wsSearchBoard||"Search board…"} style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+                  placeholder={t?.wsSearchBoard||"Search board…"} className="ws-search-inp" style={{width:"100%",padding:"9px 30px 9px 32px",border:"1px solid var(--border)",borderRadius:8,background:"var(--surface2)",color:"var(--text1)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
                 {kanbanSearch&&<button onClick={()=>setKanbanSearch("")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:13,lineHeight:1}}>✕</button>}
               </div>
+            )}
+            <div className="show-mobile ws-tabsel-wrap">
+              <select className="inp ws-tabsel" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{fontWeight:600,fontSize:13,padding:"8px 8px",height:40}}>
+          {WS_TABS.map(([v,label,cnt])=>(
+            <option key={v} value={v}>{label}{cnt!=null?` (${cnt})`:""}</option>
+          ))}
+        </select>
+            </div>
+            {kanbanView&&(
+              <button className="btn btn-ghost hide-desktop ws-searchbtn" onClick={()=>setSearchOpen(true)}
+                style={{justifyContent:"flex-start",gap:8,fontSize:14,fontWeight:600,borderColor:kanbanSearch?"var(--accent)":undefined,background:kanbanSearch?"rgba(255,122,46,.12)":undefined}}>
+                <span>🔍</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{kanbanSearch||"Search job card"}</span>
+                {kanbanSearch&&<span role="button" aria-label="Clear search" onClick={e=>{e.stopPropagation();setKanbanSearch("");}} style={{marginLeft:"auto",color:"var(--red)",fontWeight:800}}>✕</span>}
+              </button>
             )}
             <button className="btn btn-ghost ws-refresh" title={t?.wsRefreshJobs||"Refresh jobs"} disabled={jobsRefreshing}
               onClick={async()=>{if(!onRefresh)return;setJobsRefreshing(true);try{await onRefresh();}finally{setJobsRefreshing(false);}}}
@@ -733,9 +759,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                 style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",marginLeft:4,border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,background:kanbanFrom||kanbanTo?"rgba(255,122,46,.12)":"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"var(--text2)",whiteSpace:"nowrap"}}>
                 <span>📅</span>
                 <span>{kanbanFrom||kanbanTo?`${kanbanFrom||"…"} → ${kanbanTo||"…"}`:"Select date"}</span>
+                {kanbanFrom&&kanbanTo&&(()=>{ const n=Math.max(1,Math.round((new Date(kanbanTo)-new Date(kanbanFrom))/864e5)); return <span style={{fontSize:11,fontWeight:800,color:"var(--accent)",background:"rgba(255,122,46,.15)",borderRadius:99,padding:"1px 8px"}}>{n} day{n===1?"":"s"}</span>; })()}
                 {(kanbanFrom||kanbanTo)&&<span role="button" aria-label="Clear dates" title="Clear dates" onClick={e=>{e.stopPropagation();setKanbanFrom("");setKanbanTo("");}} style={{color:"var(--red)",fontWeight:800,paddingLeft:2}}>✕</span>}
               </button>
             )}
+            <WorkshopFeedbackButton headless page="Jobs" userCtx={userCtx} onSubmit={onSubmitFeedback}/>
           </div>
       )}
 
@@ -750,6 +778,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
       {/* ── Sub-navigation (mobile dropdown) — kept: the sidebar is hidden below
            768px in favour of the bottom mobile-nav bar, so this remains the only
            way to reach these sub-sections on an actual phone. ── */}
+      {wsTab!=="jobs"&&(
       <div className="show-mobile ws-subnav-m" style={{marginBottom:8}}>
         <select className="inp" value={wsTab} onChange={e=>{ const v=e.target.value; setWsTab(v); if(v==="spareshop") setSpareShopFilter({make:"",model:""}); }} style={{width:"100%",fontWeight:600,padding:"6px 10px",fontSize:13}}>
           {WS_TABS.map(([v,label,cnt])=>(
@@ -757,6 +786,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           ))}
         </select>
       </div>
+      )}
 
       {wsTab!=="spareshop"&&!(wsProfile?.hide_ads&&subActive)&&(
         <div className="ws-compact-header">

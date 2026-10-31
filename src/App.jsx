@@ -5982,6 +5982,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     <WsShareButtons t={t} wsId={wsId} wsRole={wsRole} wsProfile={workshopProfile} onTokenSaved={tok=>setWorkshopProfile(p=>({...p,booking_token:tok}))} style={{marginLeft:8}}/>
                   </span>
                   <HelpIcon topic="book-in-car" style={{marginLeft:8}}/>
+                  <button type="button" className="help-icon ws-fb-head" title="Send feedback" aria-label="Send feedback" onClick={()=>window.dispatchEvent(new Event("ws-open-feedback"))} style={{marginLeft:6,cursor:"pointer",fontSize:12,padding:0}}>💬</button>
                 </>
               )}
               {/* Subscription + job-count summary — was its own separate row inside

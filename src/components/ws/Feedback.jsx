@@ -39,13 +39,19 @@ function savePos(uid,pxPos){
 // arrive with context instead of a bare message. Draggable — the dragged position is
 // remembered per user (localStorage) so it stays out of the way of page-specific
 // controls (mobile nav, pagination, sidebar sign-out, etc).
-export function WorkshopFeedbackButton({page,userCtx,onSubmit}) {
+export function WorkshopFeedbackButton({page,userCtx,onSubmit,inline=false,headless=false}) {
   const [open,setOpen]=useState(false);
   const [type,setType]=useState("idea");
   const [message,setMessage]=useState("");
   const [sending,setSending]=useState(false);
   const [pos,setPos]=useState(()=>loadLocalPos(userCtx?.id));
   const drag=useRef({dragging:false,moved:false});
+  // The fixed 💬 icon in the page header (App.jsx) opens this dialog via a window event.
+  useEffect(()=>{
+    const h=()=>setOpen(true);
+    window.addEventListener("ws-open-feedback",h);
+    return ()=>window.removeEventListener("ws-open-feedback",h);
+  },[]);
 
   // Reconcile with the server copy so a position dragged on one device shows up
   // on another — localStorage above gives an instant paint, this corrects it.
@@ -102,9 +108,17 @@ export function WorkshopFeedbackButton({page,userCtx,onSubmit}) {
     try{ e.currentTarget.releasePointerCapture(e.pointerId); }catch{ /* ignore */ }
   };
 
+  // inline: an ordinary toolbar button (e.g. next to "Select date") instead of the floating draggable bubble
+  const trigger = inline
+    ? <button className="ws-feedback-inline" title="Send feedback" onClick={()=>setOpen(true)}
+        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"8px 12px",marginLeft:4,border:"1px solid var(--border)",borderRadius:8,background:"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"var(--text2)",whiteSpace:"nowrap"}}>
+        <span>💬</span><span className="ws-feedback-label">Feedback</span>
+      </button>
+    : null;
   return (
     <>
-      <button
+      {inline&&trigger}
+      {!inline&&!headless&&<button
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         title="Send feedback — drag to move" className={pos?"ws-feedback-pos":"ws-feedback-btn"}
         style={pos
@@ -117,7 +131,7 @@ export function WorkshopFeedbackButton({page,userCtx,onSubmit}) {
             boxShadow:"0 4px 16px rgba(0,0,0,.3)",cursor:"grab",fontSize:22,
             display:"flex",alignItems:"center",justifyContent:"center"}}>
         💬
-      </button>
+      </button>}
       {open&&(
         <Overlay onClose={()=>setOpen(false)}>
           <div className="card" style={{maxWidth:420,width:"100%",padding:20}}>

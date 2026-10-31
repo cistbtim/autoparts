@@ -232,6 +232,7 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [deleteWsBusy,   setDeleteWsBusy]   = useState(false);
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
+  const [dateOpen,setDateOpen]=useState(false); const [dateDraft,setDateDraft]=useState({from:"",to:""}); // "Select date" popup
   const [kanbanFrom,setKanbanFrom]=useState(""); const [kanbanTo,setKanbanTo]=useState(""); // date_in range filter for the board
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
   const [kanbanSearch,    setKanbanSearch]    = useState("");
@@ -581,6 +582,21 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
 
   return (
     <div className="fu">
+      {dateOpen&&(
+        <Overlay onClose={()=>setDateOpen(false)}>
+          <MHead title="📅 Select date" sub="Show jobs booked in between" onClose={()=>setDateOpen(false)}/>
+          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+            <div><div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:4}}>START DATE</div>
+              <input className="inp" type="date" value={dateDraft.from} max={dateDraft.to||undefined} onChange={e=>setDateDraft(d=>({...d,from:e.target.value}))}/></div>
+            <div><div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:4}}>END DATE</div>
+              <input className="inp" type="date" value={dateDraft.to} min={dateDraft.from||undefined} onChange={e=>setDateDraft(d=>({...d,to:e.target.value}))}/></div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setKanbanFrom("");setKanbanTo("");setDateOpen(false);}}>Clear</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setKanbanFrom(dateDraft.from);setKanbanTo(dateDraft.to);setDateOpen(false);}}>Apply</button>
+          </div>
+        </Overlay>
+      )}
       <WorkshopFeedbackButton page={WS_TABS.find(([v])=>v===wsTab)?.[1]?.replace(/^\S+\s/,"")||wsTab} userCtx={userCtx} onSubmit={onSubmitFeedback}/>
       {wsLocked&&(
         <div style={{marginBottom:8,padding:"6px 12px",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.4)",borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
@@ -706,13 +722,13 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
               </div>
             )}
             {kanbanView&&(
-              <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,padding:"3px 8px",border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,fontSize:12,fontWeight:600,color:"var(--text2)",whiteSpace:"nowrap"}} title="Show only jobs booked in between these dates">
+              <button onClick={()=>{ const iso=d=>d.toLocaleDateString("en-CA"); const now=new Date(); const wk=new Date(now); wk.setDate(wk.getDate()-7); setDateDraft({from:kanbanFrom||iso(wk),to:kanbanTo||iso(now)}); setDateOpen(true); }}
+                title="Show only jobs booked in between two dates"
+                style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",marginLeft:4,border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,background:kanbanFrom||kanbanTo?"rgba(255,122,46,.12)":"transparent",cursor:"pointer",fontSize:13,fontWeight:700,color:"var(--text2)",whiteSpace:"nowrap"}}>
                 <span>📅</span>
-                <input type="date" value={kanbanFrom} max={kanbanTo||undefined} onChange={e=>setKanbanFrom(e.target.value)} aria-label="From date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
-                <span>→</span>
-                <input type="date" value={kanbanTo} min={kanbanFrom||undefined} onChange={e=>setKanbanTo(e.target.value)} aria-label="To date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
-                {(kanbanFrom||kanbanTo)&&<button onClick={()=>{setKanbanFrom("");setKanbanTo("");}} title="Clear dates" style={{border:"none",background:"transparent",cursor:"pointer",color:"var(--red)",fontWeight:700,fontSize:13,padding:0}}>✕</button>}
-              </div>
+                <span>{kanbanFrom||kanbanTo?`${kanbanFrom||"…"} → ${kanbanTo||"…"}`:"Select date"}</span>
+                {(kanbanFrom||kanbanTo)&&<span role="button" aria-label="Clear dates" title="Clear dates" onClick={e=>{e.stopPropagation();setKanbanFrom("");setKanbanTo("");}} style={{color:"var(--red)",fontWeight:800,paddingLeft:2}}>✕</span>}
+              </button>
             )}
           </div>
       )}

@@ -697,19 +697,21 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                   <span style={{fontSize:14}}>{showKanbanPhotos?"🚗":"🚫"}</span>
                   <span className="hide-mobile">{t?.wsPhotos||"Photos"}</span>
                 </button>
-                <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,padding:"3px 8px",border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,fontSize:12,fontWeight:600,color:"var(--text2)",whiteSpace:"nowrap"}} title="Show only jobs booked in between these dates">
-                  <span>📅</span>
-                  <input type="date" value={kanbanFrom} max={kanbanTo||undefined} onChange={e=>setKanbanFrom(e.target.value)} aria-label="From date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
-                  <span>→</span>
-                  <input type="date" value={kanbanTo} min={kanbanFrom||undefined} onChange={e=>setKanbanTo(e.target.value)} aria-label="To date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
-                  {(kanbanFrom||kanbanTo)&&<button onClick={()=>{setKanbanFrom("");setKanbanTo("");}} title="Clear dates" style={{border:"none",background:"transparent",cursor:"pointer",color:"var(--red)",fontWeight:700,fontSize:13,padding:0}}>✕</button>}
-                </div>
                 <button title={hideFinished?(t?.wsShowFinishedTip||"Show Payment Received & Cancelled columns"):(t?.wsHideFinishedTip||"Collapse Payment Received & Cancelled columns — focus on active work")}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",border:"1px solid var(--border)",borderRadius:8,background:hideFinished?"var(--surface2)":"transparent",cursor:"pointer",fontSize:12,fontWeight:600,color:"var(--text2)",lineHeight:1,marginLeft:4,whiteSpace:"nowrap"}}
                   onClick={()=>{const v=!hideFinished;setHideFinished(v);try{localStorage.setItem("ws_kanban_hidefinished",v?"1":"0");}catch{}}}>
                   <span style={{fontSize:14}}>{hideFinished?"🙈":"✅"}</span>
                   <span className="hide-mobile">{hideFinished?(t?.wsFinishedHidden||"Finished Hidden"):(t?.wsHideFinished||"Hide Finished")}</span>
                 </button>
+              </div>
+            )}
+            {kanbanView&&(
+              <div style={{display:"flex",alignItems:"center",gap:4,marginLeft:4,padding:"3px 8px",border:`1px solid ${kanbanFrom||kanbanTo?"var(--accent)":"var(--border)"}`,borderRadius:8,fontSize:12,fontWeight:600,color:"var(--text2)",whiteSpace:"nowrap"}} title="Show only jobs booked in between these dates">
+                <span>📅</span>
+                <input type="date" value={kanbanFrom} max={kanbanTo||undefined} onChange={e=>setKanbanFrom(e.target.value)} aria-label="From date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
+                <span>→</span>
+                <input type="date" value={kanbanTo} min={kanbanFrom||undefined} onChange={e=>setKanbanTo(e.target.value)} aria-label="To date" style={{border:"none",background:"transparent",color:"var(--text)",fontSize:12,padding:"3px 0",width:112}}/>
+                {(kanbanFrom||kanbanTo)&&<button onClick={()=>{setKanbanFrom("");setKanbanTo("");}} title="Clear dates" style={{border:"none",background:"transparent",cursor:"pointer",color:"var(--red)",fontWeight:700,fontSize:13,padding:0}}>✕</button>}
               </div>
             )}
           </div>

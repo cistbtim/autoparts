@@ -239,6 +239,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [adsHidden,setAdsHidden]=useState(()=>{try{return sessionStorage.getItem("ws_ads_hidden")==="1";}catch{return false;}});
   const toggleAds=v=>{setAdsHidden(v);try{if(v)sessionStorage.setItem("ws_ads_hidden","1");else sessionStorage.removeItem("ws_ads_hidden");}catch{}};
   const [searchOpen,setSearchOpen]=useState(false); // phone: "Search job card" popup
+  const [waitSel,setWaitSel]=useState(()=>new Set()); // ids ticked in that popup
+  const [waitDeleting,setWaitDeleting]=useState(false);
+  const [openInqOnJob,setOpenInqOnJob]=useState(false); // job opened from the waiting-inquiries popup → show its supplier inquiries straight away
+  useEffect(()=>{ if(!activeJob) setOpenInqOnJob(false); },[activeJob]);
+  const [waitInqOpen,setWaitInqOpen]=useState(false); // popup: supplier inquiries with no reply yet
   const [dateOpen,setDateOpen]=useState(false); const [dateDraft,setDateDraft]=useState({from:"",to:""}); // "Select date" popup
   const [kanbanFrom,setKanbanFrom]=useState(""); const [kanbanTo,setKanbanTo]=useState(""); // date_in range filter for the board
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
@@ -542,10 +547,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
         sourceBooking={wsBookings.find(bk=>bk.id===activeJob.booking_id)||null}
         onPatchWsBooking={onPatchWsBooking}
         initialTab={jobDetailTab}
+        openSupplierSend={openInqOnJob}
         onRefresh={onRefresh}
         wsLocked={wsLocked}
         userCtx={userCtx}
-        onOpenJob={setActiveJob}
+        onOpenJob={(j)=>{setJobDetailTab("menu");setActiveJob(j);setView("job");}}
         t={t} lang={lang}/>
       <WorkshopFeedbackButton page={`Job Detail — ${activeJob.vehicle_reg||activeJob.id}`} userCtx={userCtx} onSubmit={onSubmitFeedback}/>
       </>
@@ -600,6 +606,65 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
           </div>
         </Overlay>
       )}
+      {waitInqOpen&&(()=>{
+        const answered=new Set([...wsSqReplies.map(r=>r.request_id),...wsSupplierQuotes.map(q=>q.request_id)]);
+        const pend=wsSupplierRequests.filter(r=>!answered.has(r.id)&&jobs.some(j=>j.id===r.job_id&&!j.is_cancelled))
+          .sort((a,b)=>new Date(a.sent_at||a.created_at||0)-new Date(b.sent_at||b.created_at||0));
+        return (
+          <Overlay onClose={()=>{setWaitInqOpen(false);setWaitSel(new Set());}}>
+            <MHead title="⏳ Inquiries waiting for a reply" sub={`${pend.length} supplier inquir${pend.length===1?"y":"ies"} · longest wait first`} onClose={()=>{setWaitInqOpen(false);setWaitSel(new Set());}}/>
+            {pend.length>0&&(
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+                <button type="button" className="btn btn-ghost btn-xs" onClick={()=>setWaitSel(new Set(pend.map(r=>r.id)))}>☑ Select all</button>
+                <button type="button" className="btn btn-ghost btn-xs" onClick={()=>setWaitSel(new Set())}>☐ Unselect all</button>
+                {onDeleteWsSupplierRequest&&!wsLocked&&<button type="button" className="btn btn-xs" disabled={!waitSel.size||waitDeleting}
+                  style={{marginLeft:"auto",color:"#fff",background:waitSel.size?"var(--red)":"var(--surface3)",border:"none",opacity:waitSel.size?1:.6}}
+                  onClick={async()=>{
+                    const ids=pend.filter(r=>waitSel.has(r.id)).map(r=>r.id);
+                    if(!ids.length||!window.confirm(`Delete ${ids.length} selected inquir${ids.length===1?"y":"ies"}? This cannot be undone.`)) return;
+                    setWaitDeleting(true);
+                    for(const id of ids){ try{ await onDeleteWsSupplierRequest(id); }catch{} }
+                    setWaitSel(new Set()); setWaitDeleting(false);
+                  }}>{waitDeleting?"Deleting…":`🗑 Delete selected (${waitSel.size})`}</button>}
+              </div>
+            )}
+            {pend.length===0&&<div style={{padding:20,textAlign:"center",color:"var(--text3)"}}>🎉 Every inquiry has been answered.</div>}
+            <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"60vh",overflowY:"auto"}}>
+              {pend.map(r=>{
+                const job=jobs.find(j=>j.id===r.job_id);
+                const h=Math.floor((Date.now()-new Date(r.sent_at||r.created_at||Date.now()).getTime())/36e5);
+                const w=h>=48?`${Math.floor(h/24)} days`:`${h} h`;
+                const late=h>=4;
+                let parts=[]; try{parts=JSON.parse(r.parts_list||"[]");}catch{}
+                const wa=r.supplier_phone?waLink(r.supplier_phone,`Hi ${r.supplier_name||""}, a gentle reminder about the parts quote I sent you ${w} ago for ${job?.vehicle_reg||"our job"}. Could you please reply with your prices today?${r.token?`
+${window.location.origin}?ws_supreq=${r.token}`:""}
+Thank you!`):null;
+                return (
+                  <div key={r.id} style={{background:"var(--surface)",border:`1px solid ${late?"rgba(239,68,68,.35)":"var(--border)"}`,borderRadius:12,padding:"10px 12px",fontSize:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <input type="checkbox" checked={waitSel.has(r.id)} aria-label="Select this inquiry" style={{width:18,height:18,flexShrink:0,accentColor:"var(--accent)"}}
+                        onChange={e=>setWaitSel(prev=>{const n=new Set(prev); if(e.target.checked) n.add(r.id); else n.delete(r.id); return n;})}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📲 {r.supplier_name||r.supplier_phone||"Unknown supplier"}</div>
+                        <div style={{fontSize:11,color:"var(--text3)"}}>🚗 {job?.vehicle_reg||"—"}{job?.customer_name?` · ${job.customer_name}`:""}</div>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:700,flexShrink:0,borderRadius:99,padding:"3px 10px",color:late?"var(--red)":"var(--text3)",background:late?"rgba(239,68,68,.12)":"var(--surface3)"}}>⏳ {w}</span>
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text2)",margin:"6px 0 8px",lineHeight:1.4}}>📋 {parts.slice(0,4).join(", ")||"—"}{parts.length>4?` +${parts.length-4} more`:""}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {wa&&<a href={wa} target="_blank" rel="noreferrer" style={{flex:1,textAlign:"center",fontSize:11,fontWeight:700,color:"#25D366",background:"rgba(37,211,102,.1)",border:"1px solid rgba(37,211,102,.4)",borderRadius:8,padding:"6px 8px",textDecoration:"none"}}>🔔 Remind</a>}
+                      {job&&<button type="button" onClick={()=>{setWaitInqOpen(false);setWaitSel(new Set());setOpenInqOnJob(true);setJobDetailTab("menu");setActiveJob(job);setView("job");}} style={{flex:1,fontSize:11,fontWeight:700,color:"var(--text2)",background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 8px",cursor:"pointer"}}>📋 Open inquiry</button>}
+                      {onDeleteWsSupplierRequest&&!wsLocked&&<button type="button" title="Delete this inquiry" disabled={waitDeleting}
+                        onClick={async()=>{ if(!window.confirm("Delete this inquiry?")) return; setWaitDeleting(true); try{ await onDeleteWsSupplierRequest(r.id); }catch{} setWaitSel(prev=>{const n=new Set(prev); n.delete(r.id); return n;}); setWaitDeleting(false); }}
+                        style={{flexShrink:0,fontSize:12,color:"var(--red)",background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer"}}>🗑</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Overlay>
+        );
+      })()}
       {dateOpen&&(
         <Overlay onClose={()=>setDateOpen(false)}>
           <MHead title="📅 Select date" sub="Show jobs booked in between" onClose={()=>setDateOpen(false)}/>
@@ -763,6 +828,11 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
                 {(kanbanFrom||kanbanTo)&&<span role="button" aria-label="Clear dates" title="Clear dates" onClick={e=>{e.stopPropagation();setKanbanFrom("");setKanbanTo("");}} style={{color:"var(--red)",fontWeight:800,paddingLeft:2}}>✕</span>}
               </button>
             )}
+            {kanbanView&&wsRole!=="mechanic"&&(()=>{ const answered=new Set([...wsSqReplies.map(r=>r.request_id),...wsSupplierQuotes.map(q=>q.request_id)]); const n=wsSupplierRequests.filter(r=>!answered.has(r.id)&&jobs.some(j=>j.id===r.job_id&&!j.is_cancelled)).length; return n>0&&(
+              <button onClick={()=>setWaitInqOpen(true)} title="Supplier inquiries still waiting for a reply"
+                style={{display:"flex",alignItems:"center",gap:6,padding:"8px 12px",marginLeft:4,border:"1px solid rgba(239,68,68,.4)",borderRadius:8,background:"rgba(239,68,68,.08)",cursor:"pointer",fontSize:13,fontWeight:700,color:"var(--red)",whiteSpace:"nowrap"}}>
+                ⏳ <span>{n} waiting</span>
+              </button>); })()}
             <WorkshopFeedbackButton headless page="Jobs" userCtx={userCtx} onSubmit={onSubmitFeedback}/>
           </div>
       )}
@@ -1574,7 +1644,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
                           </div>
                       )}
                       {col.type==="booking"&&col.items.map(b=><BkCard key={b.id} b={b}/>)}
-                      {col.type==="car"&&col.items.map(c=><CarSalesRow key={c.id} c={c} compact onOpenJob={setActiveJob}/>)}
+                      {col.type==="car"&&col.items.map(c=><CarSalesRow key={c.id} c={c} compact onOpenJob={(j)=>{setJobDetailTab("menu");setActiveJob(j);setView("job");}}/>)}
                       {col.type==="job"&&(()=>{
                         const shown=colVisibleCount[col.id]||KANBAN_PAGE_SIZE;
                         const remaining=col.items.length-shown;
@@ -2466,7 +2536,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
       {wsTab==="wsmechpay"&&<WsMechanicPayPage wsId={wsId} wsProfile={wsProfile} wsLocked={wsLocked}/>}
 
       {(wsTab==="wscarforsale"||wsTab==="wscarsold"||wsTab==="wscarcancelled")&&(
-        <WsCarSalesPage key={wsTab} kind={wsTab==="wscarforsale"?"forsale":wsTab==="wscarsold"?"sold":"cancelled"} jobs={jobs} onOpenJob={setActiveJob}/>
+        <WsCarSalesPage key={wsTab} kind={wsTab==="wscarforsale"?"forsale":wsTab==="wscarsold"?"sold":"cancelled"} jobs={jobs} onOpenJob={(j)=>{setJobDetailTab("menu");setActiveJob(j);setView("job");}}/>
       )}
 
       {wsTab==="wsdocs"&&(
@@ -4512,6 +4582,16 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
               const replyItems = digitalReply ? (() => { try { return JSON.parse(digitalReply.items||"[]"); } catch { return []; } })() : [];
               const inStockReplies = replyItems.filter(ri=>ri.condition!=="no_stock");
               const noStockReplies = replyItems.filter(ri=>ri.condition==="no_stock");
+              // Nudge: no reply and no quote yet → show how long it has been waiting, a reminder button, and suppliers not asked yet
+              const unanswered = !digitalReply && !existingQuote;
+              const waitH = r.sent_at ? Math.floor((Date.now()-new Date(r.sent_at).getTime())/36e5) : 0;
+              const waitTxt = waitH>=48 ? `${Math.floor(waitH/24)} days` : `${waitH} h`;
+              const overdue = unanswered && waitH>=4;
+              const askedNames = new Set(history.map(h=>(h.supplier_name||"").trim().toLowerCase()).filter(Boolean));
+              const notAsked = overdue ? wsSuppliers.filter(sp=>sp.name&&!askedNames.has(sp.name.trim().toLowerCase())).slice(0,4) : [];
+              const remindUrl = (overdue&&r.supplier_phone) ? waLink(r.supplier_phone, `Hi ${r.supplier_name||""}, a gentle reminder about the parts quote I sent you ${waitTxt} ago for ${job.vehicle_reg||"our job"}. Could you please reply with your prices today?${r.token?`
+${window.location.origin}?ws_supreq=${r.token}`:""}
+Thank you!`) : null;
               return (
                 <div key={r.id||i} style={{background:"var(--surface2)",borderRadius:10,padding:"10px 12px",fontSize:12,border:digitalReply?"1px solid rgba(56,189,248,.3)":existingQuote?"1px solid rgba(52,211,153,.3)":"1px solid transparent"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,gap:6}}>
@@ -4521,6 +4601,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
                     <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
                       {r.token&&<span style={{fontSize:10,background:"rgba(56,189,248,.12)",color:"#38bdf8",borderRadius:4,padding:"1px 5px",fontWeight:600}}>Link</span>}
                       {digitalReply&&<span style={{fontSize:10,background:"rgba(52,211,153,.12)",color:"var(--green)",borderRadius:4,padding:"1px 5px",fontWeight:600}}>Replied ✅</span>}
+                      {unanswered&&<span style={{fontSize:10,background:overdue?"rgba(239,68,68,.12)":"var(--surface3)",color:overdue?"var(--red)":"var(--text3)",borderRadius:4,padding:"1px 5px",fontWeight:700}}>⏳ No reply · {waitTxt}</span>}
                       <span style={{fontSize:10,color:"var(--text3)"}}>{dt}</span>
                     </div>
                   </div>
@@ -4581,6 +4662,12 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
                         📋 Copy Link
                       </button>
                     )}
+                    {remindUrl&&(
+                      <a href={remindUrl} target="_blank" rel="noreferrer"
+                        style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(37,211,102,.4)",background:"rgba(37,211,102,.1)",color:"#25D366",fontWeight:700,textDecoration:"none"}}>
+                        🔔 Remind
+                      </a>
+                    )}
                     {onDeleteSend&&(
                       <button
                         onClick={()=>{ if(window.confirm("Delete this send record and its entered quote prices?")) onDeleteSend(r.id); }}
@@ -4589,6 +4676,12 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
                       </button>
                     )}
                   </div>
+                  {overdue&&(
+                    <div style={{marginTop:8,fontSize:11,color:"var(--red)",background:"rgba(239,68,68,.07)",borderRadius:7,padding:"6px 10px",lineHeight:1.5}}>
+                      No reply for {waitTxt} — send a reminder, or ask another supplier above.
+                      {notAsked.length>0&&<div style={{color:"var(--text2)"}}>Not asked yet: {notAsked.map(sp=>sp.name).join(", ")}</div>}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -4737,7 +4830,7 @@ export function decodeVin(vin) {
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB DETAIL
 // ═══════════════════════════════════════════════════════════════
-function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,t}) {
+function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[],onChecklistSaved,parts=[],partFitments=[],settings,vehicles=[],onRefreshVehicles,wsVehicles=[],wsCustomers=[],wsStock=[],wsServices=[],wsSuppliers=[],wsSupplierRequests=[],wsSupplierQuotes=[],wsPurchaseOrders=[],onSaveWsSupplierRequest,onDeleteWsSupplierRequest,onSaveWsSupplierQuote,onSaveWsStock,onSaveWsService,onDeleteWsService,onSaveWsSupplier,onApplySupplierPrice,onBack,onSaveJob,onDeleteJob,onMoveJob,onSaveItem,onDeleteItem,onSaveInvoice,onUpdateInvoice,onDeleteInvoice,onSaveQuote,onDeleteQuote,onConvertQuoteToInvoice,onSendQuoteForApproval,onSaveWsVehicle,onPatchWsVehicle,onSubmitBuyoutOffer,onConfirmBuyoutOffer,wsRole="main",sqReplies=[],onGenerateWsQuoteLink,onSaveWsPurchaseOrder,onViewPurchaseOrders,onViewPO,onSaveWsLicenceRenewal,wsLicenceRenewals=[],onUpdateWsLicenceRenewal,onGoToStock,onGoToSpareShop,wsId=null,wsProfile={},onSaveWsProfile,wsProfiles=[],wsFriends=[],onAddWsFriend,onRemoveWsFriend,mainBranchId=null,branches=[],wsShopRequests=[],onSaveWsShopRequest,sourceBooking=null,onPatchWsBooking,onSaveWsBooking,initialTab="car",onRefresh,wsLocked=false,userCtx=null,onOpenJob,openSupplierSend=false,t}) {
   const [msgOpen,setMsgOpen]=useState(false); // customer-message draft window
   // Local currency formatter using the workshop's own settings currency
   const _wsC = curSym(settings.currency||getSettings().currency);
@@ -4828,7 +4921,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [approvalModal, setApprovalModal] = useState(false);
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [moveModal,     setMoveModal]     = useState(false);
-  const [supplierModal, setSupplierModal] = useState(false);
+  const [supplierModal, setSupplierModal] = useState(!!openSupplierSend);
   const [createPoOpen,  setCreatePoOpen]  = useState(false);
   const [newBooking,    setNewBooking]    = useState(null); // {complaint,preferred_date} while the modal is open
   // "Send job card" to a mechanic / painter: a short WhatsApp-ready message + a read-only link to this

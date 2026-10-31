@@ -110,7 +110,7 @@ export default function App() {
   });
   const [sessionExpiredMsg,setSessionExpiredMsg] = useState("");
   const handleLogin=(u,opts={})=>{api.cacheClearAll();setUser(u);setSessionExpiredMsg("");try{localStorage.setItem("ap_user",JSON.stringify(u));localStorage.setItem("ap_login_date",_today());if(opts.coworkMode)localStorage.setItem("ap_cowork_mode","1");else localStorage.removeItem("ap_cowork_mode");_touchActivity();}catch{}};
-  const handleLogout=()=>{setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");localStorage.removeItem("ap_cowork_mode");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
+  const handleLogout=()=>{try{sessionStorage.removeItem("ws_ads_hidden");}catch{}setUser(null);localStorage.removeItem("ap_user");localStorage.removeItem("ap_login_date");localStorage.removeItem("ap_last_activity");localStorage.removeItem("ap_cowork_mode");db.parts.clear().catch(()=>{});db.workshopJobs.clear().catch(()=>{});db.workshopJobItems.clear().catch(()=>{});};
   const [settingsLoaded,setSettingsLoaded] = useState(false);
   const [availLangs,setAvailLangs] = useState(getLangs());
   useEffect(()=>{ document.documentElement.setAttribute("data-theme","light"); localStorage.removeItem("ap_theme"); },[]);

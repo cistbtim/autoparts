@@ -232,6 +232,9 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
   const [deleteWsBusy,   setDeleteWsBusy]   = useState(false);
   const [collapsedCols,   setCollapsedCols]   = useState(()=>{try{return new Set(JSON.parse(localStorage.getItem("ws_kanban_collapsed")||"[]"));}catch{return new Set();}});
   const [showKanbanPhotos,setShowKanbanPhotos]= useState(()=>{try{return localStorage.getItem("ws_kanban_photos")!=="0";}catch{return true;}});
+  // Ads can be hidden while working; kept for this login only (sessionStorage, cleared on logout) so they are back next login.
+  const [adsHidden,setAdsHidden]=useState(()=>{try{return sessionStorage.getItem("ws_ads_hidden")==="1";}catch{return false;}});
+  const toggleAds=v=>{setAdsHidden(v);try{if(v)sessionStorage.setItem("ws_ads_hidden","1");else sessionStorage.removeItem("ws_ads_hidden");}catch{}};
   const [dateOpen,setDateOpen]=useState(false); const [dateDraft,setDateDraft]=useState({from:"",to:""}); // "Select date" popup
   const [kanbanFrom,setKanbanFrom]=useState(""); const [kanbanTo,setKanbanTo]=useState(""); // date_in range filter for the board
   const [hideFinished,setHideFinished]= useState(()=>{try{return localStorage.getItem("ws_kanban_hidefinished")==="1";}catch{return false;}});
@@ -761,7 +764,13 @@ export function WorkshopPage({jobs,jobsLoading=false,jobItems,invoices,quotes=[]
             <circle cx="93" cy="77" r="7" fill="var(--surface2)" stroke="#e85d04" strokeWidth="6"/>
           </svg>
           <div className="ws-compact-header-word"><span className="velg-vel">VEL</span>GENIUS</div>
-          <AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>
+          {adsHidden
+            ? <button onClick={()=>toggleAds(false)} style={{marginLeft:"auto",padding:"5px 12px",border:"1px solid var(--border)",borderRadius:99,background:"var(--surface2)",color:"var(--text3)",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📢 Show ads</button>
+            : <div style={{position:"relative",flex:1,minWidth:0}}>
+                <AdBanner ads={ads} page="workshop" userCtx={userCtx} height={140} mobileHeight={112} tabletHeight={90}/>
+                <button onClick={()=>toggleAds(true)} title="Hide ads while you work (they come back next login)"
+                  style={{position:"absolute",top:6,left:6,zIndex:5,padding:"3px 10px",border:"none",borderRadius:99,background:"rgba(0,0,0,.6)",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>✕ Hide ads</button>
+              </div>}
         </div>
       )}
 

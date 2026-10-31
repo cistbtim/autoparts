@@ -9889,24 +9889,33 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             {sends.length>0&&(
               <div style={{border:"1px solid var(--border)",borderRadius:10,marginBottom:14,overflow:"hidden"}}>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".06em",padding:"8px 12px",background:"var(--surface2)"}}>Sent so far ({sends.length})</div>
-                <div style={{maxHeight:170,overflowY:"auto"}}>
+                <div style={{maxHeight:300,overflowY:"auto",padding:8,display:"flex",flexDirection:"column",gap:8}}>
                   {sends.map(sd=>{
                     const rp=replyAfter(sd.name,sd.sent_at);
+                    const isP=sd.role==="painter";
                     return (
-                      <div key={sd.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderTop:"1px solid var(--border)",fontSize:12}}>
-                        <span style={{fontSize:15}}>{sd.role==="painter"?"🎨":"🔧"}</span>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sd.name} <span style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase"}}>{sd.role==="painter"?"Painter":"Mechanic"}</span></div>
-                          <div style={{fontSize:11,color:"var(--text3)"}}>{sd.phone?`${sd.phone} · `:""}{fmtDT(sd.sent_at)}</div>
+                      <div key={sd.id} style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,padding:"10px 12px",fontSize:12,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:20,flexShrink:0}}>{isP?"🎨":"🔧"}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sd.name}</div>
+                            <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em"}}>{isP?"Painter":"Mechanic"}</div>
+                          </div>
+                          {rp
+                            ? <button onClick={()=>{setSendMech(null);setShowReplies(true);}} style={{fontSize:11,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.12)",borderRadius:99,padding:"3px 10px",border:"none",cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>✅ Replied · {fmtAmt(rp.total??0)}</button>
+                            : <span style={{fontSize:11,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:99,padding:"3px 10px",flexShrink:0,whiteSpace:"nowrap"}}>⏳ Waiting</span>}
                         </div>
-                        <button type="button" onClick={()=>setPayFor({name:sd.name,role:sd.role,phone:sd.phone||""})} title="Payment and balance for this person"
-                          style={{fontSize:10,fontWeight:700,color:"var(--accent)",background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:5,padding:"2px 8px",flexShrink:0,cursor:"pointer",whiteSpace:"nowrap"}}>💼 Payment &amp; balance</button>
-                        {rp
-                          ? <button onClick={()=>{setSendMech(null);setShowReplies(true);}} style={{fontSize:10,fontWeight:700,color:"var(--green)",background:"rgba(52,211,153,.1)",borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",flexShrink:0}}>✅ Replied · {fmtAmt(rp.total??0)}</button>
-                          : <span style={{fontSize:10,fontWeight:600,color:"var(--text3)",background:"var(--surface3)",borderRadius:5,padding:"2px 7px",flexShrink:0}}>⏳ Waiting</span>}
-                        <button type="button" title="Send to this person again" className="btn btn-ghost btn-xs" style={{flexShrink:0}}
-                          onClick={()=>{const role=sd.role==="painter"?"painter":"mechanic";const c=sendMech.contacts.find(x=>(x.name||"").trim().toLowerCase()===(sd.name||"").trim().toLowerCase());
-                            setSendMech(s=>({...s,role,name:sd.name,phone:sd.phone||"",contactId:c?c.id:"",save:false,msg:buildJobMsg(role,withTo(s.link,sd.name,role),sd.name)}));}}>↻</button>
+                        <div style={{fontSize:11,color:"var(--text3)",margin:"6px 0 8px",display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>
+                          {sd.phone&&<span>📞 {sd.phone}</span>}
+                          <span>🕒 {fmtDT(sd.sent_at)}</span>
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button type="button" onClick={()=>setPayFor({name:sd.name,role:sd.role,phone:sd.phone||""})} title="Payment and balance for this person"
+                            style={{flex:1,fontSize:11,fontWeight:700,color:"var(--accent)",background:"rgba(255,122,46,.1)",border:"1px solid rgba(255,122,46,.35)",borderRadius:8,padding:"6px 8px",cursor:"pointer",whiteSpace:"nowrap"}}>💼 Payment &amp; balance</button>
+                          <button type="button" title="Send to this person again" className="btn btn-ghost btn-xs" style={{flexShrink:0,borderRadius:8,padding:"6px 12px"}}
+                            onClick={()=>{const role=sd.role==="painter"?"painter":"mechanic";const c=sendMech.contacts.find(x=>(x.name||"").trim().toLowerCase()===(sd.name||"").trim().toLowerCase());
+                              setSendMech(s=>({...s,role,name:sd.name,phone:sd.phone||"",contactId:c?c.id:"",save:false,msg:buildJobMsg(role,withTo(s.link,sd.name,role),sd.name)}));}}>↻ Resend</button>
+                        </div>
                       </div>
                     );
                   })}

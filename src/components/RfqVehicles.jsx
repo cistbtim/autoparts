@@ -2389,7 +2389,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         marginBottom:14,padding:"10px 14px",background:"var(--surface2)",borderRadius:10,
         border:"1px solid var(--border)"}}>
-        <div>
+        <div style={{minWidth:0,flex:1}}>
           <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:4}}>
             Part Vehicle Info (from Basic Info tab)
           </div>
@@ -2397,7 +2397,10 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
             {part.make
               ? <span className="badge" style={{background:"rgba(96,165,250,.12)",color:"var(--blue)",fontSize:13,fontWeight:700}}>🚗 {part.make}</span>
               : <span style={{fontSize:12,color:"var(--text3)"}}>No make set</span>}
-            {part.model && part.model.split(";").map(m=>m.trim()).filter(Boolean).map((m,i)=>{
+            {part.model && (()=>{
+              const models=part.model.split(/[;|]/).map(m=>m.trim()).filter(Boolean);
+              const LIMIT=6;
+              const chip=(m,i)=>{
               const gq=encodeURIComponent(`${part.make||""} ${m}`.trim());
               // WeBuyCars' own search wants a short model keyword (e.g. "GLE", "S-CLASS"),
               // not the full chassis-code/year text — strip tokens that look like a chassis
@@ -2409,7 +2412,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                 .join(" ").trim()||m;
               const wq=new URLSearchParams({q:`${part.make||""} ${shortModel}`.trim()}).toString();
               return (
-                <span key={i} className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12,display:"inline-flex",alignItems:"center",gap:5}}>
+                <span key={i} className="badge" style={{background:"var(--surface3)",color:"var(--text2)",fontSize:12,display:"inline-flex",alignItems:"center",gap:5,whiteSpace:"normal",maxWidth:"100%"}}>
                   {m}
                   <a href={`https://www.google.com/search?q=${gq}`} target="_blank" rel="noreferrer" title="Search on Google"
                     style={{color:"var(--blue)",textDecoration:"none",fontSize:11}} onClick={e=>e.stopPropagation()}>🔍</a>
@@ -2417,7 +2420,17 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
                     style={{color:"var(--green)",textDecoration:"none",fontSize:11}} onClick={e=>e.stopPropagation()}>🚗</a>
                 </span>
               );
-            })}
+              };
+              return (<>
+                {models.slice(0,LIMIT).map(chip)}
+                {models.length>LIMIT&&(
+                  <details style={{display:"contents"}}>
+                    <summary style={{cursor:"pointer",fontSize:12,fontWeight:700,color:"var(--blue)",listStyle:"none"}}>+{models.length-LIMIT} more models</summary>
+                    {models.slice(LIMIT).map((m,i)=>chip(m,i+LIMIT))}
+                  </details>
+                )}
+              </>);
+            })()}
             {part.year_range && <span className="badge" style={{background:"var(--surface3)",color:"var(--text3)",fontSize:11}}>{part.year_range}</span>}
           </div>
           <div style={{fontSize:11,color:"var(--text3)",marginTop:5}}>

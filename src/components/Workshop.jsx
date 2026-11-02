@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
 import { createWorker } from "tesseract.js";
 import { api, SUPABASE_URL, SUPABASE_KEY, uploadToStorage, deleteFromStorage } from "../lib/api.js";
 import { getSettings, C, curSym } from "../lib/settings.js";
@@ -4133,7 +4133,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
 
   // Build combined list: job items + extras
   const allItems = [
-    ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", isExtra: false})),
+    ...items.filter(i => i.description?.trim()).map(i => ({id: i.id, label: i.description, qty: +i.qty||1, sku: i.part_sku||"", group: (i.work_group||"").trim(), isExtra: false})),
     ...extraParts.map(e => ({id: e.id, label: e.label, qty: +e.qty||1, sku: e.sku||"", isExtra: true})),
   ];
   const selectedItems = allItems.filter(i => selected.includes(i.id));
@@ -4150,6 +4150,19 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
   const dispYear  = jobVehicle?.year || job.vehicle_year || "";
 
   const SEP = "─".repeat(28);
+  // Parts listed under their work-group name (e.g. *Cooling*) when the job items
+  // have one; numbering runs on across groups. No groups at all = flat list as before.
+  const partLines = () => {
+    const order = [], byGroup = {};
+    selectedItems.forEach(i => { const g = i.group||""; if(!byGroup[g]){ byGroup[g]=[]; order.push(g); } byGroup[g].push(i); });
+    const hasGroups = order.some(Boolean);
+    let n = 0; const out = [];
+    order.forEach(g => {
+      if(hasGroups) out.push(`*${g||"Other"}*`);
+      byGroup[g].forEach(i => out.push(`${++n}. ${i.label}${i.qty > 1 ? ` x${i.qty}` : ""}`));
+    });
+    return out;
+  };
   const buildMsg = (link="") => [
     `🔧 *Parts Request* — ${shopName}`,
     SEP,
@@ -4159,7 +4172,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
     `Job #: *${job.id}*  |  Date: ${job.date_in||"—"}`,
     SEP,
     `*Parts needed:*`,
-    ...selectedItems.map((i, idx) => `${idx + 1}. ${i.label}${i.qty > 1 ? ` x${i.qty}` : ""}`),
+    ...partLines(),
     SEP,
     customNote.trim() || "Please quote price & availability 🙏",
     ...(link ? [SEP, `🔗 Quote link (tap to price):`, link] : []),
@@ -4220,7 +4233,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
       supplier_vat_inclusive: chosenSupplier?.vat_inclusive||false,
       via_group:            viaGroup,
       parts_list:           JSON.stringify(selectedItems.map(i=>i.label)),
-      items_json:           JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1}))),
+      items_json:           JSON.stringify(selectedItems.map(i=>({label:i.label,description:i.label,sku:i.sku||"",qty:i.qty||1,group:i.group||""}))),
       message:              msgLines,
       ...vehiclePayload,
     });
@@ -4236,7 +4249,12 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
   // list, the same row starts showing up here too (now with a real DB id) — excluded
   // by SKU so it doesn't render twice while still being tracked as an extra above.
   const extraSkus = new Set(extraParts.map(e=>e.sku).filter(Boolean));
-  const jobItemsList = items.filter(i => i.description?.trim() && i.type !== "labour" && !(i.part_sku && extraSkus.has(i.part_sku)));
+  const _jobItems = items.filter(i => i.description?.trim() && i.type !== "labour" && !(i.part_sku && extraSkus.has(i.part_sku)));
+  // Same order as the supplier message: grouped by work_group (first appearance), ungrouped last
+  const _grpOf = i => (i.work_group||"").trim();
+  const _grpOrder = [...new Set(_jobItems.map(_grpOf))].sort((a,b)=>(a===""?1:0)-(b===""?1:0));
+  const jobItemsList = _grpOrder.flatMap(g => _jobItems.filter(i=>_grpOf(i)===g));
+  const anyGroups = _grpOrder.some(Boolean);
 
   return (
     <div style={{maxWidth:520,width:"100%"}}>
@@ -4257,8 +4275,17 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
       </div>
 
       {/* Parts section */}
-      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6}}>
-        Select Parts to Include
+      <div style={{fontSize:10,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+        <span>Select Parts to Include</span>
+        {(()=>{
+          const ids = [...jobItemsList.map(x=>x.id), ...extraParts.map(e=>e.id)];
+          if(!ids.length) return null;
+          const allOn = ids.every(id=>selected.includes(id));
+          return <button type="button" className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"1px 8px",textTransform:"none",letterSpacing:0}}
+            onClick={()=>setSelected(p=>allOn?p.filter(x=>!ids.includes(x)):[...new Set([...p,...ids])])}>
+            {allOn?"Unselect all":"Select all"}
+          </button>;
+        })()}
       </div>
       {/* position:relative wrapper so the autocomplete dropdown below can escape the
           box's own overflow:hidden (needed there to clip row backgrounds to the
@@ -4268,12 +4295,26 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
         {/* Job items — includes extras from an earlier visit to this modal, since
             extraParts is local state that resets when the modal is closed/reopened */}
         {jobItemsList.map((item, idx) => (
-          <label key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(item.id)?"var(--surface2)":"transparent"}}>
+          <Fragment key={item.id}>
+          {anyGroups&&(idx===0||_grpOf(jobItemsList[idx-1])!==_grpOf(item))&&(
+            <div style={{padding:"6px 12px",fontSize:11,fontWeight:800,letterSpacing:".05em",textTransform:"uppercase",color:"var(--accent)",background:"var(--surface3,var(--surface2))",borderBottom:"1px solid var(--border)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+              <span>🗂 {_grpOf(item)||"Other"}</span>
+              {(()=>{
+                const ids = jobItemsList.filter(x=>_grpOf(x)===_grpOf(item)).map(x=>x.id);
+                const allOn = ids.every(id=>selected.includes(id));
+                return <button type="button" className="btn btn-ghost btn-xs" style={{fontSize:10,padding:"1px 8px",textTransform:"none",letterSpacing:0}}
+                  onClick={()=>setSelected(p=>allOn?p.filter(x=>!ids.includes(x)):[...new Set([...p,...ids])])}>
+                  {allOn?"Unselect all":"Select all"}
+                </button>;
+              })()}
+            </div>
+          )}
+          <label style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:"1px solid var(--border)",cursor:"pointer",background:selected.includes(item.id)?"var(--surface2)":"transparent"}}>
             <input type="checkbox" checked={selected.includes(item.id)} onChange={()=>toggleItem(item.id)}
               style={{width:16,height:16,accentColor:"var(--accent)",cursor:"pointer",flexShrink:0}}/>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.description}</div>
-              {item.part_sku&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.part_sku}</div>}
+              {(item.work_group||item.part_sku)&&<div style={{fontSize:10,color:"var(--text3)",fontFamily:"DM Mono,monospace"}}>{item.work_group&&<span style={{fontFamily:"inherit",fontWeight:700,color:"var(--accent)",marginRight:6}}>🗂 {item.work_group}</span>}{item.part_sku}</div>}
             </div>
             <select value={+item.qty||1} onClick={ev=>ev.stopPropagation()}
               onChange={ev=>updateJobItemQty(item,+ev.target.value)} title="Quantity needed"
@@ -4285,6 +4326,7 @@ function SupplierSendModal({job, items, wsStock=[], wsSuppliers=[], wsVehicles=[
                 style={{background:"none",border:"none",cursor:"pointer",color:"var(--text3)",fontSize:14,padding:"0 2px",flexShrink:0}}>✕</button>
             )}
           </label>
+          </Fragment>
         ))}
         {/* Extra parts added manually */}
         {extraParts.map(e => (

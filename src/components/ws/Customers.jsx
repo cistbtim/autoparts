@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "../../lib/api.js";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { makeId, waLink } from "../../lib/helpers.js";
-import { Overlay, MHead, FL, FG, FD, DriveImg, LicenceDocsChecklist, RenewalDocsModal } from "../shared.jsx";
+import { Overlay, MHead, FL, FG, FD, DriveImg, LicenceDocsChecklist, RenewalDocsModal, SERVICE_TYPES, isChangeOwnership } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 
 export function WsCustomersPage({wsCustomers=[],wsVehicles=[],jobs=[],onSaveCustomer,onDeleteCustomer,onSaveVehicle,onDeleteVehicle,onOpenJob,t,wsLocked=false}) {
@@ -402,6 +402,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
   const agentPhone = (pickedAgent ? pickedAgent.phone : defaultAgentPhone).replace(/[^0-9]/g,"");
   const effExpiry  = vehicleRecord?.licence_disc_expiry || job?.licence_disc_expiry || "";
   const [f, setF] = useState({
+    service_type:  "renewal",
     vehicle_reg:   job?.vehicle_reg   || vehicleRecord?.reg   || "",
     vehicle_make:  job?.vehicle_make  || vehicleRecord?.make  || "",
     vehicle_model: job?.vehicle_model || vehicleRecord?.model || "",
@@ -438,7 +439,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
     await onSave(rec);
     if (agentPhone) {
       const msg = [
-        "🪪 Licence Renewal Request",
+        f.service_type==="change_ownership" ? "🔁 Change of Ownership Request" : "🪪 Licence Renewal Request",
         "",
         `Reg: ${f.vehicle_reg}  ${f.vehicle_make} ${f.vehicle_model}`,
         f.vin       ? `VIN: ${f.vin}` : null,
@@ -489,6 +490,22 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
             </select>
           </div>
         )}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          {SERVICE_TYPES.map(st=>(
+            <button key={st.key} type="button" onClick={()=>s("service_type",st.key)}
+              style={{flex:1,padding:"9px 10px",borderRadius:9,fontSize:13,fontWeight:700,cursor:"pointer",
+                border:`1px solid ${f.service_type===st.key?"var(--accent)":"var(--border)"}`,
+                background:f.service_type===st.key?"var(--accent)":"var(--surface2)",
+                color:f.service_type===st.key?"#fff":"var(--text2)"}}>
+              {st.key==="change_ownership"?"🔁":"🪪"} {st.label}
+            </button>
+          ))}
+        </div>
+        {f.service_type==="change_ownership"&&(
+          <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+            🔁 <strong>Required for change of ownership:</strong> Roadworthy Certificate · Seller's ID / Passport · Buyer Address Proof · Notice of Change of Ownership. Owner details below are the <strong>buyer (new owner)</strong>.
+          </div>
+        )}
         <FG cols="1fr 1fr 1fr">
           <div><FL label="Reg Plate"/><input className="inp" value={f.vehicle_reg} onChange={e=>s("vehicle_reg",e.target.value.toUpperCase())} placeholder="ABC123GP"/></div>
           <div><FL label="Make"/><input className="inp" value={f.vehicle_make} onChange={e=>s("vehicle_make",e.target.value)}/></div>
@@ -524,7 +541,7 @@ export function LicenceRenewalModal({job, vehicleRecord, settings, wsId, onSave,
         <FD><FL label="Notes"/><textarea className="inp" value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Any special instructions..." style={{minHeight:50}}/></FD>
         <FD>
           <FL label="Supporting Documents (optional)"/>
-          <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)}
+          <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)} serviceType={f.service_type}
             pathPrefix={`licence_renewals/${(f.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
         </FD>
         <div style={{display:"flex",gap:10,marginTop:16}}>
@@ -610,6 +627,7 @@ export function WsLicenceRenewalsPage({renewals=[], settings, wsId, onSave, onUp
                     <td>
                       <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:12}}>{r.vehicle_reg}</div>
                       <div style={{fontSize:11,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
+                      {isChangeOwnership(r)&&<div style={{display:"inline-block",marginTop:3,fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:10,background:"rgba(96,165,250,.18)",color:"var(--blue)"}}>🔁 Change of Ownership</div>}
                     </td>
                     <td>
                       <div style={{fontSize:13}}>{r.owner_name||"—"}</div>

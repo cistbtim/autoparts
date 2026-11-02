@@ -3,7 +3,7 @@ import { api, uploadToStorage } from "../lib/api.js";
 import { getSettings, updateSettings, curSym } from "../lib/settings.js";
 import { makeId, waLink, nemigaVinUrl, isChineseVin, CHINACARMART_URL } from "../lib/helpers.js";
 import { decodePDF417fromImage, parseLicenceDisc } from "../lib/barcode.js";
-import { Overlay, MHead, FL, FD, FG, ImgLightbox, ShopLogo, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
+import { Overlay, MHead, FL, FD, FG, ImgLightbox, ShopLogo, LicenceDocsChecklist, RenewalDocsModal, LICENCE_DOC_TYPES, isChangeOwnership, serviceLabel, uploadRenewalOutput, uploadAttachment, IcWhatsApp, IcTrash } from "./shared.jsx";
 
 // current_expiry (the expiry the renewal was submitted against) + renewal_years
 // gives the date the NEW disc granted by a completed renewal actually expires —
@@ -34,7 +34,7 @@ const buildOfficeMessage = (r, pdfUrl) => {
     return url ? `${label}: ${url}` : null;
   }).filter(Boolean);
   const lines = [
-    "🪪 Licence Renewal — please process",
+    isChangeOwnership(r) ? "🔁 Change of Ownership — please process" : "🪪 Licence Renewal — please process",
     "",
     `Reg: ${r.vehicle_reg||"—"}  ${r.vehicle_make||""} ${r.vehicle_model||""}`.trim(),
     r.vin ? `VIN: ${r.vin}` : null,
@@ -85,7 +85,7 @@ const buildOfficePdfBlob = async (r) => {
   let y = margin;
   const line = (txt, opts) => { if(!txt) return; doc.text(txt, margin, y); y += (opts?.gap ?? 6); };
   doc.setFontSize(16); doc.setFont(undefined, "bold");
-  line("Licence Renewal — Please Process", { gap: 9 });
+  line(`${serviceLabel(r)} — Please Process`, { gap: 9 });
   doc.setFontSize(11); doc.setFont(undefined, "normal");
   line(`Reg: ${r.vehicle_reg||"—"}  ${r.vehicle_make||""} ${r.vehicle_model||""}`.trim());
   line(r.vin ? `VIN: ${r.vin}` : null);
@@ -252,7 +252,11 @@ export function ManageOfficeAgentsModal({agents=[], onSave, onClose, t={}}) {
 // ═══════════════════════════════════════════════════════════════
 // LICENCE RENEWAL AGENT — cross-workshop renewal queue
 // ═══════════════════════════════════════════════════════════════
-export function LicenceAgentPage({renewals=[], workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], t={}}) {
+export function LicenceAgentPage({renewals:allRenewals=[], mode="renewal", workshopInfo={}, onUpdate, onSave, onDelete, onRefresh, officeAgents=[], t={}}) {
+  // The same ws_licence_renewals rows feed two menu entries: Renewal Queue
+  // (mode "renewal") and Change Ownership (mode "change_ownership").
+  const isOwnership = mode==="change_ownership";
+  const renewals = allRenewals.filter(r=>isChangeOwnership(r)===isOwnership);
   const [filter, setFilter] = useState("all");
   // Set by clicking a row in "Renewals by Workshop" — narrows the list below to
   // just that company/walk-in group. null = no workshop filter (show all).
@@ -402,7 +406,7 @@ No more renewal reminders will be shown for it.`)) return;
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:16}}>
         <div>
-          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>🪪 {t.laPageTitle||"Licence Renewals — All Workshops"}</div>
+          <div style={{fontWeight:700,fontSize:18,marginBottom:2}}>{isOwnership?`🔁 ${t.laOwnershipPageTitle||"Change of Ownership — All Workshops"}`:`🪪 ${t.laPageTitle||"Licence Renewals — All Workshops"}`}</div>
           <div style={{fontSize:13,color:"var(--text3)"}}>{renewals.length} {t.laTotalLabel||"total"} · {unpaidComm.length} {t.laAwaitingCommission||"awaiting commission"}</div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -412,7 +416,7 @@ No more renewal reminders will be shown for it.`)) return;
               {refreshing?"⏳":"🔄"} {t.laRefresh||"Refresh"}
             </button>
           )}
-          {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill({})}>+ {t.laAddWalkIn||"Walk-in Customer"}</button>}
+          {onSave&&<button className="btn btn-primary" onClick={()=>setWalkInPrefill(isOwnership?{service_type:"change_ownership"}:{})}>+ {t.laAddWalkIn||"Walk-in Customer"}</button>}
         </div>
       </div>
 
@@ -423,7 +427,7 @@ No more renewal reminders will be shown for it.`)) return;
       )}
 
       {/* Renewals due again soon — derived from current_expiry + renewal_years */}
-      <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
+      {!isOwnership&&<div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:10,padding:"12px 14px",marginBottom:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:dueSoon.length>0?10:0}}>
           <strong style={{color:"var(--blue)",fontSize:13}}>🔔 {dueSoon.length} {t.laDueAgainSoonSuffix||"renewal(s) due again soon"}</strong>
           <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text3)"}}>
@@ -493,21 +497,21 @@ No more renewal reminders will be shown for it.`)) return;
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Report: how many customer cars each workshop has sent through for renewal.
           Clicking a row filters the list below to just that company/walk-in group —
           toggling the same row again (or the "Show all" chip) clears it. */}
       <div className="card" style={{padding:14,marginBottom:14,overflow:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:12}}>
-          <div style={{fontWeight:700,fontSize:13}}>📊 {t.laRenewalsByWorkshop||"Renewals by Workshop"}</div>
+          <div style={{fontWeight:700,fontSize:13}}>📊 {isOwnership?"Ownership Changes by Workshop":(t.laRenewalsByWorkshop||"Renewals by Workshop")}</div>
           {activeWorkshopLabel&&(
             <button className="btn btn-ghost btn-xs" onClick={()=>{setWorkshopFilter(null);setPage(1);}}>
               {t.laFilteringBy||"Filtering by"}: <strong>{activeWorkshopLabel}</strong> · {t.laShowAll||"Show all"} ✕
             </button>
           )}
         </div>
-        {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>{t.laNoRenewalsYet||"No renewals yet"}</div>}
+        {workshopRows.length===0&&<div style={{color:"var(--text3)",fontSize:13}}>{isOwnership?"No ownership changes yet":(t.laNoRenewalsYet||"No renewals yet")}</div>}
         {workshopRows.length>0&&(<>
           <div className="mob-cards">
             {workshopRows.map(w=>(
@@ -561,8 +565,8 @@ No more renewal reminders will be shown for it.`)) return;
 
       {filtered.length===0&&(
         <div style={{textAlign:"center",padding:"40px 0",color:"var(--text3)"}}>
-          <div style={{fontSize:32,marginBottom:8}}>🪪</div>
-          <div style={{fontSize:14}}>{t.laNoRenewalRequests||"No renewal requests"} {searchQ?`${t.laMatching||"matching"} "${search}"`:filter==="all"?(t.laYet||"yet"):`${t.laWithStatus||"with status"} "${filter}"`}</div>
+          <div style={{fontSize:32,marginBottom:8}}>{isOwnership?"🔁":"🪪"}</div>
+          <div style={{fontSize:14}}>{isOwnership?"No change of ownership requests":(t.laNoRenewalRequests||"No renewal requests")}{searchQ?`${t.laMatching||"matching"} "${search}"`:filter==="all"?(t.laYet||"yet"):`${t.laWithStatus||"with status"} "${filter}"`}</div>
         </div>
       )}
 
@@ -585,6 +589,7 @@ No more renewal reminders will be shown for it.`)) return;
                     <div style={{fontWeight:700,fontFamily:"DM Mono,monospace",fontSize:14}}>{r.vehicle_reg}</div>
                     <div style={{fontSize:12,color:"var(--text3)"}}>{r.vehicle_make} {r.vehicle_model}</div>
                     <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{workshopInfo[r.workshop_id]?.name||(r.workshop_id?r.workshop_id:`🚶 ${t.laWalkIn||"Walk-in"}`)}</div>
+                    {isChangeOwnership(r)&&<div style={{display:"inline-block",marginTop:4,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:"rgba(96,165,250,.18)",color:"var(--blue)"}}>🔁 Change of Ownership</div>}
                     {sold&&<div style={{display:"inline-block",marginTop:4,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,background:"rgba(148,163,184,.18)",color:"var(--text2)"}}>🚗 Sold — no longer owns this car{r.vehicle_sold_at?` · ${r.vehicle_sold_at.slice(0,10)}`:""}</div>}
                   </div>
                   <div style={{textAlign:"right",flexShrink:0}}>
@@ -596,7 +601,7 @@ No more renewal reminders will be shown for it.`)) return;
                     ) : (
                       <div style={{fontSize:12,fontWeight:600,color:isExpired?"var(--red)":"var(--green)"}}>{r.current_expiry||"—"} {isExpired?"⚠️":""}</div>
                     )}
-                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} {t.laYrRenewalSuffix||"yr renewal"}</div>
+                    <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>{r.renewal_years||1} {isChangeOwnership(r)?"yr licence":(t.laYrRenewalSuffix||"yr renewal")}</div>
                   </div>
                 </div>
                 <div style={{fontSize:13,marginBottom:10}}>{r.owner_name||"—"}{r.owner_phone?` · ${r.owner_phone}`:""}</div>
@@ -714,6 +719,7 @@ No more renewal reminders will be shown for it.`)) return;
 function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
   const isEdit = !!(prefill?.id && onUpdate);
   const [f, setF] = useState({
+    service_type:"renewal",
     vehicle_reg:"", vehicle_make:"", vehicle_model:"", vin:"", engine_no:"",
     current_expiry:"", owner_name:"", owner_phone:"", owner_id:"",
     renewal_years:"1", notes:"", documents:{}, workshop_id:null,
@@ -773,7 +779,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
 
   return (
     <Overlay onClose={onClose}>
-      <MHead title={isEdit?`✏️ ${t.laEditRenewalTitle||"Edit Renewal"}`:`🚶 ${t.laWalkInRenewalTitle||"Walk-in Renewal"}`} onClose={onClose}/>
+      <MHead title={isEdit?`✏️ ${t.laEditRenewalTitle||"Edit Renewal"}`:`🚶 ${f.service_type==="change_ownership"?"Walk-in Change of Ownership":(t.laWalkInRenewalTitle||"Walk-in Renewal")}`} onClose={onClose}/>
 
       {(() => {
         // Documents carried forward from a previous renewal (via "🔄 Start
@@ -790,6 +796,13 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
           </div>
         );
       })()}
+
+      {/* No service toggle here: the type is fixed by the menu the form was opened from (Renewal Queue vs Change Ownership) */}
+      {f.service_type==="change_ownership"&&(
+        <div style={{background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",borderRadius:8,padding:"9px 13px",marginBottom:14,fontSize:12,color:"var(--text2)"}}>
+          🔁 <strong>Required for change of ownership:</strong> Roadworthy Certificate · Seller's ID / Passport · Buyer Address Proof · Notice of Change of Ownership. Customer details below are the <strong>buyer (new owner)</strong>.
+        </div>
+      )}
 
       <div style={{display:"flex",gap:8,marginBottom:14}}>
         <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px",background:"var(--surface2)",border:"2px dashed var(--border)",borderRadius:9,cursor:scanLoading?"wait":"pointer",fontSize:13,fontWeight:600,color:"var(--text2)"}}>
@@ -838,7 +851,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
 
       <div style={{marginBottom:14}}>
         <FL label={t.laSupportingDocsOptional||"Supporting Documents (optional)"}/>
-        <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)}
+        <LicenceDocsChecklist documents={f.documents} onChange={docs=>s("documents",docs)} serviceType={f.service_type}
           pathPrefix={`licence_renewals/${(f.vehicle_reg||"walkin").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
       </div>
 
@@ -846,7 +859,7 @@ function WalkInRenewalModal({prefill={}, onSave, onUpdate, onClose, t={}}) {
 
       <div style={{display:"flex",gap:10}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>{t.cancel||"Cancel"}</button>
-        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):`💾 ${t.laSaveRenewal||"Save Renewal"}`}</button>
+        <button className="btn btn-primary" style={{flex:2}} onClick={save} disabled={saving}>{saving?(t.laSavingEllipsis||"Saving…"):`💾 ${f.service_type==="change_ownership"?"Save Change of Ownership":(t.laSaveRenewal||"Save Renewal")}`}</button>
       </div>
     </Overlay>
   );

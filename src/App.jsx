@@ -5272,6 +5272,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       id:"grp_licence_agent", icon:"🪪", label:t.laNavGroupLabel||"Licence Renewals", roles:["licence_agent"],
       children:[
         {id:"licenceAgentQueue", icon:"🪪", label:t.laNavRenewalQueue||"Renewal Queue", roles:["licence_agent"]},
+        {id:"licenceAgentOwnership", icon:"🔁", label:t.laNavChangeOwnership||"Change Ownership", roles:["licence_agent"]},
         {id:"licenceAgentAgents", icon:"🧑‍💼", label:t.laManageAgents||"Manage Agents", roles:["licence_agent"]},
       ]
     },
@@ -5380,6 +5381,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ];
     if(role==="licence_agent") return [
       {id:"licenceAgentQueue",icon:"🪪",label:t.laNavRenewalQueue||"Renewal Queue"},
+      {id:"licenceAgentOwnership",icon:"🔁",label:t.laNavChangeOwnership||"Change Ownership"},
     ];
     if(role==="car_sales"||role==="carsales_admin") return [
       {id:"carSalesListings",icon:"🏷️",label:t.carSalesListingsNav||"Listings"},
@@ -7309,6 +7311,10 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {/* ── LICENCE RENEWAL AGENT ── */}
         {tab==="licenceAgentQueue"&&role==="licence_agent"&&(
           <LicenceAgentPage renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}
+            officeAgents={settings.licence_processing_agents||[]} t={t}/>
+        )}
+        {tab==="licenceAgentOwnership"&&role==="licence_agent"&&(
+          <LicenceAgentPage mode="change_ownership" renewals={licenceAgentQueue} workshopInfo={licenceAgentWsNames} onUpdate={updateLicenceAgentRenewal} onSave={saveLicenceAgentRenewal} onDelete={deleteLicenceAgentRenewal} onRefresh={reloadLicenceAgentQueue}
             officeAgents={settings.licence_processing_agents||[]} t={t}/>
         )}
         {tab==="licenceAgentAgents"&&role==="licence_agent"&&(

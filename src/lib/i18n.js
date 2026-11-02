@@ -362,7 +362,7 @@ export const T = {
     wsbkCall: "Call",
     wsbkWhatsApp: "WhatsApp",
     // Licence Agent — sidebar nav
-    laNavGroupLabel: "Licence Renewals", laNavRenewalQueue: "Renewal Queue",
+    laNavGroupLabel: "Licence Renewals", laNavRenewalQueue: "Renewal Queue", laNavChangeOwnership: "Change Ownership", laOwnershipPageTitle: "Change of Ownership — All Workshops",
     // Licence Agent — Renewal Queue page
     laPageTitle: "Licence Renewals — All Workshops",
     laTotalLabel: "total", laAwaitingCommission: "awaiting commission",

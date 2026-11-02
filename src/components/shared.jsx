@@ -725,7 +725,22 @@ export const LICENCE_DOC_TYPES = [
   {key:"permit_visa",       label:"Permit / Visa"},
   {key:"brnc_doc",          label:"BRNC Doc. (Business)"},
   {key:"other",             label:"Other"},
+  // Only needed when service_type === "change_ownership" (see LicenceDocsChecklist)
+  {key:"roadworthy_cert",   label:"Roadworthy Certificate",        ownershipOnly:true},
+  {key:"seller_id",         label:"Seller's ID / Passport",        ownershipOnly:true},
+  {key:"buyer_address",     label:"Buyer Address Proof",           ownershipOnly:true},
+  {key:"ownership_notice",  label:"Notice of Change of Ownership", ownershipOnly:true},
 ];
+
+// A renewal row is either a plain licence renewal (default, also every row
+// saved before this existed) or a change of ownership, which needs the extra
+// ownershipOnly documents above.
+export const SERVICE_TYPES = [
+  {key:"renewal",          label:"Licence Renewal"},
+  {key:"change_ownership", label:"Change of Ownership"},
+];
+export const isChangeOwnership = (r) => r?.service_type === "change_ownership";
+export const serviceLabel = (r) => isChangeOwnership(r) ? "Change of Ownership" : "Licence Renewal";
 
 // Documents are stored per-type as {url, expiry} — expiry is an optional
 // YYYY-MM-DD string, blank meaning "doesn't expire" (e.g. a Traffic Register
@@ -735,7 +750,7 @@ export const LICENCE_DOC_TYPES = [
 const docUrl    = (d) => typeof d === "string" ? d : (d?.url || "");
 const docExpiry = (d) => typeof d === "string" ? "" : (d?.expiry || "");
 
-export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licence_docs", readOnly=false}) {
+export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licence_docs", readOnly=false, serviceType="renewal"}) {
   const [uploading, setUploading] = useState("");
 
   const uploadOne = async (key, file) => {
@@ -775,14 +790,14 @@ export function LicenceDocsChecklist({documents={}, onChange, pathPrefix="licenc
 
   return (
     <div>
-      {LICENCE_DOC_TYPES.map(({key,label})=>{
+      {LICENCE_DOC_TYPES.filter(d=>!d.ownershipOnly || serviceType==="change_ownership" || docUrl(documents[d.key])).map(({key,label,ownershipOnly})=>{
         const url = docUrl(documents[key]);
         const expiry = docExpiry(documents[key]);
         const isExpired = expiry && new Date(expiry) < new Date();
         return (
           <div key={key} style={{marginBottom:10,paddingBottom:readOnly?10:0,borderBottom:readOnly?"1px solid var(--border)":"none"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:170,flexShrink:0,fontSize:12,fontWeight:600,color:"var(--text2)"}}>{label}</div>
+              <div style={{width:170,flexShrink:0,fontSize:12,fontWeight:600,color:"var(--text2)"}}>{ownershipOnly&&"🔁 "}{label}</div>
               {readOnly ? (
                 url
                   ? <a href={url} target="_blank" rel="noreferrer" style={{fontSize:12,color:"var(--blue)"}}>🔗 View</a>
@@ -936,10 +951,10 @@ export function RenewalDocsModal({renewal, workshopName, viewer="agent", onUpdat
           <a href={renewal.document_url} target="_blank" rel="noreferrer" style={{display:"block",marginTop:4,marginBottom:6,fontSize:13,color:"var(--blue)"}}>🔗 View legacy attached document</a>
         )}
         {canEditDocuments ? (
-          <LicenceDocsChecklist documents={renewal.documents||{}} onChange={docs=>onUpdate(renewal.id,{documents:docs})}
+          <LicenceDocsChecklist documents={renewal.documents||{}} onChange={docs=>onUpdate(renewal.id,{documents:docs})} serviceType={renewal.service_type}
             pathPrefix={`licence_renewals/${(renewal.vehicle_reg||"doc").replace(/[\s/\\]/g,"_").toUpperCase()}`}/>
         ) : hasDocs ? (
-          <LicenceDocsChecklist documents={renewal.documents} readOnly/>
+          <LicenceDocsChecklist documents={renewal.documents} readOnly serviceType={renewal.service_type}/>
         ) : !renewal.document_url&&<div style={{fontSize:12,color:"var(--text3)",marginTop:4}}>No documents were attached.</div>}
       </div>
       <div style={{borderTop:"1px solid var(--border)",paddingTop:14}}>

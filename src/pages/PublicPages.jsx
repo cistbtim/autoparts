@@ -1687,6 +1687,7 @@ export function WsSupplierQuoteReplyPage({token}) {
   const [regDone,  setRegDone]  = useState(false);
   const [regErr,   setRegErr]   = useState("");
   const [wsProfile,setWsProfile]= useState(null);
+  const [recordPartNo,setRecordPartNo]= useState(false);
   const shopSettings = getSettings();
   const bizSettings = wsProfile ? {...shopSettings,
     shop_name: wsProfile.name||shopSettings.shop_name,
@@ -1699,6 +1700,11 @@ export function WsSupplierQuoteReplyPage({token}) {
         if(!Array.isArray(r)||!r[0]){setErr("Quote request not found or link has expired.");setLoading(false);return;}
         const request=r[0];
         setReq(request);
+        // Part # / Brand fields only appear for suppliers flagged "record part numbers" (e.g. CS Auto Spares)
+        if(request.supplier_id){
+          const sp=await api.get("workshop_suppliers",`id=eq.${encodeURIComponent(request.supplier_id)}&select=record_part_no`).catch(()=>[]);
+          setRecordPartNo(Array.isArray(sp)&&!!sp[0]?.record_part_no);
+        }
         // Show the specific workshop's own banner logo/name, not just the platform default
         if(request.workshop_id){
           const wp=await api.get("workshop_profiles",`id=eq.${request.workshop_id}&select=*`).catch(()=>[]);
@@ -1787,11 +1793,20 @@ export function WsSupplierQuoteReplyPage({token}) {
               <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
                 value={item.price} onChange={e=>set(gi,"price",e.target.value)}/>
             </div>
-            <div>
+            {recordPartNo&&<div>
               <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Your Part # <span style={{color:"#64748b"}}>(optional)</span></div>
               <input style={inp} type="text" placeholder="e.g. AB-12345"
                 value={item.supplier_part_no} onChange={e=>set(gi,"supplier_part_no",e.target.value)}/>
-            </div>
+            </div>}
+            {recordPartNo&&<div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Brand <span style={{color:"#64748b"}}>(optional)</span></div>
+              <select style={sel} value={item.brand||""} onChange={e=>set(gi,"brand",e.target.value)}>
+                <option value="">—</option>
+                <option value="OEM">Original (OEM)</option>
+                <option value="Aftermarket">Aftermarket</option>
+                <option value="Used">Used</option>
+              </select>
+            </div>}
             <div style={{gridColumn:"1/-1"}}>
               <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>Notes <span style={{color:"#64748b"}}>(optional — e.g. condition, ETA)</span></div>
               <input style={inp} type="text" placeholder="e.g. New OEM, available tomorrow"

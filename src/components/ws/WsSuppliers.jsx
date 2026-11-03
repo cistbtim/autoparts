@@ -189,6 +189,9 @@ export function WsSupplierModal({item,onSave,onClose}) {
   const [vatInclusive, setVatInclusive] = useState(item?.vat_inclusive||false);
   const [supTypes,     setSupTypes]     = useState(()=>parseTypes(item?.supplier_type));
   const [carBrands,    setCarBrands]    = useState(()=>parseTypes(item?.car_brands));
+  const [shortName,    setShortName]    = useState(item?.short_name||"");
+  const [waGroupName,  setWaGroupName]  = useState(item?.wa_group_name||"");
+  const [recordPartNo, setRecordPartNo] = useState(!!item?.record_part_no);
   const [saving,       setSaving]       = useState(false);
   const isEdit=!!item;
 
@@ -211,6 +214,10 @@ export function WsSupplierModal({item,onSave,onClose}) {
         vat_inclusive:vatInclusive,
         supplier_type:supTypes.length?JSON.stringify(supTypes):null,
         car_brands:carBrands.length?JSON.stringify(carBrands):null,
+        // New columns are only sent when used, so saving still works before the SQL migration is run
+        ...(shortName.trim()?{short_name:shortName.trim()}:{}),
+        ...(waGroupName.trim()?{wa_group_name:waGroupName.trim()}:{}),
+        ...(recordPartNo||item?.record_part_no!=null?{record_part_no:recordPartNo}:{}),
       });
     }catch(e){alert("Save failed: "+e.message);}
     finally{setSaving(false);}
@@ -228,6 +235,17 @@ export function WsSupplierModal({item,onSave,onClose}) {
         <FL label="WhatsApp Group Link (optional)"/>
         <input className="inp" value={groupLink} onChange={e=>setGroupLink(e.target.value)} placeholder="https://chat.whatsapp.com/xxxxx"/>
         <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Paste the group invite link — tap ⋮ in WhatsApp group → Invite via link → Copy link</div>
+      </FD>
+      <FG>
+        <FD><FL label="Short name (used in part remarks)"/><input className="inp" value={shortName} onChange={e=>setShortName(e.target.value)} placeholder="e.g. CS"/></FD>
+        <FD><FL label="WhatsApp group / chat name"/><input className="inp" value={waGroupName} onChange={e=>setWaGroupName(e.target.value)} placeholder="e.g. Auto Fix/ CS"/></FD>
+      </FG>
+      <FD>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0"}}>
+          <input type="checkbox" id="recPartNo" checked={recordPartNo} onChange={e=>setRecordPartNo(e.target.checked)} style={{width:16,height:16,cursor:"pointer"}}/>
+          <label htmlFor="recPartNo" style={{cursor:"pointer",fontSize:13,fontWeight:500}}>Record this supplier's part numbers</label>
+        </div>
+        <div style={{fontSize:11,color:"var(--text3)"}}>Adds a Part # field to their quote link and Return Quote, and writes “{shortName.trim()||"SHORT"}: part no” into the job's part remark.</div>
       </FD>
       <FD><FL label="Notes (optional)"/><input className="inp" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. BMW specialist, fast delivery"/></FD>
       <FD>

@@ -29,6 +29,7 @@ import { PartTags, SupplierPartsPage, SupplierPricingPage, SupplierQueriesPage, 
 import { LicenceAgentPage, ManageOfficeAgentsModal, CarSalesPage } from "./components/AgentPages.jsx";
 import { MindMapPage } from "./components/MindMap.jsx";
 import { LoginPage, PaywallPage } from "./pages/LoginPage.jsx";
+import { PartMatchingPage } from "./components/PartMatching.jsx";
 import { RfqReplyPage, RfqQuoteReplyPage, RfqBatchReplyPage, SupplierSetupPage, JobCardPage, MechanicStatementPage, QuoteConfirmPage, WsSupplierQuoteReplyPage, WorkshopBookingPage, BranchRegPage, BranchActivatePage, BranchStockRequestConfirmPage, WorkshopRegisterPage, CarListingPage, CarShopPage } from "./pages/PublicPages.jsx";
 
 // ── Trap browser back button so the page never goes blank ─────
@@ -2443,6 +2444,44 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           await applySupplierPriceToItem(match.id,price,true);
         }
       }
+    }
+    // Every priced line is kept in supplier_quote_lines for the Supplier Price Book; for suppliers flagged
+    // "record part numbers" (CS) the part # is also appended to the part's remark as "CS: partno".
+    // Never touches prices.
+    const sup=workshopSuppliers.find(s=>String(s.id)===String(qt.supplier_id));
+    if(qt.job_id && qt.line_items){
+      try{
+        const short=(sup.short_name||sup.name||"").trim().split(/\s+/)[0];
+        const jobItems=workshopJobItems.filter(i=>i.job_id===qt.job_id);
+        let lis=[]; try{ lis=JSON.parse(qt.line_items||"[]"); }catch{}
+        const findItem=li=>{ const sku=(li.sku||"").trim(); return jobItems.find(i=>sku?(i.part_sku||"").trim()===sku:(i.description||"").toLowerCase().trim()===(li.name||"").toLowerCase().trim()); };
+        const remarkAdd={};
+        for(const li of lis){
+          const pn=sup?.record_part_no?(li.supplier_part_no||"").trim():""; if(!pn) continue;
+          const m=findItem(li); if(!m) continue;
+          const tag=`${short}: ${pn}`;
+          const cur=remarkAdd[m.id]??(m.remark||"");
+          // Re-saving the same quote must not duplicate the tag; a changed part # replaces this supplier's old tag
+          const parts=cur.split(/\s*;\s*|\n/).map(s=>s.trim()).filter(s=>s&&!s.toLowerCase().startsWith(short.toLowerCase()+":"));
+          remarkAdd[m.id]=[...parts,tag].join("; ");
+        }
+        for(const [itemId,remark] of Object.entries(remarkAdd)){
+          await api.patch("workshop_job_items","id",itemId,{remark}).catch(()=>{});
+          setWorkshopJobItems(prev=>prev.map(i=>String(i.id)===String(itemId)?{...i,remark}:i));
+        }
+        const quotedAt=new Date().toISOString();
+        await api.delete("supplier_quote_lines","quote_request_id",qt.request_id).catch(()=>{});
+        const rows=lis.filter(li=>+li.price>0||li.available==="No stock").map(li=>({
+          id:makeId("SQL"), workshop_id:wsId||null, quote_request_id:qt.request_id, job_id:qt.job_id,
+          supplier_id:qt.supplier_id||null, supplier_name:qt.supplier_name||"", vehicle_reg:qt.vehicle_reg||"",
+          part_name:li.name||"", supplier_part_no:sup?.record_part_no?((li.supplier_part_no||"").trim()||null):null, brand:li.brand||null,
+          sku:(li.sku||"").trim()||null,
+          price_ex_vat:+li.price_ex_vat||0, price_incl_vat:+(li.vat_incl_price||li.price)||0,
+          vat_included:!qt.vat_excluded, quote_ref:qt.quote_ref||null,
+          no_stock:li.available==="No stock", quoted_at:quotedAt, source:"return_quote",
+        }));
+        if(rows.length) await api.insert("supplier_quote_lines",rows);
+      }catch(e){ console.warn("Supplier part-no save skipped:",e); }
     }
     await refreshTables("ws_supplier_quotes","workshop_job_items");
   };
@@ -5323,6 +5362,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {id:"vehicles",icon:"🚗",label:t.vehicleMgmt||"Vehicles",roles:["admin"]},
         {id:"branches",icon:"🏢",label:t.branchMgmt||"Branches",roles:["admin"],badge:branches.filter(b=>b.status==="pending").length||0},
         {id:"settings",icon:"⚙️",label:t.settings,roles:["admin"]},
+        {id:"partmatch",icon:"🔗",label:"Part Library Matching",roles:["admin"]},
         {id:"users",icon:"🔑",label:t.users,roles:["admin"]},
         {id:"marketplace",icon:"💰",label:"Scrapyard Match",roles:["admin"]},
         {id:"branchProfile",    icon:"🏢",label:"My Branch",        roles:["admin"],branchAdminOnly:true},
@@ -9042,6 +9082,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             rfqQuotes={rfqQuotes} rfqItems={rfqItems} onCreateRfqSession={createRfqSession}
             onGoToRfqSession={(sid)=>{setRfqJumpSessionId(sid);setTab("rfq");}}
             onRefresh={()=>refreshTables("ws_shop_requests","branch_stock_requests","vehicle_requests","part_requests","rfq_quotes","rfq_items")}/>
+        )}
+
+        {tab==="partmatch"&&role==="admin"&&(
+          <PartMatchingPage enabled={!!settings.part_match_enabled} onToggle={on=>saveSettings({part_match_enabled:on})}
+            parts={parts} setParts={setParts} wsSuppliers={workshopSuppliers} branchId={currentBranch?.id||null} showToast={showToast}/>
         )}
 
         {tab==="settings"&&role==="admin"&&(

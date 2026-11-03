@@ -3075,7 +3075,9 @@ function extractPartNo(s) {
   if(lab) return lab[1].toUpperCase();
   for(const m of str.matchAll(/\b[A-Z0-9][A-Z0-9-]{4,}\b/gi)) {
     const tok = m[0];
-    if(!/\d/.test(tok)) continue;
+    // Real part numbers mix letters and digits (ADC5149); bare digits only count when long. This
+    // also rejects year ranges like "16-21" when OCR misses the item number column.
+    if(!(/\d/.test(tok)&&/[A-Z]/i.test(tok)) && !/^\d{6,}$/.test(tok)) continue;
     if(/^\d+(mm|cm|kg|ml|l|v|a|w)$/i.test(tok) || /^R\d+$/i.test(tok)) continue;
     return tok.toUpperCase();
   }

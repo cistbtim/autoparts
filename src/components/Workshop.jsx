@@ -5143,6 +5143,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
   const [resendPopup,   setResendPopup]   = useState(null); // {item, req} — resend an unanswered supplier inquiry
   const [resendMsg,     setResendMsg]     = useState("");
+  const [resendDel,     setResendDel]     = useState(false); // delete-inquiry confirm step inside the resend popup
   // Work groups: instant local view of work_group / group_done changes while the PATCH is in flight
   const [grpOv,         setGrpOv]         = useState({});
   const [grpModal,      setGrpModal]      = useState(false);
@@ -8112,6 +8113,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           const reqUrl   = (r) => r.token?`${window.location.origin}?ws_supreq=${r.token}`:"";
           const openResend = (item,r) => {
             setResendPopup({item,req:r});
+            setResendDel(false);
             setResendMsg(`Hi ${r.supplier_name||""}, a gentle reminder about the parts quote I sent you ${waitText(r)} ago for ${job.vehicle_reg||"our job"}. Could you please reply with your prices today?${reqUrl(r)?`\n${reqUrl(r)}`:""}\nThank you!`);
           };
           const renderPending = (item) => {
@@ -8214,6 +8216,23 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                   {phone&&<a href={waLink(phone,resendMsg)} target="_blank" rel="noreferrer" onClick={()=>setResendPopup(null)}
                     style={{flex:2,minWidth:140,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:14,color:"#fff",background:"#25D366",borderRadius:8,padding:"9px 12px"}}>🔔 Send via WhatsApp</a>}
                 </div>
+                {onDeleteWsSupplierRequest&&wsRole!=="mechanic"&&!wsLocked&&(
+                  <div style={{marginTop:16,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+                    {!resendDel?(
+                      <button type="button" className="btn btn-ghost btn-sm" style={{color:"var(--red)",width:"100%"}} onClick={()=>setResendDel(true)}>🗑️ Delete this inquiry</button>
+                    ):(
+                      <div style={{border:"1px solid var(--red)",borderRadius:10,padding:"10px 12px",background:"rgba(248,113,113,.08)"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"var(--red)",marginBottom:4}}>Delete the inquiry to {req.supplier_name||"this supplier"}?</div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>It covers all {asked.length} part{asked.length!==1?"s":""} listed above, not just this one. The supplier's link stops working. This cannot be undone.</div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button type="button" className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>setResendDel(false)}>Keep it</button>
+                          <button type="button" className="btn btn-sm" style={{flex:1,background:"var(--red)",color:"#fff",border:"none",fontWeight:700}}
+                            onClick={async()=>{ try{ await onDeleteWsSupplierRequest(req.id); setResendPopup(null); }catch(e){ alert("Delete failed: "+e.message); } }}>Yes, delete</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );

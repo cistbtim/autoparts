@@ -5141,6 +5141,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [remarkOverrides,   setRemarkOverrides]   = useState({});
   const [sortOverrides,     setSortOverrides]     = useState({}); // optimistic item.id -> sort_order, ahead of the save round-trip
   const [pricePopup,    setPricePopup]    = useState(null); // {item, costs, markup, selIdx}
+  const [resendPopup,   setResendPopup]   = useState(null); // {item, req} — resend an unanswered supplier inquiry
+  const [resendMsg,     setResendMsg]     = useState("");
   // Work groups: instant local view of work_group / group_done changes while the PATCH is in flight
   const [grpOv,         setGrpOv]         = useState({});
   const [grpModal,      setGrpModal]      = useState(false);
@@ -8081,6 +8083,53 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           });
           const getNoStock = (desc) => noStockMap[(desc||"").toLowerCase().trim()] || [];
 
+          // Cheapest first (the chip list and the "Choose Supplier Price" popup share this order)
+          Object.values(supCostMap).forEach(arr=>arr.sort((a,b)=>a.price-b.price));
+
+          // Suppliers asked about a part who haven't replied yet — newest unanswered inquiry per supplier,
+          // skipped when that supplier already answered another inquiry on this job covering the part.
+          const supKeyOf = r => r.supplier_id?`id:${r.supplier_id}`:`n:${(r.supplier_name||r.supplier_phone||"").toLowerCase().trim()}`;
+          const askedOf  = r => { try{ return JSON.parse(r.parts_list||"[]").map(p=>(p||"").toLowerCase().trim()); }catch{ return []; } };
+          const answeredIds = new Set([...jobSupQts.map(q=>q.request_id),...sqReplies.map(rep=>rep.request_id)]);
+          const jobReqsAll = wsSupplierRequests.filter(r=>r.job_id===job.id);
+          const answeredParts = {};   // supplier key -> Set(part)
+          jobReqsAll.filter(r=>answeredIds.has(r.id)).forEach(r=>{ const s=(answeredParts[supKeyOf(r)]=answeredParts[supKeyOf(r)]||new Set()); askedOf(r).forEach(p=>s.add(p)); });
+          const newestPend = new Map();
+          jobReqsAll.filter(r=>!answeredIds.has(r.id)).forEach(r=>{
+            const k=supKeyOf(r), t=new Date(r.sent_at||r.created_at||0).getTime(), cur=newestPend.get(k);
+            if(!cur||t>cur.t) newestPend.set(k,{r,t});
+          });
+          const pendingMap = {};
+          newestPend.forEach(({r},k)=>{
+            askedOf(r).forEach(p=>{ if(!p||answeredParts[k]?.has(p)) return; (pendingMap[p]=pendingMap[p]||[]).push(r); });
+          });
+          const getPending = (desc) => pendingMap[(desc||"").toLowerCase().trim()] || [];
+          const waitText = (r) => {
+            const h=Math.max(0,Math.floor((Date.now()-new Date(r.sent_at||r.created_at||Date.now()).getTime())/36e5));
+            return h>=48?`${Math.floor(h/24)} days`:`${h} h`;
+          };
+          const reqPhone = (r) => r.supplier_phone||wsSuppliers.find(s=>String(s.id)===String(r.supplier_id))?.phone||"";
+          const reqUrl   = (r) => r.token?`${window.location.origin}?ws_supreq=${r.token}`:"";
+          const openResend = (item,r) => {
+            setResendPopup({item,req:r});
+            setResendMsg(`Hi ${r.supplier_name||""}, a gentle reminder about the parts quote I sent you ${waitText(r)} ago for ${job.vehicle_reg||"our job"}. Could you please reply with your prices today?${reqUrl(r)?`\n${reqUrl(r)}`:""}\nThank you!`);
+          };
+          const renderPending = (item) => {
+            const pend=getPending(item.description);
+            if(!pend.length) return null;
+            return (
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                {pend.map(r=>(
+                  <span key={r.id} onClick={()=>openResend(item,r)} title="No reply yet — click to resend"
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",minWidth:180,color:"var(--text3)",background:"var(--surface2)",border:"1px dashed var(--text3)"}}>
+                    <span>⏳ {r.supplier_name||r.supplier_phone||"Supplier"}</span>
+                    <span style={{flexShrink:0,fontSize:10}}>waiting {waitText(r)} · 🔔</span>
+                  </span>
+                ))}
+              </div>
+            );
+          };
+
           // ── Order from spare shop (Option A + B) ────────────────────
           const orderFromSpareShop = async (item, sc, markupPct) => {
             const mu = +markupPct||0;
@@ -8118,6 +8167,58 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           // ────────────────────────────────────────────────────────────
 
           return (<>
+        {/* ── Resend inquiry popup (supplier hasn't replied) ── */}
+        {resendPopup&&(()=>{
+          const {item,req}=resendPopup;
+          const phone=reqPhone(req);
+          const asked=(()=>{ try{ return JSON.parse(req.parts_list||"[]"); }catch{ return []; } })();
+          const received=getSupCosts(item.description);
+          const isThis=p=>(p||"").toLowerCase().trim()===(item.description||"").toLowerCase().trim();
+          return (
+            <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
+              onClick={()=>setResendPopup(null)}>
+              <div style={{background:"var(--surface)",borderRadius:16,width:"100%",maxWidth:460,maxHeight:"92vh",overflowY:"auto",padding:20,boxShadow:"0 8px 40px rgba(0,0,0,.4)"}} onClick={e=>e.stopPropagation()}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:11,color:"var(--text3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".06em"}}>Resend inquiry</div>
+                    <div style={{fontWeight:700,fontSize:15,marginTop:2}}>📲 {req.supplier_name||phone||"Supplier"}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>Sent {fmtDT(req.sent_at||req.created_at)} · no reply for {waitText(req)}</div>
+                  </div>
+                  <button onClick={()=>setResendPopup(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"var(--text3)",padding:4}}>✕</button>
+                </div>
+
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:4}}>Asked for</div>
+                <div style={{fontSize:12,color:"var(--text2)",lineHeight:1.5,marginBottom:12}}>
+                  {asked.map((p,i)=><span key={i} style={{fontWeight:isThis(p)?800:400,color:isThis(p)?"var(--text)":"inherit"}}>{i>0?" · ":""}{p}</span>)}
+                </div>
+
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:4}}>Prices already received for “{item.description}”</div>
+                {received.length===0
+                  ? <div style={{fontSize:12,color:"var(--text3)",marginBottom:12}}>None yet.</div>
+                  : <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
+                      {received.map((sc,i)=>(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,padding:"4px 8px",borderRadius:6,background:"rgba(251,191,36,.12)",border:"1px solid rgba(251,191,36,.4)"}}>
+                          <span>{sc.isShop?"🏪":"💰"} {sc.name}</span>
+                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,color:"#1d4ed8"}}>{i===0&&received.length>1?"⭐ ":""}{fmtAmt(sc.price)}</span>
+                        </div>
+                      ))}
+                    </div>}
+
+                <div style={{fontSize:10,fontWeight:700,color:"var(--text3)",textTransform:"uppercase",marginBottom:4}}>Message (edit before sending)</div>
+                <textarea className="inp" value={resendMsg} onChange={e=>setResendMsg(e.target.value)}
+                  style={{width:"100%",minHeight:130,fontSize:13,resize:"vertical",marginBottom:10}}/>
+                {!phone&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:8}}>No WhatsApp number saved for this supplier — copy the message and send it in their group/chat.</div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button className="btn btn-ghost" style={{flex:1,minWidth:90}} onClick={()=>setResendPopup(null)}>Cancel</button>
+                  <button className="btn btn-ghost" style={{flex:1,minWidth:110}} onClick={()=>{ navigator.clipboard.writeText(resendMsg).then(()=>alert("Message copied")).catch(()=>alert(resendMsg)); }}>📋 Copy message</button>
+                  {phone&&<a href={waLink(phone,resendMsg)} target="_blank" rel="noreferrer" onClick={()=>setResendPopup(null)}
+                    style={{flex:2,minWidth:140,textAlign:"center",textDecoration:"none",fontWeight:700,fontSize:14,color:"#fff",background:"#25D366",borderRadius:8,padding:"9px 12px"}}>🔔 Send via WhatsApp</a>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Supplier price popup ── */}
         {pricePopup&&(
           <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
@@ -8533,12 +8634,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                           title={defaultMarkup>0?`Cost ${fmtAmt(sc.price)} + ${defaultMarkup}% = ${fmtAmt(sellP)}`:"Click to set cost price"}
                           style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,fontSize:11,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",minWidth:180,color:isShop?"#14532d":"#78350f",background:isShop?"rgba(52,211,153,.15)":"rgba(251,191,36,.18)",border:`1px solid ${isShop?"rgba(52,211,153,.4)":"rgba(251,191,36,.5)"}`}}>
                           <span>{isShop?"🏪":"💰"} {sc.name}</span>
-                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:12,color:"#1d4ed8",flexShrink:0}}>{fmtAmt(sc.price)}</span>
+                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:12,color:"#1d4ed8",flexShrink:0}}>{i===0&&supCosts.length>1?"⭐ ":""}{fmtAmt(sc.price)}</span>
                         </span>
                         );
                       })}
                     </div>
                   )}
+                  {!hideCosts&&renderPending(item)}
                   <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",background:accentBg,border:`1px solid ${accentBorder}`,borderRadius:item.type==="part"?"8px 8px 0 0":"8px",padding:"8px 10px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11,color:accentColor,fontWeight:700,opacity:.8}}>{t.qty}</span>
@@ -8655,12 +8757,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                           onClick={()=>isShop?setWsShopPartView({...sc,currentItem:item}):setPricePopup({item,costs:getSupCosts(item.description),markup:String(defaultMarkup),selIdx:i})}
                           style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,fontSize:10,fontWeight:600,cursor:"pointer",borderRadius:4,padding:"2px 8px",color:isShop?"#14532d":"#78350f",background:isShop?"rgba(22,163,74,.15)":"rgba(251,191,36,.18)",border:isShop?"1px solid rgba(22,163,74,.4)":"1px solid rgba(251,191,36,.5)"}}>
                           <span>{isShop?"🏪":"💰"} {sc.name}{isShop&&sc.sku?<> · <code style={{fontFamily:"DM Mono,monospace",fontSize:9}}>{sc.sku}</code></>:""}</span>
-                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:11,color:"#1d4ed8",flexShrink:0}}>{fmtAmt(sc.price)}</span>
+                          <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:800,fontSize:11,color:"#1d4ed8",flexShrink:0}}>{i===0&&supCosts.length>1?"⭐ ":""}{fmtAmt(sc.price)}</span>
                         </span>
                         );
                       })}
                     </div>
                   )}
+                  {!hideCosts&&<div style={{marginTop:4}}>{renderPending(item)}</div>}
                 </td>
                 <td style={{width:120,verticalAlign:"middle"}}>
                   <select disabled={itemsLocked} value={partTypeOverrides[item.id]??item.part_type??""} onChange={e=>commitPartType(item,e.target.value)}

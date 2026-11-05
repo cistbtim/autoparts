@@ -9085,7 +9085,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         )}
 
         {tab==="partmatch"&&role==="admin"&&(
-          <PartMatchingPage enabled={!!settings.part_match_enabled} onToggle={on=>saveSettings({part_match_enabled:on})}
+          <PartMatchingPage
+            enabled={settings.part_match_enabled!=null?!!settings.part_match_enabled:(()=>{ try{ return localStorage.getItem("ap_part_match")==="1"; }catch{ return false; } })()}
+            onToggle={async on=>{
+              // Saved to settings when the column exists; browser fallback so the switch works before the SQL is run
+              try{ localStorage.setItem("ap_part_match",on?"1":"0"); }catch{}
+              setSettings(s=>({...s,part_match_enabled:on}));
+              await saveSettings({part_match_enabled:on});
+            }}
             parts={parts} setParts={setParts} wsSuppliers={workshopSuppliers} branchId={currentBranch?.id||null} showToast={showToast}/>
         )}
 

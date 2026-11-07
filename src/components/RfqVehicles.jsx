@@ -3585,8 +3585,13 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
           onAddGeneration={(src)=>{
             // Next generation of the same model: keep make/model/variant/engine/wiki, new code, year_from after this one ends, no photos.
             const yTo = +src.year_to||0;
-            setEditV({make:src.make, model:src.model, code:nextCodeForMake(src.make, src.model), year_from:yTo?yTo+1:"", year_to:"",
-              engine:src.engine||"", variant:src.variant||"", wiki_summary:src.wiki_summary||"", _key:Date.now()+Math.random()});
+            // Bump generation markers in the name: 1ST→2ND, 3RD→4TH, MK1→MK2, MK 2→MK 3, GEN 3→GEN 4
+            const ordinal = n => `${n}${n%100>=11&&n%100<=13?"TH":["TH","ST","ND","RD"][n%10]||"TH"}`;
+            const bump = s => String(s||"")
+              .replace(/\b(\d{1,2})(ST|ND|RD|TH)\b/gi, (_,n)=>ordinal(+n+1))
+              .replace(/\b(MK|GEN)(\s?)(\d{1,2})\b/gi, (_,p,sp,n)=>`${p}${sp}${+n+1}`);
+            setEditV({make:src.make, model:bump(src.model), code:nextCodeForMake(src.make, src.model), year_from:yTo?yTo+1:"", year_to:"",
+              engine:src.engine||"", variant:bump(src.variant), wiki_summary:src.wiki_summary||"", _key:Date.now()+Math.random()});
           }}
           onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake} wikiForModel={wikiForModel}/>
       </ErrorBoundary>

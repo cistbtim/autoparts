@@ -3582,6 +3582,12 @@ export function VehiclesPage({vehicles, partFitments, parts=[], workshopJobs=[],
             await onSave(data);
             setEditV({make:data.make, model:"", code:nextCodeLetter(data.code)||nextCodeForMake(data.make), year_from:"", year_to:"", engine:"", variant:"", _key:Date.now()+Math.random()});
           }}
+          onAddGeneration={(src)=>{
+            // Next generation of the same model: keep make/model/variant/engine/wiki, new code, year_from after this one ends, no photos.
+            const yTo = +src.year_to||0;
+            setEditV({make:src.make, model:src.model, code:nextCodeForMake(src.make, src.model), year_from:yTo?yTo+1:"", year_to:"",
+              engine:src.engine||"", variant:src.variant||"", wiki_summary:src.wiki_summary||"", _key:Date.now()+Math.random()});
+          }}
           onClose={()=>setEditV(null)} t={t} nextCodeForMake={nextCodeForMake} wikiForModel={wikiForModel}/>
       </ErrorBoundary>
     )}
@@ -3811,7 +3817,7 @@ const photoShortModel = (model) => String(model||"").split(" ").filter(Boolean)
   .filter(tok=>!/^[A-Za-z]{3,}[0-9]{2,}[A-Za-z]?$/.test(tok)).join(" ").trim() || String(model||"");
 const photoSearchQuery = (f) => [f.make, photoShortModel(f.model), f.year_from].filter(Boolean).join(" ").trim();
 
-function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nextCodeForMake, wikiForModel}) {
+function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onAddGeneration, onClose, t, nextCodeForMake, wikiForModel}) {
   const isNew = !vehicle.id;
   const [f, setF] = useState({
     id:          vehicle.id||null,
@@ -4008,7 +4014,16 @@ function VehicleModal({vehicle, parts=[], onSave, onSaveAndNext, onClose, t, nex
           </div>
       }
 
-      <div style={{display:"flex",gap:10,marginTop:18}}>
+      {f.id&&onAddGeneration&&(
+        <button type="button" className="btn btn-ghost" style={{width:"100%",marginTop:14}}
+          onClick={()=>{
+            if(dirty && !window.confirm("You have unsaved changes to this vehicle that will be lost. Continue?")) return;
+            onAddGeneration(f);
+          }}>
+          🆕 Add next generation (copy this vehicle, new code &amp; year)
+        </button>
+      )}
+      <div style={{display:"flex",gap:10,marginTop:f.id&&onAddGeneration?10:18}}>
         <button className="btn btn-ghost" style={{flex:1}} onClick={handleClose}>{t.cancel}</button>
         {onSaveAndNext&&(
           <button className="btn btn-ghost" style={{flex:1,whiteSpace:"nowrap"}} onClick={()=>attemptSave(onSaveAndNext)}>

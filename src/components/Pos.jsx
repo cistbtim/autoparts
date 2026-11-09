@@ -263,17 +263,17 @@ function _receiptHtml(sale, settings, sym) {
   const { invId, cart, customer, subtotal, discount, total, splits, change, isQuote } = sale;
   const now = new Date().toLocaleString();
   const rows = cart.map(it =>
-    `<div style="display:flex;justify-content:space-between;padding:3px 0">
-      <div><b>${it.name}</b><br><span style="font-size:10px;color:#666">${it.sku || ""} ×${it.qty} @ ${sym}${(+it.price).toFixed(2)}</span></div>
-      <div style="font-weight:700">${sym}${(it.qty * it.price).toFixed(2)}</div>
-    </div>`).join("");
+    `<table style="width:100%;border-collapse:collapse;margin:3px 0"><tr>
+      <td style="vertical-align:top;padding:0;word-break:break-word"><b>${it.name}</b><br><span style="font-size:10px;color:#666">${it.sku || ""} ×${it.qty} @ ${sym}${(+it.price).toFixed(2)}</span></td>
+      <td style="vertical-align:top;padding:0 0 0 8px;text-align:right;white-space:nowrap;font-weight:700">${sym}${(it.qty * it.price).toFixed(2)}</td>
+    </tr></table>`).join("");
   const payRows = !isQuote && splits?.length ? splits.map(s =>
     `<div class="row" style="font-size:12px;color:#555"><span>${PAY_LABEL[s.method]||s.method}</span><span>${sym}${(parseFloat(s.amount)||0).toFixed(2)}</span></div>`
   ).join("") : "";
   const changeRow = !isQuote && change > 0 ? `<div class="row" style="font-weight:700;color:green"><span>Change</span><span>${sym}${change.toFixed(2)}</span></div>` : "";
   return `<!DOCTYPE html><html><head><title>Receipt ${invId}</title>
 <style>@media print{@page{margin:4mm;size:80mm auto}body{margin:0;padding:0}}
-body{font-family:monospace;max-width:300px;margin:0 auto;padding:8px;font-size:13px}
+body{font-family:monospace;max-width:300px;margin:0 auto;padding:8px;font-size:13px;text-decoration:none;font-weight:normal}
 hr{border:none;border-top:1px dashed #999;margin:6px 0}
 .row{display:flex;justify-content:space-between;margin:2px 0;font-size:13px}
 </style></head><body>

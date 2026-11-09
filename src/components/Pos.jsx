@@ -599,6 +599,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [loadInput, setLoadInput] = useState("");
   const [loadErr, setLoadErr] = useState("");
   const [loadBusy, setLoadBusy] = useState(false);
+  const [quoteList, setQuoteList] = useState(null);   // pending quotes for the "Load quote" picker
+  const [quoteListOpen, setQuoteListOpen] = useState(false);
 
   // Payment — split support
   const [splits, setSplits] = useState([{ method: "cash", amount: "" }]);
@@ -890,9 +892,58 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     } finally { setSaving(false); }
   };
 
+  // Pending quotes list for the "Load quote" box: click it to see recent quotes, type to search by number, customer name, phone or amount
+  const fetchQuoteList = async () => {
+    try {
+      const rows = await api.get("customer_invoices", `status=eq.pos_quote&select=id,customer_name,customer_phone,total,invoice_date,created_at,branch_id&order=created_at.desc&limit=200`);
+      setQuoteList(Array.isArray(rows) ? rows.filter(r => !branchId || !r.branch_id || String(r.branch_id) === String(branchId)) : []);
+    } catch { setQuoteList([]); }
+  };
+  const quoteBox = (fs, pad) => {
+    const needle = loadInput.trim().toLowerCase();
+    const digits = needle.replace(/\D/g, "");
+    const hits = (quoteList || []).filter(r => !needle
+      || (r.id || "").toLowerCase().includes(needle)
+      || (r.customer_name || "").toLowerCase().includes(needle)
+      || (digits.length >= 3 && ((r.customer_phone || "").replace(/\D/g, "").includes(digits) || String(Math.round(+r.total || 0)).includes(digits)))
+    ).slice(0, 12);
+    return (
+      <div style={{ position: "relative" }}>
+        <div style={{ display: "flex", gap: 5 }}>
+          <input className="inp" value={loadInput}
+            onFocus={() => { setQuoteListOpen(true); fetchQuoteList(); }}
+            onBlur={() => setTimeout(() => setQuoteListOpen(false), 180)}
+            onChange={e => { setLoadInput(e.target.value.toUpperCase()); setLoadErr(""); setQuoteListOpen(true); }}
+            onKeyDown={e => e.key === "Enter" && loadQuote()}
+            placeholder="🔎 Quotes: number · customer · phone" style={{ flex: 1, fontSize: fs, fontFamily: "DM Mono,monospace", padding: pad }} />
+          <button className="btn btn-ghost" style={{ padding: pad, fontSize: fs, flexShrink: 0 }}
+            onClick={() => loadQuote()} disabled={loadBusy || !loadInput.trim()}>{loadBusy ? "…" : "Load"}</button>
+        </div>
+        {quoteListOpen && (
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 60, maxHeight: 280, overflow: "auto", boxShadow: "0 8px 24px rgba(0,0,0,.3)", marginTop: 2 }}>
+            {quoteList === null
+              ? <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>Loading quotes…</div>
+              : hits.length === 0
+                ? <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>No saved quotes{needle ? " match" : ""}</div>
+                : hits.map(r => (
+                  <button key={r.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "7px 10px", display: "block" }}
+                    onMouseDown={e => e.preventDefault()} onClick={() => loadQuote(r.id)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, fontWeight: 700 }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.customer_name || "Walk-in"}{r.customer_phone ? ` · ${r.customer_phone}` : ""}</span>
+                      <span style={{ color: "var(--accent)", flexShrink: 0 }}>{sym}{(+r.total || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text3)", fontFamily: "DM Mono,monospace" }}>{r.id} · {(r.invoice_date || r.created_at || "").slice(0, 10)}</div>
+                  </button>
+                ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Load an existing quote into the cart
-  const loadQuote = async () => {
-    const q = loadInput.trim().toUpperCase();
+  const loadQuote = async (idArg) => {
+    const q = (typeof idArg === "string" ? idArg : loadInput).trim().toUpperCase();
     if (!q) return;
     setLoadErr("");
     setLoadBusy(true);
@@ -913,7 +964,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       // discount / customer_id columns may not exist on older databases — derive from what is stored
       setDiscount(inv.discount != null ? +inv.discount : Math.max(0, (+inv.subtotal || 0) - (+inv.total || 0)));
       setQuoteId(q);
-      setLoadInput("");
+      setLoadInput(""); setQuoteListOpen(false);
 
       const c = inv.customer_id
         ? customers.find(c => String(c.id) === String(inv.customer_id))
@@ -1233,14 +1284,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)" }} onClick={() => setQuoteId(null)}>✕</button>
                 </div>
               ) : (
-                <div style={{ display: "flex", gap: 5 }}>
-                  <input className="inp" value={loadInput}
-                    onChange={e => { setLoadInput(e.target.value.toUpperCase()); setLoadErr(""); }}
-                    onKeyDown={e => e.key === "Enter" && loadQuote()}
-                    placeholder="Load quote: QT-…" style={{ flex: 1, fontSize: 13, fontFamily: "DM Mono,monospace", padding: "6px 8px" }} />
-                  <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 13, flexShrink: 0 }}
-                    onClick={loadQuote} disabled={loadBusy || !loadInput.trim()}>{loadBusy ? "…" : "Load"}</button>
-                </div>
+                quoteBox(13, "6px 8px")
               )}
               {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
             </div>
@@ -1575,16 +1619,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)" }} onClick={() => setQuoteId(null)}>✕</button>
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 5 }}>
-              <input className="inp" value={loadInput}
-                onChange={e => { setLoadInput(e.target.value.toUpperCase()); setLoadErr(""); }}
-                onKeyDown={e => e.key === "Enter" && loadQuote()}
-                placeholder="Load quote: QT-…" style={{ flex: 1, fontSize: 12, fontFamily: "DM Mono,monospace", padding: "5px 8px" }} />
-              <button className="btn btn-ghost" style={{ padding: "5px 10px", fontSize: 12, flexShrink: 0 }}
-                onClick={loadQuote} disabled={loadBusy || !loadInput.trim()}>
-                {loadBusy ? "…" : "Load"}
-              </button>
-            </div>
+            quoteBox(12, "5px 8px")
           )}
           {loadErr && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
         </div>

@@ -601,6 +601,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [loadBusy, setLoadBusy] = useState(false);
   const [quoteList, setQuoteList] = useState(null);   // pending quotes for the "Load quote" picker
   const [quoteListOpen, setQuoteListOpen] = useState(false);
+  const [quoteDays, setQuoteDays] = useState(7);          // only show quotes from the last N days (7 / 14 / 30)
 
   // Payment — split support
   const [splits, setSplits] = useState([{ method: "cash", amount: "" }]);
@@ -893,9 +894,10 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   };
 
   // Pending quotes list for the "Load quote" box: click it to see recent quotes, type to search by number, customer name, phone or amount
-  const fetchQuoteList = async () => {
+  const fetchQuoteList = async (days = quoteDays) => {
     try {
-      const rows = await api.get("customer_invoices", `status=eq.pos_quote&select=id,customer_name,customer_phone,total,invoice_date,created_at,branch_id&order=created_at.desc&limit=200`);
+      const since = new Date(Date.now() - days * 86400000).toISOString();
+      const rows = await api.get("customer_invoices", `status=eq.pos_quote&created_at=gte.${since}&select=id,customer_name,customer_phone,total,invoice_date,created_at,branch_id&order=created_at.desc&limit=200`);
       setQuoteList(Array.isArray(rows) ? rows.filter(r => !branchId || !r.branch_id || String(r.branch_id) === String(branchId)) : []);
     } catch { setQuoteList([]); }
   };
@@ -920,11 +922,19 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             onClick={() => loadQuote()} disabled={loadBusy || !loadInput.trim()}>{loadBusy ? "…" : "Load"}</button>
         </div>
         {quoteListOpen && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 60, maxHeight: 280, overflow: "auto", boxShadow: "0 8px 24px rgba(0,0,0,.3)", marginTop: 2 }}>
+          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 60, maxHeight: 300, overflow: "auto", boxShadow: "0 8px 24px rgba(0,0,0,.3)", marginTop: 2 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, background: "var(--surface2)" }}>
+              <span style={{ fontSize: 11, color: "var(--text3)", marginRight: 2 }}>Last</span>
+              {[7, 14, 30].map(d => (
+                <button key={d} className={quoteDays === d ? "btn btn-primary btn-xs" : "btn btn-ghost btn-xs"}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setQuoteDays(d); setQuoteList(null); fetchQuoteList(d); }}>{d} days</button>
+              ))}
+            </div>
             {quoteList === null
               ? <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>Loading quotes…</div>
               : hits.length === 0
-                ? <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>No saved quotes{needle ? " match" : ""}</div>
+                ? <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>No saved quotes{needle ? " match" : ""} in the last {quoteDays} days{quoteDays < 30 ? " — try a longer period" : ""}</div>
                 : hits.map(r => (
                   <button key={r.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "7px 10px", display: "block" }}
                     onMouseDown={e => e.preventDefault()} onClick={() => loadQuote(r.id)}>

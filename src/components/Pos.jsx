@@ -1268,7 +1268,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                       style={{ width: 44, textAlign: "center", padding: "4px 3px", fontSize: 15, fontWeight: 700 }} />
                     <button style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, width: 34, height: 34, fontWeight: 800, fontSize: 18, cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setQty(it.part_id, it.qty + 1)}>+</button>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>@</span>
-                    <input className="inp" type="number" min={0} step="0.01" value={it.price}
+                    <input className="inp" type="number" min={0} step="0.01" placeholder="0" value={it.price === 0 ? "" : it.price}
                       onChange={e => setItemPrice(it.part_id, e.target.value)}
                       style={{ flex: 1, textAlign: "right", padding: "4px 6px", fontSize: 14, fontWeight: 700 }} />
                     <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 16, fontWeight: 800, color: "var(--accent)", flexShrink: 0, minWidth: 64, textAlign: "right" }}>{sym}{(it.qty * it.price).toFixed(2)}</span>
@@ -1617,7 +1617,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   style={{ width: 36, textAlign: "center", padding: "2px 3px", fontSize: 13, fontWeight: 700 }} />
                 <button style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, width: 26, height: 26, fontWeight: 800, fontSize: 15, cursor: "pointer", color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setQty(it.part_id, it.qty + 1)}>+</button>
                 <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 2 }}>@</span>
-                <input className="inp" type="number" min={0} step="0.01" value={it.price}
+                <input className="inp" type="number" min={0} step="0.01" placeholder="0" value={it.price === 0 ? "" : it.price}
                   onChange={e => setItemPrice(it.part_id, e.target.value)}
                   style={{ flex: 1, textAlign: "right", padding: "2px 5px", fontSize: 13, fontWeight: 700, color: "var(--text)" }} />
                 <span style={{ fontFamily: "Rajdhani,sans-serif", fontSize: 14, fontWeight: 800, color: "var(--accent)", flexShrink: 0, minWidth: 56, textAlign: "right" }}>

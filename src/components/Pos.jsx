@@ -593,6 +593,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [customer, setCustomer] = useState(null);
   const [custSearch, setCustSearch] = useState("");
   const [newCust, setNewCust] = useState(null);   // inline "Add customer" form: { name, phone, busy }
+  const [custOpen, setCustOpen] = useState(false); // mobile: customer search expanded (collapsed = slim "Walk-in" line)
+  const [vfOpen, setVfOpen] = useState(false);       // mobile: vehicle filter panel expanded
 
   // Quote
   const [quoteId, setQuoteId] = useState(null);
@@ -745,7 +747,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
   const clearAll = () => {
     setCart([]); setDiscount(0); setDiscLocked(true); setSplits([{ method: "cash", amount: "" }]);
-    setCustomer(null); setCustSearch(""); setSearch2(""); setNewCust(null);
+    setCustomer(null); setCustSearch(""); setSearch2(""); setNewCust(null); setCustOpen(false);
     setQuoteId(null); setLoadInput(""); setLoadErr("");
   };
 
@@ -814,7 +816,12 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   };
 
   // Customer picker shown at the very top of the catalog (before the parts search): look up by name or number first
-  const customerBar = () => (
+  const customerBar = (compact = false) => (compact && !customer && !custOpen && !custSearch) ? (
+    <div style={{ padding: "5px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>👤 Walk-in</span>
+      <button className="btn btn-ghost btn-xs" onClick={() => setCustOpen(true)}>Choose customer</button>
+    </div>
+  ) : (
     <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: customer ? "rgba(52,211,153,.08)" : "var(--surface)", position: "relative", zIndex: 20 }}>
       {customer ? (
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1134,15 +1141,15 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
       {mobView === "catalog" ? (
         <>
-          {customerBar()}
+          {customerBar(true)}
           {/* Search + filter bar */}
-          <div style={{ padding: "10px 10px 8px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ position: "relative" }}>
               <input ref={searchRef} className="inp" value={searchInput}
                 onChange={e => setSearch2(e.target.value)}
                 onKeyDown={handleSearchKey}
                 placeholder={t.posSearchPlaceholder||"🔍 SKU · part name · barcode…"}
-                style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "2px solid var(--border)" }} />
+                style={{ fontSize: 14, fontWeight: 600, paddingRight: 32, width: "100%", boxSizing: "border-box", background: "var(--surface)", border: "1px solid var(--border-strong, var(--border))" }} />
               {searchInput && (
                 <button onClick={() => setSearch2("")}
                   style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 14 }}>✕</button>
@@ -1155,19 +1162,26 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <option value="__all__">{t.posAllCategories||"All Categories"}</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              {vehicles.length > 0 && (
+                <button onClick={() => setVfOpen(o => !o)} title="Filter by vehicle (make / model)"
+                  style={{ flexShrink: 0, background: vfOpen ? "var(--surface2)" : "var(--surface)", border: `1px solid ${vehicleFilterIds ? "var(--text2)" : "var(--border)"}`, borderRadius: 8, padding: "0 10px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--text2)", whiteSpace: "nowrap" }}>
+                  🚗 {vehicleFilterIds ? "Vehicle ●" : "Vehicle"} {vfOpen ? "▴" : "▾"}
+                </button>
+              )}
               <button onClick={handleRefresh} disabled={refreshing} title="Refresh parts"
-                style={{ flexShrink: 0, background: "var(--surface)", border: "2px solid var(--border)", borderRadius: 8, padding: "0 12px", cursor: refreshing ? "default" : "pointer", fontSize: 15, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
+                style={{ flexShrink: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "0 10px", cursor: refreshing ? "default" : "pointer", fontSize: 14, opacity: refreshing ? .5 : 1, transition: "opacity .2s" }}>
                 {refreshing ? "⏳" : "🔄"}
               </button>
               <button onClick={toggleSelectMode} title={selectMode ? "Exit select mode" : "Select parts to enquire"}
-                style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `2px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap" }}>
-                {selectMode ? "✕ Done" : "☑ Select"}
+                style={{ flexShrink: 0, background: selectMode ? "var(--blue)" : "var(--surface)", border: `1px solid ${selectMode ? "var(--blue)" : "var(--border)"}`, borderRadius: 8, padding: "0 10px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: selectMode ? "#fff" : "var(--text2)", whiteSpace: "nowrap" }}>
+                {selectMode ? "✕ Done" : "☑"}
               </button>
             </div>
 
+            {/* Vehicle filter stays mounted (keeps its make/model choice) but is only shown when expanded */}
             {vehicles.length > 0 && (
-              <div style={{ background: "var(--surface)", border: "2px solid var(--accent)", borderRadius: 8, padding: "7px 8px" }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".06em", color: "var(--accent)", textTransform: "uppercase", marginBottom: 5 }}>🚗 {t.posFilterByVehicle||"Filter by vehicle (make / model)"}</div>
+              <div style={{ display: vfOpen ? "block" : "none", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 8px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".05em", color: "var(--text3)", textTransform: "uppercase", marginBottom: 5 }}>{t.posFilterByVehicle||"Filter by vehicle (make / model)"}</div>
                 <PosVehicleFilter vehicles={vehicles} partFitments={partFitments} parts={parts} onFilter={setVehicleFilter2} onZoom={setLightbox} />
               </div>
             )}
@@ -1205,7 +1219,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                   // bulk "Ask Supplier →" bar below is the separate path for that.
                   const handleMobClick = selectMode ? () => toggleSelect(p.id) : () => addToCart(p);
                   return (
-                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "10px 12px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.7 : 1), cursor: "pointer" }}>
+                    <div key={p.id} onClick={handleMobClick} style={{ display: "flex", gap: 10, padding: "8px 10px", borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(96,165,250,.1)" : inCart ? "rgba(255,122,46,.08)" : idx % 2 === 0 ? "transparent" : "rgba(0,0,0,.015)", borderLeft: isSelected ? "3px solid var(--blue)" : inCart ? "3px solid var(--accent)" : "3px solid transparent", opacity: selectMode ? 1 : (p.stock <= 0 ? 0.7 : 1), cursor: "pointer" }}>
                       {selectMode && (
                         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()}
@@ -1213,22 +1227,22 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                         </div>
                       )}
                       {img
-                        ? <div style={{ width: 64, height: 64, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", flexShrink: 0, overflow: "hidden" }}
+                        ? <div style={{ width: 56, height: 56, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", flexShrink: 0, overflow: "hidden" }}
                             onClick={e => { e.stopPropagation(); setLightbox({ photos: [{ url: img, name: p.name }], index: 0 }); }}>
                             <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} onError={e => e.target.parentElement.style.display = "none"} />
                           </div>
-                        : <div style={{ width: 64, height: 64, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{p.image || "🔩"}</div>
+                        : <div style={{ width: 56, height: 56, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{p.image || "🔩"}</div>
                       }
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{p.name}</div>
-                        {p.sku && <div style={{ fontFamily: "DM Mono,monospace", fontSize: 13, color: "var(--blue)", fontWeight: 700 }}>{p.sku}</div>}
-                        {(p.make || p.model) && <div style={{ fontSize: 12, color: "var(--blue)" }}>🚗 {[p.make, p.model, p.year_range].filter(Boolean).join(" · ")}</div>}
+                        <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{p.name}</div>
+                        {p.sku && <div style={{ fontFamily: "DM Mono,monospace", fontSize: 12, color: "var(--blue)", fontWeight: 700 }}>{p.sku}</div>}
+                        {(p.make || p.model) && <div style={{ fontSize: 11, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🚗 {[p.make, p.model, p.year_range].filter(Boolean).join(" · ")}</div>}
                         {codes?.size > 0 && <div style={{ fontSize: 11, fontFamily: "DM Mono,monospace", color: "var(--accent)", fontWeight: 700 }}>{[...codes].sort().slice(0, 3).join(" · ")}</div>}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                           <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 17, color: "var(--accent)" }}>{sym}{(p.price || 0).toFixed(2)}</span>
                           <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 7px", borderRadius: 6, background: p.stock > 0 ? "rgba(52,211,153,.15)" : "rgba(248,113,113,.15)", color: p.stock > 0 ? "var(--green)" : "var(--red)", border: `1px solid ${p.stock > 0 ? "rgba(52,211,153,.3)" : "rgba(248,113,113,.3)"}` }}>{p.stock || 0}</span>
                           {inCart && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>+{inCart.qty} in cart</span>}
-                          {!inCart && p.stock <= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)" }}>{t.posTapToAddAnyway||"tap to add to quote anyway"}</span>}
+                          {!inCart && p.stock <= 0 && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)" }}>{t.posTapToAddAnyway||"tap to quote"}</span>}
                           {selectMode && isEnquirableMob && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)" }}>📤</span>}
                         </div>
                       </div>
@@ -1257,8 +1271,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
           {/* Cart summary bar — always visible at bottom */}
           <button onClick={() => setMobView("cart")}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "12px 16px", background: cartCount > 0 ? "var(--accent)" : "var(--surface2)", border: "none", borderTop: `2px solid ${cartCount > 0 ? "rgba(0,0,0,.1)" : "var(--border)"}`, cursor: "pointer", width: "100%", gap: 10, transition: "background .2s" }}>
-            <span style={{ fontSize: 22 }}>🛒</span>
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: cartCount > 0 ? "12px 16px" : "8px 16px", background: cartCount > 0 ? "var(--accent)" : "var(--surface2)", border: "none", borderTop: `2px solid ${cartCount > 0 ? "rgba(0,0,0,.1)" : "var(--border)"}`, cursor: "pointer", width: "100%", gap: 10, transition: "background .2s" }}>
+            <span style={{ fontSize: cartCount > 0 ? 22 : 18 }}>🛒</span>
             {cartCount > 0 ? (
               <>
                 <div style={{ flex: 1, textAlign: "left" }}>
@@ -1269,7 +1283,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <span style={{ color: "#fff", fontSize: 20 }}>›</span>
               </>
             ) : (
-              <div style={{ flex: 1, textAlign: "left", color: "var(--text3)", fontSize: 14, fontWeight: 600 }}>Cart is empty</div>
+              <div style={{ flex: 1, textAlign: "left", color: "var(--text3)", fontSize: 13, fontWeight: 600 }}>Cart is empty</div>
             )}
           </button>
         </>

@@ -4455,7 +4455,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       await tolerantWrite(b=>api.insert("customer_invoices",b),{id:invId,...payPayload,created_at:new Date().toISOString()});
     }
     for(const it of cart){
-      await api.insert("customer_invoice_items",{
+      await tolerantWrite(b=>api.insert("customer_invoice_items",b),{
         id:makeId("CIVI"),
         invoice_id:invId,
         part_id:it.part_id,

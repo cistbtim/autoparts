@@ -193,7 +193,7 @@ export const api = {
 };
 
 // Run a write (insert/patch) and, when PostgREST says a column doesn't exist (PGRST204), drop that
-// column from the payload and retry. Any other error is thrown instead of being silently ignored.
+// column from the payload and retry (also drops our own `id` when the DB generates it). Any other error is thrown instead of being silently ignored.
 // Keeps saves working on databases where newer optional columns haven't been added yet.
 export const tolerantWrite = async (write, payload) => {
   const body = { ...payload };
@@ -203,6 +203,8 @@ export const tolerantWrite = async (write, payload) => {
     if (!isErr) return res;
     const m = res.code === "PGRST204" ? /'([^']+)' column/.exec(res.message || "") : null;
     if (m && m[1] in body) { delete body[m[1]]; continue; }
+    // GENERATED ALWAYS identity id (428C9): let the database assign it instead of sending our own
+    if (res.code === "428C9" && "id" in body) { delete body.id; continue; }
     throw new Error(res.message || res.code || "Save failed");
   }
   throw new Error("Save failed");

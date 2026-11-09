@@ -849,6 +849,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const saveQuote = async () => {
     if (!cart.length) return;
     setSaving(true);
+    let createdHeader = null;
     try {
       const qId = quoteId || makeId("QT");
       const payload = {
@@ -868,6 +869,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
         await api.delete("customer_invoice_items", "invoice_id", quoteId);
       } else {
         await tolerantWrite(b => api.insert("customer_invoices", b), { id: qId, ...payload, created_at: new Date().toISOString() });
+        createdHeader = qId;
       }
 
       for (const it of cart) {
@@ -883,6 +885,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       clearAll();
     } catch (e) {
       // Previously a failed insert was ignored and "Quote Saved" was shown for a quote that did not exist.
+      if (createdHeader) { try { await api.delete("customer_invoice_items", "invoice_id", createdHeader); await api.delete("customer_invoices", "id", createdHeader); } catch { /* best effort */ } }
       alert("Quote was NOT saved: " + (e?.message || "unknown error"));
     } finally { setSaving(false); }
   };

@@ -810,6 +810,41 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     );
   };
 
+  // Customer picker shown at the very top of the catalog (before the parts search): look up by name or number first
+  const customerBar = () => (
+    <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: customer ? "rgba(52,211,153,.08)" : "var(--surface)", position: "relative", zIndex: 20 }}>
+      {customer ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 700, color: "var(--green)" }}>
+            👤 {customer.name}{customer.phone ? ` · ${customer.phone}` : ""}
+          </span>
+          <button className="btn btn-xs btn-ghost" onClick={() => { setCustomer(null); setCustSearch(""); }}>✕ Change</button>
+        </div>
+      ) : (
+        <div style={{ position: "relative" }}>
+          <input className="inp" value={custSearch} onChange={e => setCustSearch(e.target.value)}
+            placeholder="👤 Customer — search by name or number (skip = Walk-in)"
+            style={{ fontSize: 13, padding: "7px 10px", width: "100%", boxSizing: "border-box", border: "2px solid var(--accent)", background: "var(--surface)" }} />
+          {custSearch.length > 0 && (() => {
+            const lq2 = custSearch.toLowerCase(); const custDigits = custSearch.replace(/\D/g, "").replace(/^0+/, "");
+            const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch) || (custDigits.length >= 4 && (c.phone || "").replace(/\D/g, "").includes(custDigits))).slice(0, 6);
+            return (
+              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 60, maxHeight: 260, overflow: "auto", boxShadow: "0 8px 24px rgba(0,0,0,.3)", marginTop: 2 }}>
+                {hits.length > 0 ? hits.map(c => (
+                  <button key={c.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "9px 12px", fontSize: 13 }}
+                    onClick={() => { setCustomer(c); setCustSearch(""); }}>
+                    {c.name}{c.phone ? ` · ${c.phone}` : ""}
+                  </button>
+                )) : <div style={{ padding: "9px 12px", fontSize: 12, color: "var(--text3)" }}>No match — will record as Walk-in</div>}
+                {addCustomerBox()}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+
   // Save as quote (inserts/updates record, no stock deduction)
   const saveQuote = async () => {
     if (!cart.length) return;
@@ -1035,6 +1070,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
       {mobView === "catalog" ? (
         <>
+          {customerBar()}
           {/* Search + filter bar */}
           <div style={{ padding: "10px 10px 8px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ position: "relative" }}>
@@ -1343,6 +1379,9 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       {/* ══ LEFT: Parts catalog ══ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", background: "var(--bg)" }}>
 
+        {/* Customer first, then parts search */}
+        {customerBar()}
+
         {/* Search + filter bar */}
         <div style={{ padding: "10px 12px", borderBottom: "2px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 6 }}>
@@ -1586,38 +1625,6 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
           ))}
         </div>
 
-        {/* Customer */}
-        <div style={{ padding: "7px 12px", borderTop: "1px solid var(--border)", background: customer ? "rgba(52,211,153,.06)" : "var(--surface)" }}>
-          {customer ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600, color: "var(--green)" }}>
-                👤 {customer.name}{customer.phone ? ` · ${customer.phone}` : ""}
-              </span>
-              <button className="btn btn-xs btn-ghost" onClick={() => { setCustomer(null); setCustSearch(""); }}>✕</button>
-            </div>
-          ) : (
-            <div style={{ position: "relative" }}>
-              <input className="inp" value={custSearch} onChange={e => setCustSearch(e.target.value)}
-                placeholder="👤 Customer name or phone (optional)"
-                style={{ fontSize: 12, padding: "5px 8px" }} />
-              {custSearch.length > 0 && (() => {
-                const lq2 = custSearch.toLowerCase(); const custDigits = custSearch.replace(/\D/g, "").replace(/^0+/, "");
-                const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch) || (custDigits.length >= 4 && (c.phone || "").replace(/\D/g, "").includes(custDigits))).slice(0, 5);
-                return (
-                  <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 50, maxHeight: 180, overflow: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,.3)", marginBottom: 2 }}>
-                    {hits.length > 0 ? hits.map(c => (
-                      <button key={c.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13 }}
-                        onClick={() => { setCustomer(c); setCustSearch(""); }}>
-                        {c.name}{c.phone ? ` · ${c.phone}` : ""}
-                      </button>
-                    )) : <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text3)" }}>No match — will record as Walk-in</div>}
-                    {addCustomerBox()}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
 
         {/* ── Bottom: Totals + Payment — kept as compact as the numbers allow so
             the cart list above (flex:1) keeps most of the panel's height; this

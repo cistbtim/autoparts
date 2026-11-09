@@ -1,8 +1,8 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { getSettings, C } from "../lib/settings.js";
 import { api, tolerantWrite } from "../lib/api.js";
-import { makeId, toImgUrl, waLink, mailLink } from "../lib/helpers.js";
-import { getCategories } from "../lib/constants.js";
+import { makeId, toImgUrl, waLink, mailLink, toIntlPhone, phoneKey } from "../lib/helpers.js";
+import { getCategories, COUNTRY_DIAL_CODES } from "../lib/constants.js";
 import { AttachmentPicker } from "./shared.jsx";
 
 // ── Abbreviation expansion ────────────────────────────────────────────────────
@@ -746,12 +746,28 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     setQuoteId(null); setLoadInput(""); setLoadErr("");
   };
 
-  // Inline "Add customer" — shown under the customer search when there is no match
+  // Inline "Add customer" — shown under the customer search when there is no match.
+  // Name first, then a cellphone number with its country code (defaults to this deployment's code).
+  const defaultCC = () => ((settings?.whatsapp_country_code || getSettings().whatsapp_country_code || "27") + "").replace(/\D/g, "") || "27";
+  const newCustErr = (n) => {
+    if (!n.name.trim()) return "Enter the customer name first";
+    const d = n.phone.replace(/\D/g, "");
+    const intl = n.phone.trim().startsWith("+");
+    const len = intl ? d.length : d.replace(/^0+/, "").length;
+    if (!d) return "Cellphone number is required";
+    if (len < (intl ? 8 : 6) || len > (intl ? 15 : 12)) return "Cellphone number looks wrong";
+    return "";
+  };
   const saveNewCustomer = async () => {
-    if (!newCust || newCust.busy || !newCust.name.trim() || !newCust.phone.trim()) return;
-    setNewCust(n => ({ ...n, busy: true }));
+    if (!newCust || newCust.busy) return;
+    const err = newCustErr(newCust);
+    if (err) { setNewCust(n => ({ ...n, err })); return; }
+    const phone = toIntlPhone(newCust.cc, newCust.phone);
+    const dup = customers.find(c => c.phone && phoneKey(c.phone) === phoneKey(phone));
+    if (dup) { setCustomer(dup); setCustSearch(""); setNewCust(null); return; }   // already a customer — just use them
+    setNewCust(n => ({ ...n, busy: true, err: "" }));
     try {
-      const c = await onAddCustomer({ name: newCust.name.trim(), phone: newCust.phone.trim() });
+      const c = await onAddCustomer({ name: newCust.name.trim(), phone });
       if (c) { setCustomer(c); setCustSearch(""); setNewCust(null); }
       else setNewCust(n => ({ ...n, busy: false }));
     } catch { setNewCust(n => ({ ...n, busy: false })); }
@@ -762,20 +778,32 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       <div style={{ padding: "6px 10px" }}>
         <button className="btn btn-primary btn-xs" style={{ width: "100%" }} onClick={() => {
           const q = custSearch.trim(); const isPhone = /^[+\d][\d\s-]{5,}$/.test(q);
-          setNewCust({ name: isPhone ? "" : q, phone: isPhone ? q : "", busy: false });
+          setNewCust({ name: isPhone ? "" : q, cc: defaultCC(), phone: isPhone ? q : "", busy: false, err: "" });
         }}>➕ Add customer</button>
       </div>
     );
+    const nameOk = !!newCust.name.trim();
     return (
       <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid var(--border)" }}>
-        <input className="inp" autoFocus placeholder="Name *" value={newCust.name} style={{ fontSize: 13, padding: "6px 8px" }}
-          onChange={e => setNewCust(n => ({ ...n, name: e.target.value }))} />
-        <input className="inp" type="tel" placeholder="Phone *" value={newCust.phone} style={{ fontSize: 13, padding: "6px 8px" }}
-          onChange={e => setNewCust(n => ({ ...n, phone: e.target.value }))}
-          onKeyDown={e => e.key === "Enter" && saveNewCustomer()} />
+        <input className="inp" autoFocus placeholder="Customer name *" value={newCust.name} style={{ fontSize: 13, padding: "6px 8px" }}
+          onChange={e => setNewCust(n => ({ ...n, name: e.target.value, err: "" }))} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <select className="inp" value={newCust.cc} disabled={!nameOk} style={{ width: 112, flexShrink: 0, fontSize: 12, padding: "6px 4px" }}
+            onChange={e => setNewCust(n => ({ ...n, cc: e.target.value }))}>
+            {COUNTRY_DIAL_CODES.map(([name, code]) => <option key={name} value={code}>+{code} {name}</option>)}
+            {!COUNTRY_DIAL_CODES.some(([, code]) => code === newCust.cc) && <option value={newCust.cc}>+{newCust.cc}</option>}
+          </select>
+          <input className="inp" type="tel" disabled={!nameOk} placeholder={nameOk ? "Cellphone number *" : "Enter name first"} value={newCust.phone}
+            style={{ flex: 1, minWidth: 0, fontSize: 13, padding: "6px 8px" }}
+            onChange={e => setNewCust(n => ({ ...n, phone: e.target.value, err: "" }))}
+            onKeyDown={e => e.key === "Enter" && saveNewCustomer()} />
+        </div>
+        {newCust.err && <div style={{ fontSize: 11, color: "var(--red)" }}>⚠ {newCust.err}</div>}
+        {nameOk && newCust.phone.replace(/\D/g, "") && !newCustErr(newCust) &&
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>Will be saved as {toIntlPhone(newCust.cc, newCust.phone)}</div>}
         <div style={{ display: "flex", gap: 6 }}>
           <button className="btn btn-ghost btn-xs" style={{ flex: 1 }} onClick={() => setNewCust(null)}>Cancel</button>
-          <button className="btn btn-primary btn-xs" style={{ flex: 2 }} disabled={newCust.busy || !newCust.name.trim() || !newCust.phone.trim()}
+          <button className="btn btn-primary btn-xs" style={{ flex: 2 }} disabled={newCust.busy || !nameOk || !newCust.phone.trim()}
             onClick={saveNewCustomer}>{newCust.busy ? "…" : "Save customer"}</button>
         </div>
       </div>
@@ -1223,8 +1251,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                     placeholder="👤 Customer (optional)"
                     style={{ fontSize: 13, padding: "6px 10px" }} />
                   {custSearch.length > 0 && (() => {
-                    const lq2 = custSearch.toLowerCase();
-                    const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch)).slice(0, 5);
+                    const lq2 = custSearch.toLowerCase(); const custDigits = custSearch.replace(/\D/g, "").replace(/^0+/, "");
+                    const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch) || (custDigits.length >= 4 && (c.phone || "").replace(/\D/g, "").includes(custDigits))).slice(0, 5);
                     return (
                       <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 50, maxHeight: 180, overflow: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,.3)", marginBottom: 2 }}>
                         {hits.length > 0 ? hits.map(c => (
@@ -1573,8 +1601,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 placeholder="👤 Customer name or phone (optional)"
                 style={{ fontSize: 12, padding: "5px 8px" }} />
               {custSearch.length > 0 && (() => {
-                const lq2 = custSearch.toLowerCase();
-                const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch)).slice(0, 5);
+                const lq2 = custSearch.toLowerCase(); const custDigits = custSearch.replace(/\D/g, "").replace(/^0+/, "");
+                const hits = customers.filter(c => c.name?.toLowerCase().includes(lq2) || c.phone?.includes(custSearch) || (custDigits.length >= 4 && (c.phone || "").replace(/\D/g, "").includes(custDigits))).slice(0, 5);
                 return (
                   <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, zIndex: 50, maxHeight: 180, overflow: "auto", boxShadow: "0 -4px 20px rgba(0,0,0,.3)", marginBottom: 2 }}>
                     {hits.length > 0 ? hits.map(c => (

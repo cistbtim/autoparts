@@ -708,3 +708,17 @@ export function groupedRowsHtml(items, rowFn, fmt, ungroupedFn) {
   if (!rest.length) return sections;
   return sections + head("Other items", rest.length, "#475569") + plain(rest) + (ungroupedFn ? "" : foot("Other items", rest, "#475569", "#f1f5f9"));
 }
+
+// Build a full international phone ("+27833927725") from a dialling code and a locally typed number.
+// A number typed with its own leading "+" is treated as already international.
+export const toIntlPhone = (countryCode, local) => {
+  const raw = (local || "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (raw.startsWith("+")) return "+" + digits;
+  const cc = (countryCode || "").replace(/\D/g, "");
+  return "+" + cc + digits.replace(/^0+/, "");
+};
+// Digits-only key for comparing phone numbers regardless of "+", spaces or a local leading zero
+// (last 9 digits, so "0833927725" and "+27833927725" match).
+export const phoneKey = (p) => (p || "").replace(/\D/g, "").slice(-9);

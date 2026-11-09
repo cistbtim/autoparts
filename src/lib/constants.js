@@ -191,3 +191,16 @@ export const canAccess = (u) => {
   const s = getSubInfo(u);
   return s.status === "active" || s.status === "trial";
 };
+
+// Dialling codes for phone entry (customer add forms) — Africa first, then common trading partners.
+export const COUNTRY_DIAL_CODES = [
+  ["South Africa","27"],["Angola","244"],["Botswana","267"],["Eswatini","268"],["Lesotho","266"],["Mozambique","258"],
+  ["Namibia","264"],["Zambia","260"],["Zimbabwe","263"],["Malawi","265"],["Tanzania","255"],["Kenya","254"],["Uganda","256"],
+  ["Rwanda","250"],["DR Congo","243"],["Congo","242"],["Nigeria","234"],["Ghana","233"],["Cameroon","237"],["Ethiopia","251"],
+  ["Egypt","20"],["Morocco","212"],["Mauritius","230"],["Madagascar","261"],
+  ["China","86"],["Hong Kong","852"],["Taiwan","886"],["Japan","81"],["South Korea","82"],["India","91"],["Pakistan","92"],
+  ["Thailand","66"],["Vietnam","84"],["Malaysia","60"],["Singapore","65"],["Indonesia","62"],["Philippines","63"],
+  ["United Arab Emirates","971"],["Saudi Arabia","966"],["Turkey","90"],
+  ["United Kingdom","44"],["Ireland","353"],["Germany","49"],["France","33"],["Italy","39"],["Spain","34"],["Portugal","351"],["Netherlands","31"],
+  ["United States / Canada","1"],["Brazil","55"],["Australia","61"],["New Zealand","64"],
+];

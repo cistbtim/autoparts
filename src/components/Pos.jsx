@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { getSettings, C } from "../lib/settings.js";
-import { api } from "../lib/api.js";
+import { api, tolerantWrite } from "../lib/api.js";
 import { makeId, toImgUrl, waLink, mailLink } from "../lib/helpers.js";
 import { getCategories } from "../lib/constants.js";
 import { AttachmentPicker } from "./shared.jsx";
@@ -571,7 +571,7 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
 }
 
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null, t = {} }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, onAddCustomer = null, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null, t = {} }) {
   const sym = C();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -592,6 +592,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [custSearch, setCustSearch] = useState("");
+  const [newCust, setNewCust] = useState(null);   // inline "Add customer" form: { name, phone, busy }
 
   // Quote
   const [quoteId, setQuoteId] = useState(null);
@@ -741,8 +742,44 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
   const clearAll = () => {
     setCart([]); setDiscount(0); setDiscLocked(true); setSplits([{ method: "cash", amount: "" }]);
-    setCustomer(null); setCustSearch(""); setSearch2("");
+    setCustomer(null); setCustSearch(""); setSearch2(""); setNewCust(null);
     setQuoteId(null); setLoadInput(""); setLoadErr("");
+  };
+
+  // Inline "Add customer" — shown under the customer search when there is no match
+  const saveNewCustomer = async () => {
+    if (!newCust || newCust.busy || !newCust.name.trim() || !newCust.phone.trim()) return;
+    setNewCust(n => ({ ...n, busy: true }));
+    try {
+      const c = await onAddCustomer({ name: newCust.name.trim(), phone: newCust.phone.trim() });
+      if (c) { setCustomer(c); setCustSearch(""); setNewCust(null); }
+      else setNewCust(n => ({ ...n, busy: false }));
+    } catch { setNewCust(n => ({ ...n, busy: false })); }
+  };
+  const addCustomerBox = () => {
+    if (!onAddCustomer) return null;
+    if (!newCust) return (
+      <div style={{ padding: "6px 10px" }}>
+        <button className="btn btn-primary btn-xs" style={{ width: "100%" }} onClick={() => {
+          const q = custSearch.trim(); const isPhone = /^[+\d][\d\s-]{5,}$/.test(q);
+          setNewCust({ name: isPhone ? "" : q, phone: isPhone ? q : "", busy: false });
+        }}>➕ Add customer</button>
+      </div>
+    );
+    return (
+      <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid var(--border)" }}>
+        <input className="inp" autoFocus placeholder="Name *" value={newCust.name} style={{ fontSize: 13, padding: "6px 8px" }}
+          onChange={e => setNewCust(n => ({ ...n, name: e.target.value }))} />
+        <input className="inp" type="tel" placeholder="Phone *" value={newCust.phone} style={{ fontSize: 13, padding: "6px 8px" }}
+          onChange={e => setNewCust(n => ({ ...n, phone: e.target.value }))}
+          onKeyDown={e => e.key === "Enter" && saveNewCustomer()} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="btn btn-ghost btn-xs" style={{ flex: 1 }} onClick={() => setNewCust(null)}>Cancel</button>
+          <button className="btn btn-primary btn-xs" style={{ flex: 2 }} disabled={newCust.busy || !newCust.name.trim() || !newCust.phone.trim()}
+            onClick={saveNewCustomer}>{newCust.busy ? "…" : "Save customer"}</button>
+        </div>
+      </div>
+    );
   };
 
   // Save as quote (inserts/updates record, no stock deduction)
@@ -756,6 +793,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
         customer_name: customer?.name || "Walk-in",
         customer_phone: customer?.phone || "",
         date: new Date().toISOString().slice(0, 10),
+        invoice_date: new Date().toISOString().slice(0, 10),
         subtotal, discount, total,
         status: "pos_quote",
         is_pos: true,
@@ -763,14 +801,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       };
 
       if (quoteId) {
-        await api.patch("customer_invoices", "id", quoteId, payload);
+        await tolerantWrite(b => api.patch("customer_invoices", "id", quoteId, b), payload);
         await api.delete("customer_invoice_items", "invoice_id", quoteId);
       } else {
-        await api.insert("customer_invoices", { id: qId, ...payload, created_at: new Date().toISOString() });
+        await tolerantWrite(b => api.insert("customer_invoices", b), { id: qId, ...payload, created_at: new Date().toISOString() });
       }
 
       for (const it of cart) {
-        await api.insert("customer_invoice_items", {
+        await tolerantWrite(b => api.insert("customer_invoice_items", b), {
           id: makeId("CIVI"), invoice_id: qId,
           part_id: it.part_id, part_name: it.name, part_sku: it.sku,
           qty: it.qty, unit_price: it.price, total: it.qty * it.price,
@@ -780,6 +818,9 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       setQuoteId(qId);
       setDone({ invId: qId, cart: [...cart], customer, subtotal, discount, total, splits: [], change: 0, isQuote: true });
       clearAll();
+    } catch (e) {
+      // Previously a failed insert was ignored and "Quote Saved" was shown for a quote that did not exist.
+      alert("Quote was NOT saved: " + (e?.message || "unknown error"));
     } finally { setSaving(false); }
   };
 
@@ -803,14 +844,15 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
         price: +(it.unit_price || 0),
         qty: +(it.qty || 1),
       })));
-      setDiscount(+(inv.discount || 0));
+      // discount / customer_id columns may not exist on older databases — derive from what is stored
+      setDiscount(inv.discount != null ? +inv.discount : Math.max(0, (+inv.subtotal || 0) - (+inv.total || 0)));
       setQuoteId(q);
       setLoadInput("");
 
-      if (inv.customer_id) {
-        const c = customers.find(c => String(c.id) === String(inv.customer_id));
-        if (c) setCustomer(c);
-      }
+      const c = inv.customer_id
+        ? customers.find(c => String(c.id) === String(inv.customer_id))
+        : (inv.customer_phone && customers.find(c => c.phone && c.phone === inv.customer_phone));
+      if (c) setCustomer(c);
     } catch { setLoadErr("Error loading quote"); }
     finally { setLoadBusy(false); }
   };
@@ -827,6 +869,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       const invId = await onSave(cart, customer, payMethod, cashAmt, change, discount, quoteId);
       setDone({ invId, cart: [...cart], customer, subtotal, discount, total, splits: [...splits], change, isQuote: false });
       clearAll();
+    } catch (e) {
+      alert("Sale was NOT saved: " + (e?.message || "unknown error"));
     } finally { setSaving(false); }
   };
 
@@ -1187,6 +1231,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                           <button key={c.id} className="btn btn-ghost" style={{ width: "100%", textAlign: "left", padding: "10px 14px", fontSize: 14 }}
                             onClick={() => { setCustomer(c); setCustSearch(""); }}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</button>
                         )) : <div style={{ padding: "10px 14px", fontSize: 13, color: "var(--text3)" }}>No match — Walk-in</div>}
+                        {addCustomerBox()}
                       </div>
                     );
                   })()}
@@ -1538,6 +1583,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                         {c.name}{c.phone ? ` · ${c.phone}` : ""}
                       </button>
                     )) : <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text3)" }}>No match — will record as Walk-in</div>}
+                    {addCustomerBox()}
                   </div>
                 );
               })()}

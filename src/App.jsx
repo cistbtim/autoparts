@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { api, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
+import { api, tolerantWrite, setDemoMode, SUPABASE_URL, SUPABASE_KEY } from "./lib/api.js";
 import { getSettings, updateSettings, loadSettings, C, curSym } from "./lib/settings.js";
 import { T, registerLang, getLangs, setCurrentLang, tSt, ts } from "./lib/i18n.js";
 import { nameWithTags, toImgUrl, toSaveUrl, toLogoUrl, extractDriveId, stripCacheBuster, toFullUrl, partPhotoUrls, today, fmtAmt, fmtDT, fmtD, makeId, makeToken, detectGeoLocation, waLink, mailLink, stripFlag, openPartLabelsWindow, normMake, REF_REFERRER_REWARD_DAYS } from "./lib/helpers.js";
@@ -4434,6 +4434,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       customer_name:customer?.name||"Walk-in",
       customer_phone:customer?.phone||"",
       date:new Date().toISOString().slice(0,10),
+      invoice_date:new Date().toISOString().slice(0,10),
       subtotal,
       discount:discount||0,
       total,
@@ -4447,10 +4448,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     };
     if(existingQuoteId){
       // Convert saved quote to paid invoice — patch header, replace items
-      await api.patch("customer_invoices","id",existingQuoteId,payPayload);
+      await tolerantWrite(b=>api.patch("customer_invoices","id",existingQuoteId,b),payPayload);
       await api.delete("customer_invoice_items","invoice_id",existingQuoteId);
     } else {
-      await api.insert("customer_invoices",{id:invId,...payPayload,created_at:new Date().toISOString()});
+      // tolerantWrite: older databases lack some columns (customer_id, discount, date, created_by) — drop them rather than lose the invoice
+      await tolerantWrite(b=>api.insert("customer_invoices",b),{id:invId,...payPayload,created_at:new Date().toISOString()});
     }
     for(const it of cart){
       await api.insert("customer_invoice_items",{
@@ -4474,6 +4476,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     await refreshTables("customer_invoices","parts","inventory_logs");
     showToast(`✅ Sale complete — ${C()}${total.toFixed(2)}`);
     return invId;
+  };
+
+  // POS — add a customer on the spot; returns the saved row so the cart can use it straight away
+  const addPosCustomer=async(data)=>{
+    const r=await api.upsert("customers",{...data,orders:0,total_spent:0,branch_id:currentBranch?.id||null});
+    const nc=Array.isArray(r)?r[0]:null;
+    if(!nc?.id){showToast("Could not add customer: "+(r?.message||"unknown error"),"err");return null;}
+    await refreshTables("customers");
+    showToast("Customer added");
+    return nc;
   };
 
   // Customer Invoices
@@ -6984,6 +6996,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             partSuppliers={partSuppliers}
             settings={settings}
             onSave={savePosInvoice}
+            onAddCustomer={addPosCustomer}
             onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
             onRequestNewPart={()=>openM("partRequest")} t={t}/>
         )}

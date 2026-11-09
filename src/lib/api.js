@@ -192,6 +192,22 @@ export const api = {
   },
 };
 
+// Run a write (insert/patch) and, when PostgREST says a column doesn't exist (PGRST204), drop that
+// column from the payload and retry. Any other error is thrown instead of being silently ignored.
+// Keeps saves working on databases where newer optional columns haven't been added yet.
+export const tolerantWrite = async (write, payload) => {
+  const body = { ...payload };
+  for (let i = 0; i < 12; i++) {
+    const res = await write(body);
+    const isErr = res && !Array.isArray(res) && (res.code || res.message);
+    if (!isErr) return res;
+    const m = res.code === "PGRST204" ? /'([^']+)' column/.exec(res.message || "") : null;
+    if (m && m[1] in body) { delete body[m[1]]; continue; }
+    throw new Error(res.message || res.code || "Save failed");
+  }
+  throw new Error("Save failed");
+};
+
 // Upload a Blob/File to Supabase Storage and return the public URL.
 export const uploadToStorage = async (bucket, path, blob, contentType = "image/jpeg") => {
   const resp = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodeURIComponent(path).replace(/%2F/g, "/")}`, {

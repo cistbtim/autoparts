@@ -1036,7 +1036,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     // transferRequests is excluded here on purpose: TransferRequestCard fetches only
     // the part_suppliers rows it actually needs (its own request's items) instead of
     // the full 69k+ row table — that full fetch was the slow part on mobile data.
-    if(["inventory","suppliers","pos","partRequests","wsShopRequests","requestsKanban"].includes(tab)) loadPartSuppliers();
+    if(["inventory","suppliers","pos","partRequests","wsShopRequests","requestsKanban","buyerdesk"].includes(tab)) loadPartSuppliers();
   },[tab,loadPartSuppliers]);
 
   // Scoped load — always runs fresh (bypassing the SWR cache) whenever the Edit Part modal
@@ -5118,7 +5118,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // POS "Ask Supplier" requests: waiting for the buyer (draft) / replied to the salesman
   const _isPosReq=s=>/^POS request/.test(s.name||"");
   const _myReqName=user?.name||user?.username;
-  const posReqPending=rfqSessions.filter(s=>_isPosReq(s)&&s.status==="draft").length;
+  const posReqPending=rfqSessions.filter(s=>_isPosReq(s)&&s.status==="draft").length+wsShopRequests.filter(r=>r.status==="pending"||r.status==="escalated").length; // buyer queue: shop (POS) + workshop requests
   const posReqReplied=rfqSessions.filter(s=>_isPosReq(s)&&s.status==="replied"&&s.created_by===_myReqName).length;
   const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
   const pendingWsFeedback=workshopFeedback.filter(f=>f.status==="new").length;
@@ -7076,10 +7076,12 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         {tab==="buyerdesk"&&(
           <BuyerDeskPage
             sessions={rfqSessions} items={rfqItems} quotes={rfqQuotes}
-            parts={isBranchUser?displayParts:parts}
-            overdueAuto={overdueAutoRfq}
-            onReply={replyRfqToSales}
-            onRefresh={()=>refreshTables("rfq_sessions","rfq_items","rfq_quotes","parts")}
+            parts={isBranchUser?displayParts:parts} suppliers={suppliers} partSuppliers={partSuppliers} inquiries={inquiries} settings={settings}
+            lowStockParts={lowStock} wsRequests={wsShopRequests}
+            overdueAuto={overdueAutoRfq} role={role} user={user}
+            onReply={replyRfqToSales} onCreateRfq={createRfqSession} onEditPart={openPartEditor}
+            wsHandlers={{onReply:replyWsShopRequest,onEscalate:escalateWsShopRequest,onMainReply:mainReplyWsShopRequest,onDelete:deleteWsShopRequest,onSendInquiry:sendInquiry,onManualQuote:saveManualQuote,onAcceptQuote:acceptInquiry,onCancelOrder:cancelOrder,onEditPart:openPartEditor}}
+            onRefresh={()=>refreshTables("rfq_sessions","rfq_items","rfq_quotes","ws_shop_requests","parts")}
             onOpenRfq={(sid)=>{setRfqJumpSessionId(sid||null);setTab("rfq");}}/>
         )}
 

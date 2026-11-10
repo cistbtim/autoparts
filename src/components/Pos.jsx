@@ -1004,6 +1004,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       setDiscount(inv.discount != null ? +inv.discount : Math.max(0, (+inv.subtotal || 0) - (+inv.total || 0)));
       setQuoteId(q);
       setLoadInput(""); setQuoteListOpen(false);
+      setMobView("cart");
 
       const c = inv.customer_id
         ? customers.find(c => String(c.id) === String(inv.customer_id))
@@ -1164,6 +1165,11 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       {mobView === "catalog" ? (
         <>
           {customerBar(true)}
+          {/* Find a saved quote from the front page — loading it jumps to the cart */}
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface)", position: "relative", zIndex: 60 }}>
+            {quoteBox(13, "6px 8px")}
+            {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
+          </div>
           {/* Search + filter bar */}
           <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ position: "relative" }}>
@@ -1321,19 +1327,14 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
           {/* Rest of cart: quote bar, items, customer, totals, payment */}
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-            {/* Quote bar */}
-            <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: quoteId ? "rgba(96,165,250,.08)" : "var(--surface)" }}>
-              {quoteId ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: "var(--blue)", fontWeight: 800, fontFamily: "DM Mono,monospace" }}>📋 {quoteId}</span>
-                  <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>quote loaded</span>
-                  <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)" }} onClick={() => setQuoteId(null)}>✕</button>
-                </div>
-              ) : (
-                quoteBox(13, "6px 8px")
-              )}
-              {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
-            </div>
+            {/* Loaded-quote chip (quotes are searched from the Parts page) */}
+            {quoteId && (
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", background: "rgba(96,165,250,.08)", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: "var(--blue)", fontWeight: 800, fontFamily: "DM Mono,monospace" }}>📋 {quoteId}</span>
+                <span style={{ fontSize: 12, color: "var(--text3)", flex: 1 }}>quote loaded</span>
+                <button className="btn btn-xs btn-ghost" style={{ color: "var(--red)" }} onClick={() => setQuoteId(null)}>✕</button>
+              </div>
+            )}
 
             {/* Cart items — natural height (the whole panel scrolls), so every selected item is visible */}
             <div style={{ flexShrink: 0, background: "var(--surface)" }}>

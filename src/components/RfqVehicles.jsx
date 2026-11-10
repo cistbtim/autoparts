@@ -594,7 +594,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22,flexWrap:"wrap",gap:10}}>
         <div>
           <h1 style={{fontSize:20,fontWeight:700}}>📋 {t.rfqSession}</h1>
-          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rfqSessions.length} {t.rfqSesCount}</p>
+          <p style={{color:"var(--text3)",fontSize:13,marginTop:3}}>{rfqSessions.filter(s=>!/^POS request/.test(s.name||"")).length} {t.rfqSesCount} <span style={{marginLeft:6}}>· requests from sales are on the <b>Buyer Desk</b></span></p>
         </div>
         <button className="btn btn-primary" onClick={()=>{setView("create");setWStep(1);setWParts([]);setWSuppliers([]);}}>
           + {t.newRfq}
@@ -604,7 +604,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
         <table className="tbl">
           <thead><tr>{[t.name,t.status,t.parts,t.suppliers,t.rfqQuotes,t.rfqCreated,t.actions].map(h=><th key={h}>{h}</th>)}</tr></thead>
           <tbody>
-            {rfqSessions.map(s=>{
+            {rfqSessions.filter(s=>!/^POS request/.test(s.name||"")).map(s=>{
               const sItems=rfqItems.filter(i=>i.rfq_id===s.id);
               const sQuotes=rfqQuotes.filter(q=>q.rfq_id===s.id);
               const sSuppIds=[...new Set(sQuotes.map(q=>q.supplier_id))];
@@ -645,7 +645,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                 </tr>
               );
             })}
-            {rfqSessions.length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.rfqNoSessions}</td></tr>}
+            {rfqSessions.filter(s=>!/^POS request/.test(s.name||"")).length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:36,color:"var(--text3)"}}>{t.rfqNoSessions}</td></tr>}
           </tbody>
         </table>
       </div>

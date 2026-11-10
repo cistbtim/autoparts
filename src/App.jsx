@@ -22,6 +22,7 @@ import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
 import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
 import { PosPage, MyRequestsPage } from "./components/Pos.jsx";
+import { BuyerDeskPage } from "./components/BuyerDesk.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { RentalDashboardPage, RentalVehiclesPage, RentalBookingsPage, RentalCustomersPage, RentalProfilePage } from "./components/Rental.jsx";
@@ -5288,7 +5289,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
         {id:"supplierPricing",icon:"💰",label:"Supplier Pricing",roles:["admin"],badge:(allSupplierParts.filter(p=>!p.price).length+supplierCostUpdates.length)||0},
-        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:(overdueAutoRfq+posReqPending)||0},
+        {id:"buyerdesk",icon:"🧑‍💼",label:"Buyer Desk",roles:["admin"],badge:posReqPending||0},
+        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:overdueAutoRfq||0},
         {id:"inquiries",icon:"📩",label:t.inquiries,roles:["admin"],badge:pendingInq},
         {id:"purchaseInvoices",icon:"🧾",label:t.purchaseInvoices,roles:["admin"]},
         {id:"supplierReturns",icon:"↩️",label:t.supplierReturns,roles:["admin"]},
@@ -5559,14 +5561,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers", icon:"👥",label:t.customers},
-      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ",badge:(overdueAutoRfq+posReqPending)||0},
+      {id:"buyerdesk", icon:"🧑‍💼",label:"Buyer Desk",badge:posReqPending||0},
+      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
       {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     if(role==="branch_admin") return [
       {id:"inventory",       icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",          icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers",       icon:"👥",label:t.customers},
-      {id:"rfq",             icon:"📋",label:t.rfqSession||"RFQ",badge:(overdueAutoRfq+posReqPending)||0},
+      {id:"buyerdesk",       icon:"🧑‍💼",label:"Buyer Desk",badge:posReqPending||0},
+      {id:"rfq",             icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
       {id:"suppliers",       icon:"🏭",label:t.suppliers},
       {id:"vehicleRequests", icon:"🚗",label:"Vehicle Requests",badge:pendingVehicleRequests},
       {id:"branch_users",    icon:"👤",label:"Users"},
@@ -7066,6 +7070,17 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onAskBuyer={savePosSupplierRequest}
             onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
             onRequestNewPart={()=>openM("partRequest")} t={t}/>
+        )}
+
+        {/* ── BUYER DESK (requests from sales) ── */}
+        {tab==="buyerdesk"&&(
+          <BuyerDeskPage
+            sessions={rfqSessions} items={rfqItems} quotes={rfqQuotes}
+            parts={isBranchUser?displayParts:parts}
+            overdueAuto={overdueAutoRfq}
+            onReply={replyRfqToSales}
+            onRefresh={()=>refreshTables("rfq_sessions","rfq_items","rfq_quotes","parts")}
+            onOpenRfq={(sid)=>{setRfqJumpSessionId(sid||null);setTab("rfq");}}/>
         )}
 
         {/* ── MY REQUESTS (POS "Ask Supplier" requests + buyer replies) ── */}

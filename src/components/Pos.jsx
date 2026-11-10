@@ -760,7 +760,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       if (ex) return prev.map(i => i.part_id === part.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { part_id: part.id, sku: part.sku || "", name: part.name, price: +(part.price || 0), qty: 1 }];
     });
-    searchRef.current?.focus();
+    // Keep the search box focused for scanner/keyboard use — but never on touch screens, where it pops the keyboard up
+    if (!window.matchMedia?.("(pointer: coarse)").matches) searchRef.current?.focus();
   };
 
   const removeFromCart = (pid) => setCart(prev => prev.filter(i => i.part_id !== pid));

@@ -7,7 +7,7 @@ import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 
-export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onDeleteSession,onEditPart,t,user,settings,initialSessionId=null,onConsumeInitialSession}) {
+export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onAddSuppliers,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onDeleteSession,onEditPart,t,user,settings,initialSessionId=null,onConsumeInitialSession}) {
   const [view,setView]=useState("list"); // list | create | detail
   const [activeSession,setActiveSession]=useState(null);
 
@@ -74,6 +74,11 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
   const [wStep,setWStep]=useState(1); // 1=parts 2=suppliers 3=review
   const [wSearch,setWSearch]=useState("");
   const [wSupSearch,setWSupSearch]=useState("");
+  // Detail view: buyer adds suppliers to a saved request (e.g. a POS "Ask Supplier" draft)
+  const [addSupOpen,setAddSupOpen]=useState(false);
+  const [addSupSel,setAddSupSel]=useState([]);
+  const [addSupBusy,setAddSupBusy]=useState(false);
+  const [addSupSearch,setAddSupSearch]=useState("");
 
   const filteredParts=wSearch?parts.filter(p=>(p.name+p.sku+p.chinese_desc).toLowerCase().includes(wSearch.toLowerCase())):parts;
   const togglePart=(p)=>setWParts(prev=>{
@@ -271,6 +276,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             {prevSession&&<button className="btn btn-ghost btn-sm" onClick={()=>openSession(prevSession)}>← Prev</button>}
             {nextSession&&<button className="btn btn-ghost btn-sm" onClick={()=>openSession(nextSession)}>Next →</button>}
             <button className="btn btn-ghost btn-sm" onClick={handleRefresh}>🔄 Refresh</button>
+            {onAddSuppliers&&activeSession.status!=="ordered"&&<button className="btn btn-ghost btn-sm" style={{color:"var(--blue)"}} onClick={()=>{setAddSupSel([]);setAddSupSearch("");setAddSupOpen(o=>!o);}}>➕ Add suppliers</button>}
             {hasSelected&&<button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={handleUnselectAll}>✕ Unselect All</button>}
             {activeSession.status==="ordered"
               ? <span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)",padding:"6px 14px"}}>✅ Ordered</span>
@@ -278,6 +284,39 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             }
           </div>
         </div>
+
+        {allSuppliers.length===0&&!addSupOpen&&(
+          <div style={{padding:"12px 14px",marginBottom:14,borderRadius:10,background:"rgba(96,165,250,.08)",border:"1px solid rgba(96,165,250,.3)",fontSize:13,color:"var(--text2)"}}>
+            🆕 No suppliers yet — this request is waiting for the buyer. Tap <b>➕ Add suppliers</b>, choose who to ask, then send them the link to quote price &amp; stock.
+          </div>
+        )}
+        {addSupOpen&&(
+          <div className="card" style={{padding:14,marginBottom:14}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>Choose suppliers to ask ({sessionItems.length} part{sessionItems.length!==1?"s":""})</div>
+            <input className="inp" style={{marginBottom:8}} value={addSupSearch} onChange={e=>setAddSupSearch(e.target.value)} placeholder="Search suppliers..."/>
+            <div style={{border:"1px solid var(--border)",borderRadius:10,overflow:"hidden",maxHeight:300,overflowY:"auto"}}>
+              {suppliers.filter(s=>!allSuppliers.some(a=>String(a.id)===String(s.id))&&(!addSupSearch||((s.name||"")+(s.email||"")+(s.phone||"")).toLowerCase().includes(addSupSearch.toLowerCase()))).map(s=>{
+                const sel=addSupSel.some(x=>x.id===s.id);
+                return (
+                  <label key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderBottom:"1px solid var(--border)",background:sel?"rgba(255,154,92,.06)":"transparent",cursor:"pointer"}}>
+                    <input type="checkbox" checked={sel} onChange={()=>setAddSupSel(prev=>sel?prev.filter(x=>x.id!==s.id):[...prev,s])} style={{accentColor:"var(--accent)",width:16,height:16}}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:14}}>{s.name}</div>
+                      <div style={{fontSize:12,color:"var(--text3)"}}>{s.phone&&<span style={{marginRight:10}}>📞 {s.phone}</span>}{s.email&&<span>✉ {s.email}</span>}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddSupOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{flex:2}} disabled={addSupSel.length===0||addSupBusy}
+                onClick={async()=>{setAddSupBusy(true);try{await onAddSuppliers(activeSession.id,addSupSel);needSync.current=true;await onRefresh();setAddSupOpen(false);}finally{setAddSupBusy(false);}}}>
+                {addSupBusy?"Creating…":`Create quote requests (${sessionItems.length*addSupSel.length})`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Progress */}
         <div style={{background:"var(--surface2)",borderRadius:99,height:6,marginBottom:16,overflow:"hidden"}}>
@@ -534,6 +573,7 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                 <tr key={s.id} style={isOverdue?{background:"rgba(255,154,92,.08)",outline:"1px solid rgba(255,154,92,.3)"}:{}}>
                   <td style={{fontWeight:600}}>
                     {s.name}
+                    {sQuotes.length===0&&<span className="badge" style={{marginLeft:6,fontSize:10,background:"rgba(96,165,250,.15)",color:"var(--blue)"}}>🆕 needs suppliers</span>}
                     {s.is_auto&&<span style={{marginLeft:6,fontSize:11,color:"var(--text3)",fontWeight:400}}>auto</span>}
                   </td>
                   <td>

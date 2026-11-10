@@ -593,7 +593,7 @@ function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, se
 }
 
 // ── Main POS page ─────────────────────────────────────────────────────────────
-export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, onAddCustomer = null, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null, t = {} }) {
+export function PosPage({ parts, customers, vehicles = [], partFitments = [], onSave, onRefresh, onAddCustomer = null, onAskBuyer = null, branchId = null, suppliers = [], partSuppliers = [], settings = {}, onRequestNewPart = null, t = {} }) {
   const sym = C();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => {
@@ -616,6 +616,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [custSearch, setCustSearch] = useState("");
   const [newCust, setNewCust] = useState(null);   // inline "Add customer" form: { name, phone, busy }
   const [custOpen, setCustOpen] = useState(false); // mobile: customer search expanded (collapsed = slim "Walk-in" line)
+  const [askBusy, setAskBusy] = useState(false);    // "Ask Supplier" request being saved
+  const [askMsg, setAskMsg] = useState("");
   const [vfOpen, setVfOpen] = useState(false);       // mobile: vehicle filter panel expanded
 
   // Quote
@@ -979,6 +981,25 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
       </div>
     );
   };
+
+  // "Ask Supplier" only SAVES the request (an RFQ draft with the cart parts) — the buyer picks suppliers and collects price/stock on the RFQ screen
+  const askBuyer = async () => {
+    if (!cart.length || !onAskBuyer || askBusy) return;
+    setAskBusy(true); setAskMsg("");
+    try {
+      await onAskBuyer(cart, customer, quoteId);
+      setAskMsg("✓ Request saved — the buyer will see it in RFQ");
+      setTimeout(() => setAskMsg(""), 5000);
+    } catch (e) { alert("Request was NOT saved: " + (e?.message || "unknown error")); }
+    finally { setAskBusy(false); }
+  };
+  const askBuyerBtn = (style) => onAskBuyer && (
+    <>
+      <button className="btn btn-ghost" style={{ borderColor: "rgba(96,165,250,.4)", color: "var(--blue)", ...style }}
+        onClick={askBuyer} disabled={askBusy || cart.length === 0}>{askBusy ? "Saving…" : "📤 Ask Supplier (save request)"}</button>
+      {askMsg && <div style={{ fontSize: 12, color: "var(--green)", fontWeight: 600, textAlign: "center" }}>{askMsg}</div>}
+    </>
+  );
 
   // Load an existing quote into the cart
   const loadQuote = async (idArg) => {
@@ -1455,6 +1476,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                 <button className="btn btn-ghost" style={{ flex: 1, fontSize: 13, padding: "9px 0", borderColor: "rgba(107,114,128,.3)", color: "var(--text3)" }}
                   onClick={clearAll} disabled={cart.length === 0}>🗑 Clear</button>
               </div>
+              {askBuyerBtn({ width: "100%", fontSize: 13, padding: "9px 0" })}
             </div>
           </div>
         </div>
@@ -1802,6 +1824,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
             <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: 13, color: "var(--text3)" }}
               title="Clear cart" onClick={clearAll}>🗑</button>
           </div>
+          {askBuyerBtn({ width: "100%", fontSize: 12, padding: "6px 0" })}
         </div>
       </div>
     </div>

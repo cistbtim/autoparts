@@ -4574,7 +4574,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     showToast("✅ Scrapyard settings saved");
   };
   // ── RFQ functions ──────────────────────────────────────────
-  const createRfqSession=async(name,deadline,selectedParts,selectedSuppliers)=>{
+  const createRfqSession=async(name,deadline,selectedParts,selectedSuppliers,silent=false)=>{
     const sid=makeId("RFQ");
     await api.insert("rfq_sessions",{
       id:sid, name, status:"draft", deadline:deadline||"",
@@ -4604,8 +4604,44 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     }
     for(const q of quotes) await api.insert("rfq_quotes",q);
     await refreshTables("rfq_sessions","rfq_items","rfq_quotes");
-    showToast(`✅ RFQ created — ${items.length} parts × ${selectedSuppliers.length} suppliers`);
+    if(!silent) showToast(`✅ RFQ created — ${items.length} parts × ${selectedSuppliers.length} suppliers`);
     return sid;
+  };
+
+  // POS "Ask Supplier": only SAVES the request as a draft RFQ (parts, no suppliers yet) —
+  // the buyer opens the RFQ screen, adds suppliers and collects price/stock there.
+  const savePosSupplierRequest=async(cart,customer,quoteId)=>{
+    const sel=cart.map(it=>{
+      const p=parts.find(x=>String(x.id)===String(it.part_id))||{};
+      return {...p, id:it.part_id, name:it.name||p.name, sku:it.sku||p.sku, qty_needed:Math.max(1,+it.qty||1)};
+    });
+    const name=`POS request${quoteId?` · ${quoteId}`:""} · ${customer?.name||"Walk-in"}`;
+    const sid=await createRfqSession(name,"",sel,[],true);
+    showToast(`📤 Request saved for the buyer — ${sel.length} part${sel.length!==1?"s":""} (RFQ)`);
+    return sid;
+  };
+
+  // Buyer adds suppliers to an existing (draft) RFQ session — one pending quote per item × supplier
+  const addRfqSuppliers=async(sid,sups)=>{
+    const items=rfqItems.filter(i=>i.rfq_id===sid);
+    let n=0;
+    for(const item of items){
+      for(const sup of sups){
+        if(rfqQuotes.some(q=>q.rfq_item_id===item.id&&String(q.supplier_id)===String(sup.id))) continue;
+        await api.insert("rfq_quotes",{
+          id:makeId("RFQQ"), rfq_id:sid, rfq_item_id:item.id,
+          supplier_id:String(sup.id), supplier_name:sup.name,
+          supplier_part_no:"", unit_price:null, stock_qty:null, lead_days:null,
+          notes:"", token:makeToken(), status:"pending",
+          created_at:new Date().toISOString()
+        });
+        n++;
+      }
+    }
+    const sess=rfqSessions.find(s=>s.id===sid);
+    if(sess?.status==="draft") await api.patch("rfq_sessions","id",sid,{status:"sent"});
+    await refreshTables("rfq_sessions","rfq_quotes");
+    showToast(`✅ ${n} quote request${n!==1?"s":""} created`);
   };
 
   const updateRfqStatus=async(sid,status)=>{
@@ -6921,7 +6957,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <RfqPage
             parts={isBranchUser?displayParts:parts} suppliers={suppliers}
             rfqSessions={rfqSessions} rfqItems={rfqItems} rfqQuotes={rfqQuotes}
-            onCreate={createRfqSession} onUpdateStatus={updateRfqStatus}
+            onCreate={createRfqSession} onAddSuppliers={addRfqSuppliers} onUpdateStatus={updateRfqStatus}
             onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}
             onUnselectAll={unselectAllRfq} onRefresh={loadAll}
             onCreatePO={createPOFromRfq} onResendStale={checkStaleRfqs} onDeleteSession={deleteRfqSession}
@@ -6997,6 +7033,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             settings={settings}
             onSave={savePosInvoice}
             onAddCustomer={addPosCustomer}
+            onAskBuyer={savePosSupplierRequest}
             onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
             onRequestNewPart={()=>openM("partRequest")} t={t}/>
         )}

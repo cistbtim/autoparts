@@ -1307,6 +1307,13 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
                           {selectMode && isEnquirableMob && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--blue)" }}>📤</span>}
                         </div>
                       </div>
+                      {inCart && !selectMode && (
+                        <button title={inCart.qty > 1 ? "Remove one" : "Remove from cart"}
+                          onClick={e => { e.stopPropagation(); setQty(p.id, inCart.qty - 1); }}
+                          style={{ alignSelf: "center", flexShrink: 0, minWidth: 44, height: 44, borderRadius: 10, border: "1px solid rgba(248,113,113,.4)", background: "var(--surface)", color: "var(--red)", fontWeight: 800, fontSize: inCart.qty > 1 ? 22 : 16, cursor: "pointer" }}>
+                          {inCart.qty > 1 ? "−" : "✕"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}

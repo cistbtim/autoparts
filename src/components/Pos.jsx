@@ -234,15 +234,22 @@ function PosVehicleFilter({ vehicles, partFitments, parts, onFilter, onZoom }) {
           onClick={() => { setMake(""); setModel(""); setCode(""); onFilter(null); }}>✕ Clear</button>
       )}
 
-      {vehiclePhotos.map(({ url, label }, i) => (
-        <img key={label} src={url} alt={label} title={label}
-          style={{ height: 52, maxWidth: 90, objectFit: "contain", borderRadius: 7, background: "var(--surface2)", border: "1px solid var(--border)", flexShrink: 0, cursor: "zoom-in" }}
-          onError={e => e.target.style.display = "none"}
-          onClick={() => onZoom?.({
-            photos: vehiclePhotos.map(p => ({ url: p.url, name: `${make} ${model}${code ? " " + code : ""} — ${p.label}` })),
-            index: i,
-          })} />
-      ))}
+      {vehiclePhotos.length > 0 && (
+        <div style={{ flexBasis: "100%", display: "grid", gridTemplateColumns: `repeat(${vehiclePhotos.length}, minmax(0, 1fr))`, gap: 5 }}>
+          {vehiclePhotos.map(({ url, label }, i) => (
+            <div key={label} style={{ position: "relative", height: 44, borderRadius: 6, overflow: "hidden", background: "var(--surface2)", border: "1px solid var(--border)", cursor: "zoom-in" }}
+              onClick={() => onZoom?.({
+                photos: vehiclePhotos.map(p => ({ url: p.url, name: `${make} ${model}${code ? " " + code : ""} — ${p.label}` })),
+                index: i,
+              })}>
+              <img src={url} alt={label} title={label} loading="lazy"
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                onError={e => e.target.style.display = "none"} />
+              <span style={{ position: "absolute", left: 3, bottom: 2, fontSize: 9, fontWeight: 700, color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,.8)" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -364,9 +371,21 @@ function PosDone({ sale, onNewSale }) {
   const sym = C();
   const { invId, cart, customer, subtotal, discount, total, splits, change, isQuote } = sale;
   const now = new Date();
+  const [copied, setCopied] = useState(false);
+  const copyId = async () => {
+    try { await navigator.clipboard.writeText(String(invId)); }
+    catch {
+      const ta = document.createElement("textarea");
+      ta.value = String(invId); document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch { /* ignore */ }
+      document.body.removeChild(ta);
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 1800);
+  };
 
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: 20 }}>
+      <button className="btn btn-ghost" style={{ marginBottom: 10, fontWeight: 700 }} onClick={onNewSale}>← Return to POS</button>
       <div className="card" style={{ padding: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div style={{ fontSize: 44 }}>{isQuote ? "📋" : "✅"}</div>
@@ -377,6 +396,9 @@ function PosDone({ sale, onNewSale }) {
             #{invId}
             {!isQuote && ` · ${now.toLocaleString()}`}
           </div>
+          <button className="btn btn-ghost btn-xs" style={{ marginTop: 8 }} onClick={copyId}>
+            {copied ? "✓ Copied" : `📋 Copy ${isQuote ? "quote" : "invoice"} ID`}
+          </button>
           {isQuote && (
             <div style={{ marginTop: 8, padding: "8px 16px", background: "rgba(96,165,250,.1)", border: "1px solid rgba(96,165,250,.3)", borderRadius: 8, fontSize: 13, color: "var(--blue)" }}>
               Give this number to the customer to collect their order
@@ -443,7 +465,7 @@ function PosDone({ sale, onNewSale }) {
           </button>
           <button className="btn btn-ghost" style={{ padding: "9px 0", fontSize: 13, color: "var(--text3)", marginTop: 4 }}
             onClick={onNewSale}>
-            ➕ New Sale
+            ← Return to POS
           </button>
         </div>
       </div>
@@ -1313,8 +1335,8 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
               {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
             </div>
 
-            {/* Cart items */}
-            <div style={{ flex: 1, overflowY: "auto", background: "var(--surface)" }}>
+            {/* Cart items — natural height (the whole panel scrolls), so every selected item is visible */}
+            <div style={{ flexShrink: 0, background: "var(--surface)" }}>
               {cart.length === 0 ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 120, color: "var(--text3)", flexDirection: "column", gap: 8 }}>
                   <div style={{ fontSize: 36, opacity: .3 }}>🛒</div>

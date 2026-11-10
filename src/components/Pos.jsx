@@ -616,6 +616,7 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
   const [custSearch, setCustSearch] = useState("");
   const [newCust, setNewCust] = useState(null);   // inline "Add customer" form: { name, phone, busy }
   const [custOpen, setCustOpen] = useState(false); // mobile: customer search expanded (collapsed = slim "Walk-in" line)
+  const [lookupMode, setLookupMode] = useState("customer"); // mobile front page: one search area, switch between Customer / Quote
   const [askBusy, setAskBusy] = useState(false);    // "Ask Supplier" request being saved
   const [askMsg, setAskMsg] = useState("");
   const [vfOpen, setVfOpen] = useState(false);       // mobile: vehicle filter panel expanded
@@ -1185,11 +1186,21 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
 
       {mobView === "catalog" ? (
         <>
-          {customerBar(true)}
-          {/* Find a saved quote from the front page — loading it jumps to the cart */}
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface)", position: "relative", zIndex: 60 }}>
-            {quoteBox(13, "6px 8px")}
-            {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
+          {/* One shared lookup area — choose what to search: customer, or a saved quote (loading a quote jumps to the cart) */}
+          <div style={{ position: "relative", zIndex: 60, background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 0" }}>
+              <span style={{ fontSize: 11, color: "var(--text3)" }}>Search</span>
+              {[["customer", "👤 Customer"], ["quote", "📋 Quote"]].map(([m, lbl]) => (
+                <button key={m} className={lookupMode === m ? "btn btn-primary btn-xs" : "btn btn-ghost btn-xs"}
+                  onClick={() => { setLookupMode(m); setQuoteListOpen(false); setLoadErr(""); }}>{lbl}</button>
+              ))}
+            </div>
+            {lookupMode === "customer" ? customerBar() : (
+              <div style={{ padding: "6px 10px 8px" }}>
+                {quoteBox(13, "6px 8px")}
+                {loadErr && <div style={{ fontSize: 12, color: "var(--red)", marginTop: 3 }}>{loadErr}</div>}
+              </div>
+            )}
           </div>
           {/* Search + filter bar */}
           <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", background: "var(--surface2)", display: "flex", flexDirection: "column", gap: 6 }}>

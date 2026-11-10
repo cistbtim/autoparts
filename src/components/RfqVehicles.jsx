@@ -7,7 +7,7 @@ import { tSt } from "../lib/i18n.js";
 import { CSS } from "../styles.js";
 import { ErrorBoundary, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox } from "../components/shared.jsx";
 
-export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onAddSuppliers,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onDeleteSession,onEditPart,t,user,settings,initialSessionId=null,onConsumeInitialSession}) {
+export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate,onAddSuppliers,onReplySales,onUpdateStatus,onSelectQuote,onUnselectQuote,onUnselectAll,onRefresh,onCreatePO,onResendStale,onDeleteSession,onEditPart,t,user,settings,initialSessionId=null,onConsumeInitialSession}) {
   const [view,setView]=useState("list"); // list | create | detail
   const [activeSession,setActiveSession]=useState(null);
 
@@ -79,6 +79,9 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
   const [addSupSel,setAddSupSel]=useState([]);
   const [addSupBusy,setAddSupBusy]=useState(false);
   const [addSupSearch,setAddSupSearch]=useState("");
+  // Reply to the salesman (POS requests): { [itemId]: {price,stock,note} }
+  const [replyEdit,setReplyEdit]=useState({});
+  const [replyBusy,setReplyBusy]=useState(false);
 
   const filteredParts=wSearch?parts.filter(p=>(p.name+p.sku+p.chinese_desc).toLowerCase().includes(wSearch.toLowerCase())):parts;
   const togglePart=(p)=>setWParts(prev=>{
@@ -317,6 +320,46 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
             </div>
           </div>
         )}
+
+        {onReplySales&&/^POS request/.test(activeSession.name||"")&&(()=>{
+          const val=(item,k)=>replyEdit[item.id]?.[k]??(item["reply_"+k]??"");
+          const setV=(item,k,v)=>setReplyEdit(p=>({...p,[item.id]:{...p[item.id],[k]:v}}));
+          const allFilled=sessionItems.length>0&&sessionItems.every(i=>val(i,"price")!==""&&val(i,"price")!==null);
+          return (
+            <div className="card" style={{padding:14,marginBottom:14,borderColor:"rgba(96,165,250,.35)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                <div style={{fontWeight:700,fontSize:14,flex:1}}>📨 Reply to sales</div>
+                {activeSession.status==="replied"&&<span className="badge" style={{background:"rgba(52,211,153,.12)",color:"var(--green)"}}>✅ Replied</span>}
+                {activeSession.status==="draft"&&<span className="badge" style={{background:"rgba(96,165,250,.15)",color:"var(--blue)"}}>🆕 Waiting for buyer</span>}
+              </div>
+              <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Enter the selling price and stock for each part. Sales sees this under <b>My Requests</b> and can ask again if needed.</div>
+              {sessionItems.map(item=>{
+                const iq=sessionQuotes.filter(q=>q.rfq_item_id===item.id&&q.unit_price!=null);
+                const best=iq.length?Math.min(...iq.map(q=>+q.unit_price)):null;
+                return (
+                  <div key={item.id} style={{padding:"8px 0",borderTop:"1px solid var(--border)"}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{item.part_name} <span style={{color:"var(--accent)"}}>×{item.qty_needed}</span></div>
+                    {best!=null&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Best supplier quote: {cur}{best.toFixed(2)}</div>}
+                    <div style={{display:"flex",gap:6,marginTop:4}}>
+                      <input className="inp" type="number" min={0} step="0.01" placeholder={`Price (${cur})`} value={val(item,"price")} onChange={e=>setV(item,"price",e.target.value)} style={{flex:1,minWidth:0,fontSize:13,padding:"6px 8px"}}/>
+                      <input className="inp" type="number" min={0} placeholder="Stock" value={val(item,"stock")} onChange={e=>setV(item,"stock",e.target.value)} style={{width:76,fontSize:13,padding:"6px 8px"}}/>
+                    </div>
+                    <input className="inp" placeholder="Note (optional) — e.g. arrives Friday" value={val(item,"note")} onChange={e=>setV(item,"note",e.target.value)} style={{marginTop:6,fontSize:13,padding:"6px 8px",width:"100%",boxSizing:"border-box"}}/>
+                  </div>
+                );
+              })}
+              <button className="btn btn-primary" style={{width:"100%",marginTop:10}} disabled={!allFilled||replyBusy}
+                onClick={async()=>{
+                  setReplyBusy(true);
+                  try{
+                    const ok=await onReplySales(activeSession.id,sessionItems.map(i=>({id:i.id,reply_price:+val(i,"price")||0,reply_stock:val(i,"stock")===""?null:+val(i,"stock"),reply_note:val(i,"note")})));
+                    if(ok){setReplyEdit({});setActiveSession(a=>a?{...a,status:"replied"}:a);}
+                  }finally{setReplyBusy(false);}
+                }}>{replyBusy?"Sending…":activeSession.status==="replied"?"📨 Update reply":"📨 Send reply to sales"}</button>
+              {!allFilled&&<div style={{fontSize:11,color:"var(--text3)",marginTop:4,textAlign:"center"}}>Enter a price for every part to send</div>}
+            </div>
+          );
+        })()}
 
         {/* Progress */}
         <div style={{background:"var(--surface2)",borderRadius:99,height:6,marginBottom:16,overflow:"hidden"}}>
@@ -573,7 +616,8 @@ export function RfqPage({parts,suppliers,rfqSessions,rfqItems,rfqQuotes,onCreate
                 <tr key={s.id} style={isOverdue?{background:"rgba(255,154,92,.08)",outline:"1px solid rgba(255,154,92,.3)"}:{}}>
                   <td style={{fontWeight:600}}>
                     {s.name}
-                    {sQuotes.length===0&&<span className="badge" style={{marginLeft:6,fontSize:10,background:"rgba(96,165,250,.15)",color:"var(--blue)"}}>🆕 needs suppliers</span>}
+                    {/^POS request/.test(s.name||"")&&s.status==="draft"&&<span className="badge" style={{marginLeft:6,fontSize:10,background:"rgba(96,165,250,.15)",color:"var(--blue)"}}>🆕 from sales</span>}
+                    {/^POS request/.test(s.name||"")&&s.status==="replied"&&<span className="badge" style={{marginLeft:6,fontSize:10,background:"rgba(52,211,153,.12)",color:"var(--green)"}}>✅ replied</span>}
                     {s.is_auto&&<span style={{marginLeft:6,fontSize:11,color:"var(--text3)",fontWeight:400}}>auto</span>}
                   </td>
                   <td>

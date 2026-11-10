@@ -21,7 +21,7 @@ import { AgentOfficePage } from "./components/AgentOffice.jsx";
 import { RequestsKanbanPage } from "./components/RequestsKanban.jsx";
 import db from "./lib/db.js";
 import { SupplierImportModal } from "./components/SupplierImport.jsx";
-import { PosPage } from "./components/Pos.jsx";
+import { PosPage, MyRequestsPage } from "./components/Pos.jsx";
 import { ScrapyardVehiclesPage, ScrapyardPartsPage, ScrapyardAdminPage, ScrapyardPartsAdminPage } from "./components/Scrapyard.jsx";
 import { SyOrdersPage, SyCustomersPage, SyInvoicesPage, SyPickingPage, SyReturnsPage, SyGatePage, SyDashboardPage } from "./components/ScrapyardSales.jsx";
 import { RentalDashboardPage, RentalVehiclesPage, RentalBookingsPage, RentalCustomersPage, RentalProfilePage } from "./components/Rental.jsx";
@@ -833,8 +833,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       api.get("vehicles","select=*&order=make.asc,model.asc,year_from.asc").catch(()=>[]),
       api.get("part_fitments","select=*").catch(()=>[]),
       isSalesman ? Promise.resolve([]) : api.get("payments",`${bF}select=*&order=payment_date.desc`).catch(()=>[]),
-      isSalesman ? Promise.resolve([]) : api.get("rfq_sessions",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
-      isSalesman ? Promise.resolve([]) : api.get("rfq_items","select=*").catch(()=>[]),
+      api.get("rfq_sessions",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
+      api.get("rfq_items","select=*").catch(()=>[]),
       isSalesman ? Promise.resolve([]) : api.get("rfq_quotes","select=*&order=created_at.desc").catch(()=>[]),
       isSalesman ? Promise.resolve([]) : api.get("stock_moves",`${bF}select=*&order=moved_at.desc&limit=200`).catch(()=>[]),
       isSalesman ? Promise.resolve([]) : api.get("stock_takes",`${bF}select=*&order=created_at.desc`).catch(()=>[]),
@@ -4621,6 +4621,29 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     return sid;
   };
 
+  // Buyer replies to the salesman: selling price / stock / note per item, then the request is marked "replied"
+  const replyRfqToSales=async(sid,replies)=>{
+    const by=user.name||user.username;
+    for(const r of replies){
+      const res=await api.patch("rfq_items","id",r.id,{reply_price:r.reply_price,reply_stock:r.reply_stock,reply_note:r.reply_note||"",replied_at:new Date().toISOString(),replied_by:by});
+      if(res&&!Array.isArray(res)&&(res.code||res.message)){
+        showToast(`❌ Reply not saved: ${res.message||res.code} — run the rfq_items reply_* SQL first`,"err");
+        return false;
+      }
+    }
+    await api.patch("rfq_sessions","id",sid,{status:"replied"});
+    await refreshTables("rfq_sessions","rfq_items");
+    showToast("✅ Reply sent to sales");
+    return true;
+  };
+
+  // Salesman re-sends a request back to the buyer (status → draft so it shows up as new on the RFQ screen)
+  const resendPosRequest=async(sid)=>{
+    await api.patch("rfq_sessions","id",sid,{status:"draft"});
+    await refreshTables("rfq_sessions");
+    showToast("🔁 Request sent to the buyer again");
+  };
+
   // Buyer adds suppliers to an existing (draft) RFQ session — one pending quote per item × supplier
   const addRfqSuppliers=async(sid,sups)=>{
     const items=rfqItems.filter(i=>i.rfq_id===sid);
@@ -5091,6 +5114,11 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const pendingCnt=branchOrders.filter(o=>o.status==="Processing"||o.status==="Ready to Ship").length;
   const pendingInq=inquiries.filter(i=>i.status==="pending").length;
   const overdueAutoRfq=rfqSessions.filter(s=>s.is_auto&&s.status==="pending"&&s.reply_deadline&&new Date(s.reply_deadline)<new Date()).length;
+  // POS "Ask Supplier" requests: waiting for the buyer (draft) / replied to the salesman
+  const _isPosReq=s=>/^POS request/.test(s.name||"");
+  const _myReqName=user?.name||user?.username;
+  const posReqPending=rfqSessions.filter(s=>_isPosReq(s)&&s.status==="draft").length;
+  const posReqReplied=rfqSessions.filter(s=>_isPosReq(s)&&s.status==="replied"&&s.created_by===_myReqName).length;
   const pendingCQ=customerQueries.filter(q=>q.status==="pending").length;
   const pendingWsFeedback=workshopFeedback.filter(f=>f.status==="new").length;
   const getPartSupps=(pid)=>partSuppliers.filter(ps=>ps.part_id===pid).map(ps=>({...ps,supplier:suppliers.find(s=>s.id===ps.supplier_id)}));
@@ -5260,7 +5288,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"suppliers",icon:"🏭",label:t.suppliers,roles:["admin"]},
         {id:"supplierPricing",icon:"💰",label:"Supplier Pricing",roles:["admin"],badge:(allSupplierParts.filter(p=>!p.price).length+supplierCostUpdates.length)||0},
-        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:overdueAutoRfq||0},
+        {id:"rfq",icon:"📋",label:t.rfqSession,roles:["admin"],badge:(overdueAutoRfq+posReqPending)||0},
         {id:"inquiries",icon:"📩",label:t.inquiries,roles:["admin"],badge:pendingInq},
         {id:"purchaseInvoices",icon:"🧾",label:t.purchaseInvoices,roles:["admin"]},
         {id:"supplierReturns",icon:"↩️",label:t.supplierReturns,roles:["admin"]},
@@ -5385,6 +5413,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       children:[
         {id:"pos",icon:"🖥️",label:"POS",roles:["admin","manager"]},
         {id:"my_sales",icon:"📊",label:"My Statement",roles:["admin","manager"]},
+        {id:"my_requests",icon:"📤",label:"My Requests",roles:["admin","manager"],badge:posReqReplied||0},
         {id:"shop",icon:"🛒",label:t.shop,roles:["admin","customer"]},
         {id:"picking",icon:"🔍",label:t.picking,roles:["admin","shipper"],badge:pendingCnt},
         {id:"orders",icon:"📋",label:t.orders,roles:["admin","shipper"]},
@@ -5438,7 +5467,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
         // branch_picker: orders only
         if(role==="branch_picker") return ["orders","picking"].includes(c.id);
         // branch_salesman: POS + My Statement
-        if(role==="branch_salesman") return ["pos","my_sales"].includes(c.id);
+        if(role==="branch_salesman") return ["pos","my_sales","my_requests"].includes(c.id);
         // branch_manager + branch_admin: full access minus hidden
         return true;
       }
@@ -5518,6 +5547,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
     ];
     if(role==="branch_salesman") return [
       {id:"pos",      icon:"🖥️", label:"POS"},
+      {id:"my_requests", icon:"📤", label:"Requests", badge:posReqReplied||0},
       {id:"my_sales", icon:"📊", label:"My Sales"},
     ];
     if(role==="branch_warehouse") return [
@@ -5529,14 +5559,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       {id:"inventory", icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",    icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers", icon:"👥",label:t.customers},
-      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
+      {id:"rfq",       icon:"📋",label:t.rfqSession||"RFQ",badge:(overdueAutoRfq+posReqPending)||0},
       {id:"suppliers", icon:"🏭",label:t.suppliers},
     ];
     if(role==="branch_admin") return [
       {id:"inventory",       icon:"📦",label:t.inventory,badge:lowStock.length},
       {id:"orders",          icon:"📋",label:t.orders,badge:pendingCnt},
       {id:"customers",       icon:"👥",label:t.customers},
-      {id:"rfq",             icon:"📋",label:t.rfqSession||"RFQ",badge:overdueAutoRfq||0},
+      {id:"rfq",             icon:"📋",label:t.rfqSession||"RFQ",badge:(overdueAutoRfq+posReqPending)||0},
       {id:"suppliers",       icon:"🏭",label:t.suppliers},
       {id:"vehicleRequests", icon:"🚗",label:"Vehicle Requests",badge:pendingVehicleRequests},
       {id:"branch_users",    icon:"👤",label:"Users"},
@@ -6957,7 +6987,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
           <RfqPage
             parts={isBranchUser?displayParts:parts} suppliers={suppliers}
             rfqSessions={rfqSessions} rfqItems={rfqItems} rfqQuotes={rfqQuotes}
-            onCreate={createRfqSession} onAddSuppliers={addRfqSuppliers} onUpdateStatus={updateRfqStatus}
+            onCreate={createRfqSession} onAddSuppliers={addRfqSuppliers} onReplySales={replyRfqToSales} onUpdateStatus={updateRfqStatus}
             onSelectQuote={selectRfqQuote} onUnselectQuote={unselectRfqQuote}
             onUnselectAll={unselectAllRfq} onRefresh={loadAll}
             onCreatePO={createPOFromRfq} onResendStale={checkStaleRfqs} onDeleteSession={deleteRfqSession}
@@ -7036,6 +7066,16 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
             onAskBuyer={savePosSupplierRequest}
             onRefresh={()=>refreshTables("parts","customers","vehicles","part_fitments","part_suppliers")}
             onRequestNewPart={()=>openM("partRequest")} t={t}/>
+        )}
+
+        {/* ── MY REQUESTS (POS "Ask Supplier" requests + buyer replies) ── */}
+        {tab==="my_requests"&&(
+          <MyRequestsPage
+            sessions={rfqSessions.filter(s=>_isPosReq(s)&&s.created_by===_myReqName)}
+            items={rfqItems}
+            onResend={resendPosRequest}
+            onRefresh={()=>refreshTables("rfq_sessions","rfq_items")}
+            onUseInPos={()=>setTab("pos")}/>
         )}
 
         {/* ── MY SALES STATEMENT (branch_salesman) ── */}

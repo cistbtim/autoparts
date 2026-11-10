@@ -473,6 +473,72 @@ function PosDone({ sale, onNewSale }) {
   );
 }
 
+// ── Salesman: my "Ask Supplier" requests + the buyer's replies ────────────────
+export function MyRequestsPage({ sessions = [], items = [], onResend, onRefresh, onUseInPos }) {
+  const sym = C();
+  const [busy, setBusy] = useState("");
+  const list = [...sessions].sort((a, b) => (a.created_at || "") < (b.created_at || "") ? 1 : -1);
+  const STATUS = {
+    draft:   ["⏳ Waiting for buyer", "var(--blue)", "rgba(96,165,250,.15)"],
+    sent:    ["📨 Buyer is asking suppliers", "var(--yellow)", "rgba(251,191,36,.15)"],
+    replied: ["✅ Buyer replied", "var(--green)", "rgba(52,211,153,.15)"],
+    ordered: ["🛒 Ordered", "var(--green)", "rgba(52,211,153,.15)"],
+  };
+  const loadIntoPos = (rows) => {
+    try {
+      localStorage.setItem("pos_pending_cart", JSON.stringify(rows.map(i => ({ part_id: i.part_id, sku: i.part_sku, name: i.part_name, price: i.reply_price ?? 0, qty: i.qty_needed || 1 }))));
+    } catch { /* ignore */ }
+    onUseInPos?.();
+  };
+  return (
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "4px 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 12, gap: 8 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>📤 My Requests</h1>
+        <button className="btn btn-ghost btn-sm" onClick={async () => { setBusy("refresh"); try { await onRefresh?.(); } finally { setBusy(""); } }}>{busy === "refresh" ? "…" : "🔄 Refresh"}</button>
+      </div>
+      {list.length === 0 && <div className="card" style={{ padding: 24, textAlign: "center", color: "var(--text3)", fontSize: 13 }}>No requests yet. In POS, add parts to the cart and tap <b>📤 Ask Supplier</b>.</div>}
+      {list.map(s => {
+        const its = items.filter(i => i.rfq_id === s.id);
+        const [lbl, col, bg] = STATUS[s.status] || [s.status, "var(--text3)", "var(--surface2)"];
+        const hasReply = its.some(i => i.reply_price != null);
+        return (
+          <div key={s.id} className="card" style={{ padding: 14, marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(s.name || "").replace(/^POS request\s*·?\s*/, "") || "Request"}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "DM Mono,monospace" }}>{(s.created_at || "").slice(0, 16).replace("T", " ")}</div>
+              </div>
+              <span className="badge" style={{ background: bg, color: col, whiteSpace: "nowrap" }}>{lbl}</span>
+            </div>
+            {its.map(i => (
+              <div key={i.id} style={{ padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{i.part_name} <span style={{ color: "var(--text3)", fontWeight: 400 }}>×{i.qty_needed}</span></span>
+                  {i.reply_price != null
+                    ? <span style={{ fontFamily: "Rajdhani,sans-serif", fontWeight: 800, fontSize: 16, color: "var(--accent)" }}>{sym}{(+i.reply_price).toFixed(2)}</span>
+                    : <span style={{ fontSize: 11, color: "var(--text3)" }}>no price yet</span>}
+                </div>
+                {i.part_sku && <div style={{ fontFamily: "DM Mono,monospace", fontSize: 11, color: "var(--blue)" }}>{i.part_sku}</div>}
+                {i.reply_price != null && (
+                  <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 2 }}>
+                    {i.reply_stock != null && <span style={{ fontWeight: 700, color: +i.reply_stock > 0 ? "var(--green)" : "var(--red)", marginRight: 8 }}>Stock: {i.reply_stock}</span>}
+                    {i.reply_note && <span>💬 {i.reply_note}</span>}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              {hasReply && <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => loadIntoPos(its)}>🛒 Use in POS</button>}
+              {s.status !== "draft" && <button className="btn btn-ghost" style={{ flex: 1 }} disabled={busy === s.id}
+                onClick={async () => { if (!window.confirm("Send this request to the buyer again?")) return; setBusy(s.id); try { await onResend?.(s.id); } finally { setBusy(""); } }}>🔁 Ask again</button>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Multi-part supplier enquiry modal ─────────────────────────────────────────
 function AskMultiOverlay({ parts, suppliers, partSuppliers, selectedIds, sym, settings, onToggle, onClose }) {
   const shopName = settings?.shop_name || "VelGenius";
@@ -763,6 +829,21 @@ export function PosPage({ parts, customers, vehicles = [], partFitments = [], on
     // Keep the search box focused for scanner/keyboard use — but never on touch screens, where it pops the keyboard up
     if (!window.matchMedia?.("(pointer: coarse)").matches) searchRef.current?.focus();
   };
+
+  // "Use in POS" from My Requests drops the buyer-priced parts into the cart
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("pos_pending_cart");
+      if (!raw) return;
+      localStorage.removeItem("pos_pending_cart");
+      const rows = JSON.parse(raw);
+      if (!Array.isArray(rows) || !rows.length) return;
+      setCart(rows.map(r => {
+        const p = parts.find(x => String(x.id) === String(r.part_id));
+        return { part_id: p ? p.id : (/^\d+$/.test(String(r.part_id)) ? +r.part_id : r.part_id), sku: r.sku || p?.sku || "", name: r.name || p?.name || "", price: +r.price || 0, qty: +r.qty || 1 };
+      }));
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeFromCart = (pid) => setCart(prev => prev.filter(i => i.part_id !== pid));
   const setQty = (pid, q) => {

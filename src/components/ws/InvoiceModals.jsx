@@ -266,6 +266,66 @@ export function WsInvoiceEditModal({invoice,onSave,onClose}) {
   );
 }
 
+export function WsDepositModal({quote,settings,onSave,onClose}) {
+  const C=curSym(settings.currency||getSettings().currency);
+  const total=+quote.total||0;
+  const [amount,setAmount]=useState(quote.deposit_paid?String(quote.deposit_paid):"");
+  const [method,setMethod]=useState(quote.deposit_method||"EFT / Bank Transfer");
+  const [date,setDate]=useState(quote.deposit_date?String(quote.deposit_date).slice(0,10):new Date().toISOString().slice(0,10));
+  const [ref,setRef]=useState(quote.deposit_ref||"");
+  const [saving,setSaving]=useState(false);
+  const paid=parseFloat(amount)||0;
+
+  const handleSave=async(clear=false)=>{
+    if(!clear&&paid<=0){alert("Enter the deposit amount");return;}
+    if(!clear&&total>0&&paid>total){alert("Deposit is more than the quotation total");return;}
+    setSaving(true);
+    try{
+      await onSave(clear
+        ?{deposit_paid:0,deposit_method:null,deposit_date:null,deposit_ref:null}
+        :{deposit_paid:paid,deposit_method:method,deposit_date:date,deposit_ref:ref});
+    }catch(e){ alert(e.message); }
+    finally{ setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <MHead title="💰 Deposit Received" onClose={onClose}/>
+      <div className="card" style={{padding:12,marginBottom:14,background:"var(--surface2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+          <span style={{color:"var(--text3)"}}>Quotation Total</span>
+          <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{C} {total.toFixed(2)}</strong>
+        </div>
+        {paid>0&&(
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginTop:6,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+            <span style={{fontWeight:700}}>Balance after deposit</span>
+            <strong style={{fontFamily:"Rajdhani,sans-serif",color:"var(--accent)",fontSize:16}}>{C} {Math.max(0,total-paid).toFixed(2)}</strong>
+          </div>
+        )}
+      </div>
+      <FG>
+        <div><FL label={`Deposit Amount (${C})`}/><input className="inp" type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} autoFocus/></div>
+        <div>
+          <FL label="Payment Method"/>
+          <select className="inp" value={method} onChange={e=>setMethod(e.target.value)}>
+            {["Cash","Card","EFT / Bank Transfer","Cheque","Other"].map(m=><option key={m}>{m}</option>)}
+          </select>
+        </div>
+      </FG>
+      <FG>
+        <div><FL label="Date Received"/><input className="inp" type="date" value={date} onChange={e=>setDate(e.target.value)}/></div>
+        <div><FL label="Reference / Receipt No"/><input className="inp" value={ref} onChange={e=>setRef(e.target.value)} placeholder="Optional"/></div>
+      </FG>
+      <div style={{fontSize:11,color:"var(--text3)",marginTop:8}}>When this quotation is converted to an invoice, the deposit is recorded as the first payment automatically.</div>
+      <div style={{display:"flex",gap:10,marginTop:16,flexWrap:"wrap"}}>
+        <button className="btn btn-ghost" style={{flex:"1 1 80px"}} onClick={onClose}>Cancel</button>
+        {(+quote.deposit_paid||0)>0&&<button className="btn btn-ghost" style={{flex:"1 1 80px",color:"var(--red)"}} disabled={saving} onClick={()=>handleSave(true)}>Remove</button>}
+        <button className="btn btn-success" style={{flex:"2 1 140px"}} disabled={saving} onClick={()=>handleSave(false)}>{saving?"Saving...":"💾 Save Deposit"}</button>
+      </div>
+    </Overlay>
+  );
+}
+
 export function WsPaymentModal({invoice,settings,onSave,onClose}) {
   const balance=(+invoice.total||0)-(+invoice.paid_amount||0);
   const [amount,setAmount]=useState(balance.toFixed(2));
@@ -463,6 +523,11 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
   const selTax=settings.vat_number?(selSubtotal-invDisc)*(settings.tax_rate||0)/100:0;
   const selTotal=selSubtotal-invDisc+selTax;
 
+  // Deposit already received on the quotation becomes the first payment on the invoice
+  const dep=prefill.deposit||null;
+  const depPaid=dep?Math.min(+dep.amount||0,selTotal):0;
+  const depStatus=depPaid>0?(depPaid>=selTotal?"paid":"partial"):"unpaid";
+
   const handleCreate=async(payNow=false)=>{
     if(selItems.length===0){alert("Select at least one item to invoice.");return;}
     setSaving(true);
@@ -472,9 +537,10 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
         invoice_customer:invCust, inv_phone:invPhone, inv_email:invEmail,
         vehicle_reg:job.vehicle_reg||"",
         invoice_date:invDate, due_date:dueDate,
-        subtotal:selSubtotal, tax:selTax, total:selTotal, status:"unpaid", notes,
+        subtotal:selSubtotal, tax:selTax, total:selTotal, status:depStatus, notes,
         ...(invDisc>0?{discount_amount:invDisc}:{}),
-      }, payNow);
+        ...(depPaid>0?{paid_amount:depPaid,payment_method:dep.method||"Deposit",payment_date:dep.date||invDate,payment_ref:dep.ref||"Deposit"}:{}),
+      }, payNow&&depStatus!=="paid");
     }catch(e){ alert("Failed to create invoice: "+e.message); }
     finally{ setSaving(false); }
   };
@@ -541,6 +607,8 @@ export function WorkshopInvoiceModal({job,items,settings,onSave,onClose,t,prefil
           {invDisc>0&&<div style={{color:"var(--red)"}}>🏷️ Discount (from quotation): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>− {fmt(invDisc)}</strong></div>}
           {settings.vat_number&&(settings.tax_rate||0)>0&&<div>VAT ({settings.tax_rate}%): <strong style={{fontFamily:"Rajdhani,sans-serif"}}>{fmt(selTax)}</strong></div>}
           <div style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>Total: {fmt(selTotal)}</div>
+          {depPaid>0&&<div style={{color:"var(--green)"}}>💰 Deposit already received: <strong style={{fontFamily:"Rajdhani,sans-serif"}}>− {fmt(depPaid)}</strong></div>}
+          {depPaid>0&&<div style={{fontSize:15,fontWeight:700}}>Balance due: {fmt(selTotal-depPaid)}</div>}
         </div>
       </div>
 

@@ -23,7 +23,7 @@ import { WsScrapyardMatchPage } from "./ws/ScrapyardMatch.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
-import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsStatementModal, WorkshopInvoiceModal } from "./ws/InvoiceModals.jsx";
+import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsDepositModal, WsStatementModal, WorkshopInvoiceModal } from "./ws/InvoiceModals.jsx";
 import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
 import { HelpIcon } from "./HelpIcon.jsx";
 import { WsServiceRemindersPage, JobReminderCard } from "./ws/ServiceReminders.jsx";
@@ -1857,6 +1857,7 @@ ${inv?`<h2>Invoice</h2><p>Status: <b>${inv.status}</b> · Total: <b>${C} ${(+inv
             invEmail: qInvModal.quote.quote_email||"",
             dueDate:  qInvModal.quote.valid_until||"",
             notes:    `Converted from Quote ${qInvModal.quote.id}${qInvModal.quote.notes?"\n"+qInvModal.quote.notes:""}`,
+            deposit:  (+qInvModal.quote.deposit_paid||0)>0?{amount:+qInvModal.quote.deposit_paid,method:qInvModal.quote.deposit_method,date:qInvModal.quote.deposit_date,ref:qInvModal.quote.deposit_ref}:null,
           }}
           onSave={async(inv)=>{
             await onSaveInvoice(inv);
@@ -5005,6 +5006,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   const [paymentModal, setPaymentModal] = useState(false);
   const [statementModal,setStatementModal]=useState(false);
   const [quoteModal,   setQuoteModal]   = useState(false);  // create/edit quote
+  const [depositModal, setDepositModal] = useState(false);  // record deposit already received on the quote
   const [creatingNewQuote,setCreatingNewQuote]=useState(false); // true = "+ New Quote" (blank), false = editing the selected one
   const [activeQuoteId,setActiveQuoteId]=useState(null); // which of this job's (possibly several) quotes is selected
   const quote = quotes.find(q=>q.id===activeQuoteId) || quotes[0] || null;
@@ -9169,6 +9171,20 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
               ⏳ {t.wsqtAwaitingResponse}
             </div>
           )}
+          {/* Deposit already received from the customer (carried onto the invoice when the quote is converted) */}
+          {(+quote.deposit_paid||0)>0&&(
+            <div style={{marginBottom:10,padding:"8px 12px",borderRadius:8,background:"rgba(52,211,153,.12)",border:"1px solid rgba(52,211,153,.3)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:18}}>💰</span>
+              <div style={{flex:1,minWidth:140}}>
+                <div style={{fontWeight:700,fontSize:13,color:"var(--green)"}}>Deposit received: {fmtAmt(quote.deposit_paid)}</div>
+                <div style={{fontSize:11,color:"var(--text3)",marginTop:1}}>
+                  {[quote.deposit_method,quote.deposit_date&&String(quote.deposit_date).slice(0,10),quote.deposit_ref].filter(Boolean).join(" · ")}
+                  {(+quote.total||0)>0&&<> · Balance due {fmtAmt(Math.max(0,(+quote.total||0)-(+quote.deposit_paid||0)))}</>}
+                </div>
+              </div>
+              {!wsLocked&&quote.status!=="converted"&&<button className="btn btn-ghost btn-xs" onClick={()=>setDepositModal(true)}>✏️ Edit</button>}
+            </div>
+          )}
           {/* Parts list no longer matches this quotation */}
           {!invoice&&(()=>{
             const sy=quoteSync(quote,items);
@@ -9283,6 +9299,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                 onClick={()=>onSaveQuote({...quote,status:quote.status==="accepted"?"sent":"accepted"})}>
                 {quote.status==="accepted"?"↩ "+t.wsqtUnaccept:"✅ "+t.wsqtMarkAccepted}
               </button>
+            )}
+            {!wsLocked&&quote.status!=="converted"&&!((+quote.deposit_paid||0)>0)&&(
+              <button className="btn btn-success btn-xs" onClick={()=>setDepositModal(true)} title="Customer already paid a deposit for this job">💰 Record deposit</button>
             )}
             {!wsLocked&&quote.status!=="converted"&&(
               <button className="btn btn-ghost btn-xs" onClick={()=>{setCreatingNewQuote(false);setQuoteModal(true);}}>✏️ Edit</button>
@@ -10020,6 +10039,13 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           onClose={()=>setEditJob(false)} t={t}/>
       )}
 
+      {/* Record a deposit the customer already paid against the quotation */}
+      {depositModal&&quote&&(
+        <WsDepositModal quote={quote} settings={settings}
+          onSave={async(d)=>{ await onSaveQuote({...quote,...d}); setDepositModal(false); }}
+          onClose={()=>setDepositModal(false)}/>
+      )}
+
       {/* Create invoice modal (also used for quote→invoice conversion) */}
       {creatingInv&&(
         <WorkshopInvoiceModal
@@ -10035,6 +10061,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
             dueDate:  quoteSrcForInv.valid_until||"",
             discountType:quoteSrcForInv.discount_type, discountValue:quoteSrcForInv.discount_value, discountAmount:quoteSrcForInv.discount_amount,
             notes:    `Converted from Quote ${quoteSrcForInv.id}${quoteSrcForInv.notes?"\n"+quoteSrcForInv.notes:""}`,
+            deposit:  (+quoteSrcForInv.deposit_paid||0)>0?{amount:+quoteSrcForInv.deposit_paid,method:quoteSrcForInv.deposit_method,date:quoteSrcForInv.deposit_date,ref:quoteSrcForInv.deposit_ref}:null,
           } : {}}
           onSave={async(inv, payNow=false)=>{
             await onSaveInvoice(inv);

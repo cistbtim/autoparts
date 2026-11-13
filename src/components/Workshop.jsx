@@ -3984,6 +3984,16 @@ const makePartSku = (name) => {
 // engine cylinder counts (3/4/6/8) since spark plugs, injectors, coils etc.
 // are usually needed "one per cylinder". current is folded in too, in case a
 // qty saved some other way (e.g. from the admin item editor) isn't one of these.
+// Pull a cylinder count out of free text like "3.0 V6", "W12", "I4 turbo", "6 cyl".
+// Returns 0 when nothing explicit is found (never guesses from displacement).
+const guessCylinders = (...texts) => {
+  const s = texts.filter(Boolean).join(" ").toUpperCase();
+  let m = s.match(/\b[VW]-?\s?(6|8|10|12|16)\b/)
+       || s.match(/\b[ILHRF]-?(3|4|5|6)\b/)
+       || s.match(/\b(3|4|5|6|8|10|12|16)[\s-]?CYL/);
+  return m ? +m[1] : 0;
+};
+
 const SUPPLIER_QTY_OPTIONS = [1,2,3,4,5,6,7,8,10,12];
 const qtyOptionsFor = (current) => {
   const c = +current || 1;
@@ -12148,6 +12158,21 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     return new Set(matchV.map(v=>String(v.id)));
   },[hasVehicle,vehicleMake,vehicleModel,vehicles]);
 
+  // Cylinder count for per-cylinder parts (spark plugs, injectors, coils…):
+  // read from the job's model text plus matched catalog vehicles' engine/variant.
+  // Only used when every source that names a count agrees; otherwise 0 and the
+  // manual picker is shown as before.
+  const detectedCyl = useMemo(()=>{
+    const counts = new Set();
+    const own = guessCylinders(vehicleModel);
+    if(own) counts.add(own);
+    vehicles.filter(v=>matchVIds.has(String(v.id))).forEach(v=>{
+      const c = guessCylinders(v.engine, v.variant);
+      if(c) counts.add(c);
+    });
+    return counts.size===1 ? [...counts][0] : 0;
+  },[vehicleModel,vehicles,matchVIds]);
+
   // The global partFitments prop is loaded once at app start and cached —
   // fitments added/linked since then (e.g. from the vehicle-fitment search
   // page) won't be in it yet. Re-fetch fresh, scoped to just the matched
@@ -12247,7 +12272,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     // Per-cylinder parts (spark plugs, injectors, coils…) vary by vehicle — leave qty
     // blank so the cylinder-count picker below forces a real choice, instead of
     // silently carrying over whatever qty was last used or defaulting to 1.
-    setQty(p.qty_per_cylinder?"":(+p.default_qty>0?+p.default_qty:1));
+    setQty(p.qty_per_cylinder?(detectedCyl||""):(+p.default_qty>0?+p.default_qty:1));
     setSearch("");
     setCreating(false);
   };
@@ -12272,7 +12297,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setMarkupPct(defaultMarkupPct);
       setPrice(String(listPrice||""));
     }
-    setQty(p.qty_per_cylinder?"":(+p.default_qty>0?+p.default_qty:1));
+    setQty(p.qty_per_cylinder?(detectedCyl||""):(+p.default_qty>0?+p.default_qty:1));
     setSearch("");
     setCreating(false);
   };
@@ -12679,6 +12704,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       {selItem?.qty_per_cylinder&&(
         <div style={{marginBottom:12,padding:"10px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)"}}>
           <div style={{fontSize:12,fontWeight:700,color:"var(--yellow)",marginBottom:8}}>🔧 How many cylinders does this vehicle have?</div>
+          {detectedCyl>0&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8}}>✅ Auto-detected {detectedCyl} cylinders from this vehicle's engine — change below if wrong</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {[3,4,5,6,8,10,12].map(n=>(
               <button key={n} type="button" onClick={()=>setQty(n)}

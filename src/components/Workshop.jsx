@@ -3994,6 +3994,55 @@ const guessCylinders = (...texts) => {
   return m ? +m[1] : 0;
 };
 
+// Cylinder count from the engine number printed on the licence disc. Only makes
+// whose engine number STARTS with the engine code are covered (BMW/MINI numbers
+// are plain serials — nothing to read there). Unknown → 0.
+const ENGINE_PREFIX_CYL = {
+  TOYOTA: { 3:["1KR"], 4:["1ZR","2ZR","3ZR","1NR","2NR","8NR","1NZ","2NZ","1ND","2AD","1AD","2AR","8AR","1GD","2GD","1KD","2KD","1TR","2TR","1ZZ","2ZZ","3SZ","1SZ","K3"], 6:["1GR","2GR","3GR","4GR","1MZ","2GR"], 8:["1UR","3UR","2UZ","1UZ","1VD"] },
+  LEXUS:  { 4:["8AR","2AR","8NR"], 6:["2GR","3GR","4GR","1GR","2GR"], 8:["1UR","3UR","2UZ"] },
+  HONDA:  { 4:["R18","R20","L12","L13","L15","L16","K20","K24","N22","L15"], 6:["J35","J30"] },
+  NISSAN: { 3:["HR10","HR12","B4D"], 4:["HR15","HR16","QR","MR","R9M","YD","K9K","MRA"], 6:["VQ","VG"], 8:["VK"] },
+  SUZUKI: { 3:["K10"], 4:["K12","K14","K15","M13","M15"] },
+  KIA:    { 3:["G3L"], 4:["G4F","G4L","G4N","G4K","D4F","D4H"] },
+  HYUNDAI:{ 3:["G3L"], 4:["G4F","G4L","G4N","G4K","D4F","D4H"] },
+  MAZDA:  { 4:["PY","PE","P5","SH","ZY","Z6","LF"] },
+  VOLVO:  { 4:["B42","D42","B4","D4"], 5:["B52","D52","D5"], 6:["B62","B6"] },
+};
+// Mercedes: first 3 digits of the 14-digit number are the engine family.
+const MERC_FAMILY_CYL = { 111:4,112:6,113:8,156:8,157:8,260:4,264:4,266:4,270:4,271:4,272:6,273:8,274:4,276:6,278:8,279:12,282:4,607:4,611:4,612:5,613:6,626:4,640:4,642:6,646:4,651:4,654:4,656:6 };
+const engineMake = (make) => {
+  const m = (make||"").toUpperCase();
+  if (m.includes("MERC")) return "MERCEDES";
+  for (const k of Object.keys(ENGINE_PREFIX_CYL)) if (m.includes(k)) return k;
+  return m;
+};
+const cylFromEngineNo = (make, engineNo) => {
+  const mk = engineMake(make);
+  const en = (engineNo||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (!en) return 0;
+  if (mk === "MERCEDES") return /^\d{12,}/.test(en) ? (MERC_FAMILY_CYL[+en.slice(0,3)]||0) : 0;
+  const t = ENGINE_PREFIX_CYL[mk];
+  if (!t) return 0;
+  for (const [n, prefixes] of Object.entries(t)) if (prefixes.some(p => en.startsWith(p))) return +n;
+  return 0;
+};
+// Learned: other vehicles of the same make whose engine number starts the same
+// and whose cylinder count was already chosen by hand — used when no rule matches.
+const learnedCylinders = (make, engineNo, wsVehicles=[], selfId=null) => {
+  const mk = engineMake(make);
+  if (mk==="BMW" || mk==="MINI") return 0; // serial numbers, a shared prefix means nothing
+  const en = (engineNo||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  const key = mk==="MERCEDES" ? en.slice(0,3) : en.slice(0,4);
+  if (key.length < 3) return 0;
+  const found = new Set();
+  wsVehicles.forEach(v=>{
+    if (v.id===selfId || !(+v.cylinders>0) || engineMake(v.make)!==mk) return;
+    const o = (v.engine_no||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (o.slice(0,key.length)===key) found.add(+v.cylinders);
+  });
+  return found.size===1 ? [...found][0] : 0;
+};
+
 const SUPPLIER_QTY_OPTIONS = [1,2,3,4,5,6,7,8,10,12];
 const qtyOptionsFor = (current) => {
   const c = +current || 1;
@@ -5475,6 +5524,17 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   useEffect(()=>{ if(pendingPayModal&&invoice){ setPendingPayModal(false); setPaymentModal(true); } },[invoice,pendingPayModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vehicleRecord = wsVehicles.find(v=>v.id===job.workshop_vehicle_id)||null;
+  // Cylinder count remembered per vehicle (workshop_vehicles.cylinders) — set the
+  // first time someone picks it for a spark plug etc., reused on every later job.
+  const [cylSaved, setCylSaved] = useState({});
+  const savedCyl = +(cylSaved[vehicleRecord?.id] ?? vehicleRecord?.cylinders) || 0;
+  const rememberCyl = async(n)=>{
+    if(!vehicleRecord?.id) return;
+    setCylSaved(p=>({...p,[vehicleRecord.id]:n}));
+    try{ await api.patch("workshop_vehicles","id",vehicleRecord.id,{cylinders:n}); }catch{}
+  };
+  const engineCyl = cylFromEngineNo(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no)
+    || learnedCylinders(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no, wsVehicles, vehicleRecord?.id);
   const vehicleHistory = jobs.filter(j=>{
     if(j.id===job.id) return false;
     if(job.workshop_vehicle_id&&j.workshop_vehicle_id===job.workshop_vehicle_id) return true;
@@ -9692,6 +9752,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           vehicleMake={job.vehicle_make}
           vehicleModel={job.vehicle_model}
           vehicleLabel={[job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")}
+          savedCyl={savedCyl}
+          engineCyl={engineCyl}
+          onRememberCyl={rememberCyl}
           linkedBranchId={wsProfile?.linked_branch_id||null}
           linkedBranchName={branches.find(b=>b.id===wsProfile?.linked_branch_id)?.name||""}
           mainBranchId={mainBranchId}
@@ -12086,7 +12149,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -12170,8 +12233,8 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       const c = guessCylinders(v.engine, v.variant);
       if(c) counts.add(c);
     });
-    return counts.size===1 ? [...counts][0] : 0;
-  },[vehicleModel,vehicles,matchVIds]);
+    return savedCyl || engineCyl || (counts.size===1 ? [...counts][0] : 0);
+  },[savedCyl,engineCyl,vehicleModel,vehicles,matchVIds]);
 
   // The global partFitments prop is loaded once at app start and cached —
   // fitments added/linked since then (e.g. from the vehicle-fitment search
@@ -12704,10 +12767,10 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       {selItem?.qty_per_cylinder&&(
         <div style={{marginBottom:12,padding:"10px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)"}}>
           <div style={{fontSize:12,fontWeight:700,color:"var(--yellow)",marginBottom:8}}>🔧 How many cylinders does this vehicle have?</div>
-          {detectedCyl>0&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8}}>✅ Auto-detected {detectedCyl} cylinders from this vehicle's engine — change below if wrong</div>}
+          {detectedCyl>0&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8}}>✅ {savedCyl?"Remembered":engineCyl?"From engine no.":"Auto-detected"}: {detectedCyl} cylinders for this vehicle — change below if wrong</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {[3,4,5,6,8,10,12].map(n=>(
-              <button key={n} type="button" onClick={()=>setQty(n)}
+              <button key={n} type="button" onClick={()=>{ setQty(n); onRememberCyl?.(n); }}
                 style={{padding:"6px 14px",borderRadius:8,border:+qty===n?"1px solid var(--yellow)":"1px solid var(--border)",
                   background:+qty===n?"var(--yellow)":"var(--surface2)",color:+qty===n?"#000":"var(--text2)",
                   fontWeight:700,fontSize:13,cursor:"pointer"}}>{n}</button>

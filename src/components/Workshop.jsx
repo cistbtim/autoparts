@@ -9802,6 +9802,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           engineOil={engineOil}
           vehicleVin={job.vin}
           vehicleYear={job.vehicle_year}
+          vehicleEngine={vehicleRecord?.engine||""}
           onRememberOil={rememberOil}
           onRememberCyl={rememberCyl}
           linkedBranchId={wsProfile?.linked_branch_id||null}
@@ -12198,7 +12199,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl, savedOil=0, engineOil=0, vehicleVin="", vehicleYear="", onRememberOil,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl, savedOil=0, engineOil=0, vehicleVin="", vehicleYear="", vehicleEngine="", onRememberOil,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -12852,7 +12853,14 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                   {label:"Google",icon:"🔍",href:`https://www.google.com/search?q=${q}`},
                   {label:"WolfOil",icon:"🛢️",href:"https://za.wolfoil.com/en-us/oil-finder",vin:true},
                   {label:"Castrol",icon:"🟢",href:"https://www.castrol.com/en_za/south-africa/home/oil-finder.html",vin:true},
-                  {label:"Shell",icon:"🐚",href:`https://www.google.com/search?q=${encodeURIComponent("Shell LubeMatch "+(vehicleLabel||vehicleMake||"")+" "+(vehicleYear||""))}`},
+                  {label:"Shell",icon:"🐚",href:(()=>{
+                    // Shell LubeMatch is an embedded app: the page hash carries base64 of a path relative to
+                    // the iframe — "#/za/en-za/search/vehicle?search=<text>" opens vehicle search pre-filled.
+                    const text=[vehicleLabel||vehicleMake,(String(vehicleEngine||"").match(/\b\d\.\d\b/)||[""])[0]].filter(Boolean).join(" ");
+                    const rel=`#/za/en-za/search/vehicle?search=${encodeURIComponent(text)}`;
+                    const b64=btoa(String.fromCharCode(...new TextEncoder().encode(rel)));
+                    return `https://www.shell.co.za/motorists/oils-lubricants/lubematch.html#iframe=${encodeURIComponent(b64)}`;
+                  })()},
                   {label:"Images",icon:"🖼️",href:`https://www.google.com/search?tbm=isch&q=${q}`},
                 ];
                 return links.map(l=>(

@@ -12852,7 +12852,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                 const links=[
                   {label:"Google",icon:"🔍",href:`https://www.google.com/search?q=${q}`},
                   {label:"WolfOil",icon:"🛢️",href:"https://za.wolfoil.com/en-us/oil-finder",vin:true},
-                  {label:"Castrol",icon:"🟢",href:"https://www.castrol.com/en_za/south-africa/home/oil-finder.html",vin:true},
+                  {label:"Castrol",icon:"🟢",href:`https://www.castrol.com/en_za/south-africa/home/product-finder.html?q=${encodeURIComponent([vehicleLabel||vehicleMake,(String(vehicleEngine||"").match(/\b\d\.\d\b/)||[""])[0]].filter(Boolean).join(" ")).replace(/%20/g,"+")}&page=landing`},
                   {label:"Shell",icon:"🐚",href:(()=>{
                     // Shell LubeMatch is an embedded app: the page hash carries base64 of a path relative to
                     // the iframe — "#/za/en-za/search/vehicle?search=<text>" opens vehicle search pre-filled.

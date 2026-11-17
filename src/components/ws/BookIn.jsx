@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { api, uploadToStorage } from "../../lib/api.js";
 import { makeId, toImgUrl } from "../../lib/helpers.js";
-import { decodePDF417fromImage, parseLicenceDisc } from "../../lib/barcode.js";
+import { decodePDF417fromImage, parseLicenceDisc, ocrLicenceDisc } from "../../lib/barcode.js";
 import { Overlay, MHead, FL, ImgLightbox } from "../shared.jsx";
 import { VehiclePhotoUploader } from "../RfqVehicles.jsx";
 import { printJobCardLabel } from "./Print.jsx";
@@ -167,7 +167,16 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],se
       // Auto-proceed to lookup — pass reg directly to avoid stale state on mobile
       if(reg) doLookup(reg);
     }catch(e){
-      setScanError("PDF417 not detected — try a clearer, closer photo. ("+e.message+")");
+      // Barcode unreadable — try the printed text on the disc (OCR). Less reliable, so it only
+      // fills the plate/details for the user to CHECK; no automatic lookup.
+      try{
+        const p=await ocrLicenceDisc(dataUrl);
+        setScanResult(p);
+        if(p.reg) setPlate(p.reg.replace(/\s/g,"").toUpperCase());
+        setScanError("⚠️ Barcode unreadable — filled from the printed text instead. Please check the plate, VIN and engine no. before continuing.");
+      }catch{
+        setScanError("PDF417 not detected and the printed text couldn't be read — try a clearer, closer photo with the torch on, or type the plate. ("+e.message+")");
+      }
       setScanLoading(false);
     }
   };

@@ -440,9 +440,9 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   const photosBlock = photoList.length ? `
     <div style="width:100%;flex-basis:100%">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      <div style="display:flex;flex-wrap:nowrap;gap:6px">
-      ${photoList.map(p=>`<div style="flex:1 1 0;min-width:0;margin-bottom:2px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${photoList.map(p=>`<div style="flex:0 0 calc(33.333% - 6px);min-width:0;margin-bottom:2px;page-break-inside:avoid">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:auto;max-height:230px;object-fit:contain;background:#f3f4f6;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
       </div>
@@ -636,9 +636,9 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   const photosBlock = photoList.length ? `
     <div style="width:100%;flex-basis:100%">
       <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📸 Vehicle Photos</div>
-      <div style="display:flex;flex-wrap:nowrap;gap:6px">
-      ${photoList.map(p=>`<div style="flex:1 1 0;min-width:0;margin-bottom:2px">
-        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${photoList.map(p=>`<div style="flex:0 0 calc(33.333% - 6px);min-width:0;margin-bottom:2px;page-break-inside:avoid">
+        <img src="${toImgUrl(p.url)||p.url}" referrerpolicy="no-referrer" style="width:100%;height:auto;max-height:230px;object-fit:contain;background:#f3f4f6;border-radius:6px;border:1px solid #e5e5e5;display:block"/>
         <div style="font-size:8px;font-weight:700;color:#666;text-align:center;margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${p.label}</div>
       </div>`).join("")}
       </div>

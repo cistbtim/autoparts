@@ -1,3 +1,4 @@
+import { getSettings } from "./settings.js";
 // Dynamsoft Barcode Reader v7.4.0-v1 — PDF417 decoder for SA eNaTIS licence discs
 const DYNAMSOFT_CDN = "https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@7.4.0-v1/dist/";
 
@@ -228,7 +229,41 @@ export function parseDiscText(text) {
   return out;
 }
 
+// Ask the Worker's vision AI (POST /api/disc-ocr) to read the printed text. Far better than in-browser
+// Tesseract on curved/tilted/dark disc photos. Only exists on the Cloudflare deploy; any failure → null.
+async function aiReadDisc(dataUrl) {
+  try {
+    const img = document.createElement("img");
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const resp = await fetch("/api/disc-ocr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Shared-Secret": getSettings().worker_shared_secret || "" },
+      body: JSON.stringify({ image: c.toDataURL("image/jpeg", 0.88) }),
+    });
+    const j = await resp.json();
+    if (!j?.ok || !j.result) return null;
+    const r = j.result, clean = v => (typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null") ? v.trim().toUpperCase() : null;
+    const vinRaw = (clean(r.vin) || "").replace(/[^A-Z0-9]/g, "");
+    const vin = vinRaw.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(VIN_FIX(vinRaw)) ? VIN_FIX(vinRaw) : null;
+    const reg = (clean(r.reg) || "").replace(/[^A-Z0-9]/g, "") || null;
+    const exp = clean(r.expiry_date);
+    const out = {
+      reg: reg && SA_PLATE.test(reg) ? reg : null, vin, engine_no: (clean(r.engine_no) || "").replace(/[^A-Z0-9]/g, "") || null,
+      make: clean(r.make) ? clean(r.make).charAt(0) + clean(r.make).slice(1).toLowerCase() : null, model: null, color: null,
+      body_type: clean(r.body_type), expiry_date: exp && /^20\d{2}-\d{2}-\d{2}$/.test(exp) ? exp : null,
+      licence_no: (clean(r.licence_no) || "").replace(/[^A-Z0-9]/g, "") || null, raw: JSON.stringify(r), ocr: true,
+    };
+    return (out.vin || out.reg) ? out : null;
+  } catch { return null; }
+}
+
 export async function ocrLicenceDisc(dataUrl) {
+  const ai = await aiReadDisc(dataUrl);
+  if (ai) return ai;
   if (!window.Tesseract) {
     await new Promise((res, rej) => {
       const s = document.createElement("script");

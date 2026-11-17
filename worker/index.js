@@ -35,6 +35,9 @@ export default {
     if (url.pathname === "/api/photo-damage-check" && request.method === "POST") {
       return handleDamageCheck(request, env);
     }
+    if (url.pathname === "/api/disc-ocr" && request.method === "POST") {
+      return handleDiscOcr(request, env);
+    }
     if (url.pathname === "/api/photo-proxy" && request.method === "GET") {
       return handlePhotoProxy(url);
     }
@@ -146,6 +149,43 @@ async function handleDamageCheck(request, env) {
     return json({ ok: false, error: parsedResult.error }, 502);
   }
   return json({ ok: true, result: parsedResult.data });
+}
+
+// Reads the PRINTED text on a South African licence disc photo (used when the PDF417 barcode can't be
+// decoded - blurry / dark / glare). Image is posted by the browser as a data URI. Result is a best-effort
+// read: the app shows it to staff to confirm and never trusts it blindly.
+const DISC_OCR_PROMPT = `This is a photo of a South African vehicle licence disc (round sticker). Read ONLY text that is actually printed on it. Fields: "Licence no." (short code like X9BN311D), "Vehicle register no." (the number plate, e.g. GMK956L), "VIN" (17 characters, never contains I, O or Q), "Engine no.", "Make" (e.g. TOYOTA), "Description" (body type, e.g. Station wagon), and "Date of expiry" (YYYY-MM-DD, printed large at the bottom). Do NOT guess: if a field is not clearly legible use null.
+
+Respond with ONLY valid JSON, no other text, exactly this shape:
+{"licence_no":null,"reg":null,"vin":null,"engine_no":null,"make":null,"body_type":null,"expiry_date":null}`;
+
+async function handleDiscOcr(request, env) {
+  const sharedSecret = request.headers.get("X-Shared-Secret");
+  const expectedSecret = await getWorkerSharedSecret();
+  if (!expectedSecret || sharedSecret !== expectedSecret) return json({ ok: false, error: "Unauthorized" }, 401);
+  if (!env.AI) return json({ ok: false, error: "Server not configured (missing AI binding)" }, 500);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "Invalid JSON body" }, 400); }
+  const image = body?.image;
+  if (typeof image !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(image)) return json({ ok: false, error: "image (data URI) required" }, 400);
+  if (image.length > MAX_IMAGE_BYTES * 1.4) return json({ ok: false, error: "Image too large" }, 413);
+  let aiResult;
+  try {
+    aiResult = await env.AI.run(VISION_MODEL, {
+      messages: [
+        { role: "system", content: "You are an OCR assistant that only responds with valid JSON." },
+        { role: "user", content: DISC_OCR_PROMPT },
+      ],
+      image,
+      max_tokens: 300,
+    });
+  } catch (e) {
+    return json({ ok: false, error: `Workers AI error: ${e.message || e}` }, 502);
+  }
+  const field = aiResult?.response ?? aiResult?.result;
+  const parsed = field && typeof field === "object" ? { ok: true, data: field } : extractJson(field || "");
+  if (!parsed.ok) return json({ ok: false, error: parsed.error }, 502);
+  return json({ ok: true, result: parsed.data });
 }
 
 async function getRecentCorrections() {

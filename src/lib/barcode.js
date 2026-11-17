@@ -215,10 +215,11 @@ export function parseDiscText(text) {
   if (em && em[1] !== out.vin) out.engine_no = em[1];
   // Licence number
   const lm = T.match(/LICENCE\s*NO[^A-Z0-9]*(?:LISENSIENR)?[^A-Z0-9]*([A-Z0-9]{6,10})/) || T.match(/LISENSIENR[^A-Z0-9]*([A-Z0-9]{6,10})/);
-  if (lm) out.licence_no = lm[1];
+  if (lm) out.reg = lm[1]; // the number plate is the "Licence no." line on these discs
   // Registration plate — prefer the token after the "register" label, else any SA-plate-shaped token
   const pm = T.match(/REGISTER?\s*NO[^A-Z0-9]*(?:VRT\.?\s*REGISTERNR)?[^A-Z0-9]*([A-Z]{1,3}\d{3,6}[A-Z]{0,2})/) || T.match(/REGISTERNR[^A-Z0-9]*([A-Z]{1,3}\d{3,6}[A-Z]{0,2})/);
-  if (pm) out.reg = pm[1];
+  if (out.reg) { /* already taken from "Licence no." */ }
+  else if (pm) out.reg = pm[1];
   else out.reg = tokens.find(tk => SA_PLATE.test(tk) && tk !== out.engine_no && tk !== out.licence_no && !(out.vin || "").includes(tk)) || null;
   // Make
   out.make = OCR_MAKES.find(m => new RegExp(`\b${m}\b`).test(T)) || null;
@@ -249,13 +250,15 @@ async function aiReadDisc(dataUrl) {
     const r = j.result, clean = v => (typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null") ? v.trim().toUpperCase() : null;
     const vinRaw = (clean(r.vin) || "").replace(/[^A-Z0-9]/g, "");
     const vin = vinRaw.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(VIN_FIX(vinRaw)) ? VIN_FIX(vinRaw) : null;
-    const reg = (clean(r.reg) || "").replace(/[^A-Z0-9]/g, "") || null;
+    // On these discs the number plate is the "Licence no." line; "Veh. register no." is a separate code.
+    const plate = (clean(r.licence_no) || "").replace(/[^A-Z0-9]/g, "");
+    const registerNo = (clean(r.reg) || "").replace(/[^A-Z0-9]/g, "") || null;
     const exp = clean(r.expiry_date);
     const out = {
-      reg: reg && SA_PLATE.test(reg) ? reg : null, vin, engine_no: (clean(r.engine_no) || "").replace(/[^A-Z0-9]/g, "") || null,
+      reg: /^[A-Z0-9]{5,10}$/.test(plate) ? plate : null, vin, engine_no: (clean(r.engine_no) || "").replace(/[^A-Z0-9]/g, "") || null,
       make: clean(r.make) ? clean(r.make).charAt(0) + clean(r.make).slice(1).toLowerCase() : null, model: null, color: null,
       body_type: clean(r.body_type), expiry_date: exp && /^20\d{2}-\d{2}-\d{2}$/.test(exp) ? exp : null,
-      licence_no: (clean(r.licence_no) || "").replace(/[^A-Z0-9]/g, "") || null, raw: JSON.stringify(r), ocr: true,
+      licence_no: registerNo, raw: JSON.stringify(r), ocr: true, // licence_no here holds the "Veh. register no."
     };
     return (out.vin || out.reg) ? out : null;
   } catch { return null; }

@@ -4028,7 +4028,22 @@ const cylFromEngineNo = (make, engineNo) => {
 };
 // Learned: other vehicles of the same make whose engine number starts the same
 // and whose cylinder count was already chosen by hand — used when no rule matches.
-const learnedCylinders = (make, engineNo, wsVehicles=[], selfId=null) => {
+// Engine-oil part? (viscosity grade in the name, e.g. "5W30"; filters excluded)
+const isOilPart = (name) => /(?<!\d)\d{1,2}\s?W[-\s]?\d{1,2}(?!\d)/i.test(name||"") && !/filter/i.test(name||"");
+// Oil capacity (litres, with filter) by engine-number prefix — only engines
+// I'm confident about; anything else is remembered per vehicle after the
+// first manual entry. Longest prefix wins.
+const ENGINE_OIL_L = {
+  TOYOTA: { "1NZ":3.7, "2NZ":3.7, "1NR":3.7, "1ZR":4.2, "2ZR":4.2, "3ZR":4.2, "1ZZ":4.2, "2TR":5.7, "1GR":5.7, "2GR":6.1 },
+};
+const oilFromEngineNo = (make, engineNo) => {
+  const t = ENGINE_OIL_L[engineMake(make)];
+  const en = (engineNo||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (!t || !en) return 0;
+  const hit = Object.keys(t).filter(k=>en.startsWith(k)).sort((a,b)=>b.length-a.length)[0];
+  return hit ? t[hit] : 0;
+};
+const learnedCylinders = (make, engineNo, wsVehicles=[], selfId=null, field="cylinders") => {
   const mk = engineMake(make);
   if (mk==="BMW" || mk==="MINI") return 0; // serial numbers, a shared prefix means nothing
   const en = (engineNo||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -4036,9 +4051,25 @@ const learnedCylinders = (make, engineNo, wsVehicles=[], selfId=null) => {
   if (key.length < 3) return 0;
   const found = new Set();
   wsVehicles.forEach(v=>{
-    if (v.id===selfId || !(+v.cylinders>0) || engineMake(v.make)!==mk) return;
+    if (v.id===selfId || !(+v[field]>0) || engineMake(v.make)!==mk) return;
     const o = (v.engine_no||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
-    if (o.slice(0,key.length)===key) found.add(+v.cylinders);
+    if (o.slice(0,key.length)===key) found.add(+v[field]);
+  });
+  return found.size===1 ? [...found][0] : 0;
+};
+
+// Learned oil litres by make + model (+ same engine size if known): another workshop
+// vehicle of the same model already had its litres entered by hand. Only used when
+// every match agrees.
+const learnedOilByModel = (make, model, engineNo, wsVehicles=[], selfId=null) => {
+  const mk = engineMake(make);
+  const md = (model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if (!mk || md.length < 2) return 0;
+  const found = new Set();
+  wsVehicles.forEach(v=>{
+    if (v.id===selfId || !(+v.oil_litres>0) || engineMake(v.make)!==mk) return;
+    const vm = (v.model||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (vm===md) found.add(+v.oil_litres);
   });
   return found.size===1 ? [...found][0] : 0;
 };
@@ -5535,6 +5566,16 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
   };
   const engineCyl = cylFromEngineNo(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no)
     || learnedCylinders(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no, wsVehicles, vehicleRecord?.id);
+  const [oilSaved, setOilSaved] = useState({});
+  const savedOil = +(oilSaved[vehicleRecord?.id] ?? vehicleRecord?.oil_litres) || 0;
+  const engineOil = oilFromEngineNo(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no)
+    || learnedCylinders(job.vehicle_make, job.engine_no||vehicleRecord?.engine_no, wsVehicles, vehicleRecord?.id, "oil_litres")
+    || learnedOilByModel(job.vehicle_make, vehicleRecord?.model||job.vehicle_model, job.engine_no||vehicleRecord?.engine_no, wsVehicles, vehicleRecord?.id);
+  const rememberOil = async(n)=>{
+    if(!vehicleRecord?.id) return;
+    setOilSaved(p=>({...p,[vehicleRecord.id]:n}));
+    try{ await api.patch("workshop_vehicles","id",vehicleRecord.id,{oil_litres:n}); }catch{}
+  };
   const vehicleHistory = jobs.filter(j=>{
     if(j.id===job.id) return false;
     if(job.workshop_vehicle_id&&j.workshop_vehicle_id===job.workshop_vehicle_id) return true;
@@ -9754,6 +9795,9 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           vehicleLabel={[job.vehicle_make,resolvedVehicleModel].filter(Boolean).join(" ")}
           savedCyl={savedCyl}
           engineCyl={engineCyl}
+          savedOil={savedOil}
+          engineOil={engineOil}
+          onRememberOil={rememberOil}
           onRememberCyl={rememberCyl}
           linkedBranchId={wsProfile?.linked_branch_id||null}
           linkedBranchName={branches.find(b=>b.id===wsProfile?.linked_branch_id)?.name||""}
@@ -12149,7 +12193,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl, savedOil=0, engineOil=0, onRememberOil,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -12225,6 +12269,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   // read from the job's model text plus matched catalog vehicles' engine/variant.
   // Only used when every source that names a count agrees; otherwise 0 and the
   // manual picker is shown as before.
+  const oilL = savedOil || engineOil || 0; // litres for engine-oil parts
   const detectedCyl = useMemo(()=>{
     const counts = new Set();
     const own = guessCylinders(vehicleModel);
@@ -12335,7 +12380,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
     // Per-cylinder parts (spark plugs, injectors, coils…) vary by vehicle — leave qty
     // blank so the cylinder-count picker below forces a real choice, instead of
     // silently carrying over whatever qty was last used or defaulting to 1.
-    setQty(p.qty_per_cylinder?(detectedCyl||""):(+p.default_qty>0?+p.default_qty:1));
+    setQty(p.qty_per_cylinder?(detectedCyl||""):(type==="part"&&isOilPart(p.name)?(oilL||""):(+p.default_qty>0?+p.default_qty:1)));
     setSearch("");
     setCreating(false);
   };
@@ -12360,7 +12405,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
       setMarkupPct(defaultMarkupPct);
       setPrice(String(listPrice||""));
     }
-    setQty(p.qty_per_cylinder?(detectedCyl||""):(+p.default_qty>0?+p.default_qty:1));
+    setQty(p.qty_per_cylinder?(detectedCyl||""):(type==="part"&&isOilPart(p.name)?(oilL||""):(+p.default_qty>0?+p.default_qty:1)));
     setSearch("");
     setCreating(false);
   };
@@ -12442,6 +12487,7 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
   const handleSave=async()=>{
     if(!desc.trim()||!price){alert("Fill description and price");return;}
     if(selItem?.qty_per_cylinder&&!(+qty>0)){alert("Please select how many cylinders this vehicle has");return;}
+    if(type==="part"&&isOilPart(selItem?.name)&&!(+qty>0)){alert("Please enter how many litres of oil this vehicle takes");return;}
     setSaving(true);
     try{
       let stockId=type==="part"&&selItem&&selSource==="stock"?selItem.id:null;
@@ -12778,9 +12824,23 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
           </div>
         </div>
       )}
+      {type==="part"&&selItem&&!selItem.qty_per_cylinder&&isOilPart(selItem.name)&&(
+        <div style={{marginBottom:12,padding:"10px 12px",borderRadius:8,background:"rgba(251,191,36,.1)",border:"1px solid rgba(251,191,36,.35)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"var(--yellow)",marginBottom:8}}>🛢️ Litres of oil for this vehicle (Qty = litres)</div>
+          {oilL>0&&<div style={{fontSize:11,color:"var(--green)",marginBottom:8}}>✅ {savedOil?"Remembered":"From engine no. (check it)"}: {oilL} L — change below if wrong</div>}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[3,3.5,4,4.5,5,5.5,6,6.5,7,8].map(n=>(
+              <button key={n} type="button" onClick={()=>{ setQty(n); onRememberOil?.(n); }}
+                style={{padding:"6px 12px",borderRadius:8,border:+qty===n?"1px solid var(--yellow)":"1px solid var(--border)",
+                  background:+qty===n?"var(--yellow)":"var(--surface2)",color:+qty===n?"#000":"var(--text2)",
+                  fontWeight:700,fontSize:13,cursor:"pointer"}}>{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <FG>
         <div><FL label="Qty"/><input className="inp" type="number" value={qty} onChange={e=>setQty(e.target.value)} min="0.5" step="0.5"
-          style={selItem?.qty_per_cylinder&&!(+qty>0)?{borderColor:"var(--yellow)"}:{}}/></div>
+          style={(selItem?.qty_per_cylinder||(type==="part"&&isOilPart(selItem?.name)))&&!(+qty>0)?{borderColor:"var(--yellow)"}:{}}/></div>
         <div><FL label={`Unit ${type==="part"?"Price":"Rate"}`}/><input className="inp" type="number" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0.00"/></div>
         <div><FL label="Total"/><input className="inp" value={fmtAmt(total)} readOnly style={{color:"var(--accent)",fontWeight:700,fontFamily:"Rajdhani,sans-serif"}}/></div>
       </FG>

@@ -399,6 +399,21 @@ export function printJobCardLabel(job, settings) {
   w.document.close();
 }
 
+// Bank-details block for the quote / invoice PDFs. Returns "" when no bank details are set up
+// (Workshop Settings → Banking). `reference` = what the customer should quote when paying.
+function bankDetailsBlock(settings, title, reference) {
+  const esc = v => String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const rows = [["Bank",settings.bank_name],["Account Holder",settings.bank_account_holder],["Account Number",settings.bank_account_number],["Branch Code",settings.bank_branch_code],["SWIFT / IBAN",settings.bank_swift]].filter(([,v])=>v);
+  if (!rows.length) return "";
+  return `
+  <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 14px;margin:0 0 20px;page-break-inside:avoid">
+    <div style="font-size:11px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🏦 ${esc(title)}</div>
+    ${rows.map(([label,value])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px"><span style="color:#64748b">${label}</span><span style="font-weight:700;font-family:monospace">${esc(value)}</span></div>`).join("")}
+    ${reference?`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px"><span style="color:#64748b">Payment Reference</span><span style="font-weight:700;font-family:monospace">${esc(reference)}</span></div>`:""}
+    ${settings.bank_reference_note?`<div style="margin-top:6px;font-size:11px;color:#475569;font-style:italic">ℹ️ ${esc(settings.bank_reference_note)}</div>`:""}
+  </div>`;
+}
+
 export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}, vehicles=[]) {
   const items = sortForPrint(allItems);
   const dispModel = resolveVehicleModel(job, vehicles);
@@ -562,6 +577,8 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
     <div class="t-row" style="font-weight:800;font-size:16px;color:${total-amountPaid>0.005?"#b91c1c":"#166534"};border-top:2px solid #333;padding-top:6px;margin-top:4px"><span>BALANCE DUE</span><span>${fmt(Math.max(0,total-amountPaid))}</span></div>`:""}
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}
   </div>
+
+  ${bankDetailsBlock(settings,"Bank Details — Pay To",job.vehicle_reg||"")}
 
   ${invoice?.notes?`<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>`:""}
 
@@ -785,6 +802,8 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
       ${settings.bank_reference_note?`<div style="margin-top:6px;font-size:11px;color:#475569;font-style:italic">ℹ️ ${settings.bank_reference_note}</div>`:""}
     </div>`:""}
   </div>`:""}
+
+  ${quote.deposit_message?"":bankDetailsBlock(settings,"Bank Details",job.vehicle_reg||"")}
 
   ${quote.notes?`<div class="notes"><strong>Notes:</strong> ${quote.notes}</div>`:""}
 

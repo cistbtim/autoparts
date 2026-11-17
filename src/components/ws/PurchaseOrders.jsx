@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getSettings, curSym } from "../../lib/settings.js";
 import { waLink } from "../../lib/helpers.js";
 import { Overlay, MHead, FL, FG } from "../shared.jsx";
+import { poEtaInfo, toLocalInput, ETA_COLOR, ETA_BG } from "../../lib/poEta.js";
 
 export function WsCreatePoFromJobModal({job,jobItems=[],wsSupplierQuotes=[],wsSupplierRequests=[],sqReplies=[],wsSuppliers=[],settings,onSave,onViewPOs,onClose}) {
   const C=curSym(settings?.currency||getSettings().currency);
@@ -375,11 +376,13 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
   const STATUS_BG={draft:"var(--surface3)",sent:"rgba(96,165,250,.12)",partial:"rgba(251,191,36,.12)",received:"rgba(52,211,153,.12)",cancelled:"rgba(248,113,113,.12)"};
 
   const filtered=purchaseOrders.filter(po=>{
+    if(filterSt==="__late__") return poEtaInfo(po)?.level==="late";
     if(filterSt!=="__all__"&&po.status!==filterSt) return false;
     if(search.trim()){const h=`${po.supplier_name||""} ${po.id}`.toLowerCase();if(!search.toLowerCase().split(/\s+/).every(w=>h.includes(w)))return false;}
     return true;
   });
 
+  const lateCount=purchaseOrders.filter(p=>poEtaInfo(p)?.level==="late").length;
   const summary={
     draft:purchaseOrders.filter(p=>p.status==="draft").length,
     sent:purchaseOrders.filter(p=>p.status==="sent").length,
@@ -399,6 +402,12 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
           </div>
         ))}
       </div>
+      {lateCount>0&&(
+        <div onClick={()=>setFilterSt(p=>p==="__late__"?"__all__":"__late__")}
+          style={{cursor:"pointer",marginBottom:12,padding:"10px 14px",borderRadius:8,background:ETA_BG.late,border:"1px solid "+ETA_COLOR.late,color:ETA_COLOR.late,fontWeight:700,fontSize:13}}>
+          ⚠️ {lateCount} order{lateCount!==1?"s":""} late or with no delivery time confirmed — {filterSt==="__late__"?"tap to show all":"tap to view"}
+        </div>
+      )}
       {/* Controls */}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
         <input className="inp" style={{flex:1,minWidth:140}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search supplier, PO #…"/>
@@ -431,6 +440,7 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
                     <span style={{fontFamily:"Rajdhani,sans-serif",fontWeight:700,fontSize:14,color:"var(--accent)"}}>{fmt(po.total_amount)}</span>
                   </div>
                 </div>
+                {(()=>{ const eta=poEtaInfo(po); return eta?<div style={{display:"inline-block",fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,marginBottom:6,background:ETA_BG[eta.level],color:ETA_COLOR[eta.level]}}>{eta.label}</div>:null; })()}
                 <div style={{fontSize:12,color:"var(--text2)",marginBottom:6}}>{items.map(i=>i.description).join(" · ")||"No items"}</div>
                 {items.length>0&&(
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -508,6 +518,7 @@ export function WsPurchaseOrdersPage({purchaseOrders=[],poItems=[],wsSuppliers=[
             <MHead title={`PO — ${viewPo.supplier_name||"Unknown"}`} onClose={()=>setModal(null)}/>
             <div style={{marginBottom:8}}>
               <div style={{fontSize:12,color:"var(--text3)",marginBottom:4}}>Status: <span style={{color:STATUS_COLOR[viewPo.status]||"var(--text3)",fontWeight:700,textTransform:"capitalize"}}>{viewPo.status||"draft"}</span></div>
+              {(()=>{ const eta=poEtaInfo(viewPo); return eta?<div style={{fontSize:12,fontWeight:700,marginBottom:4,color:ETA_COLOR[eta.level]}}>{eta.label}</div>:null; })()}
               {viewPo.supplier_quote_ref&&<div style={{fontSize:12,color:"var(--blue)",marginBottom:4}}>Quote Ref: <strong>{viewPo.supplier_quote_ref}</strong></div>}
               {viewPo.notes&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Notes: {viewPo.notes}</div>}
               {viewPo.job_id&&<div style={{fontSize:12,color:"var(--text2)",marginBottom:4}}>Job: {viewPo.job_id}</div>}
@@ -576,6 +587,7 @@ export function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuote
   const [notes,setNotes]=useState(po?.notes||"");
   const [jobId,setJobId]=useState(po?.job_id||"");
   const [sqRef,setSqRef]=useState(po?.supplier_quote_ref||"");
+  const [expectedAt,setExpectedAt]=useState(toLocalInput(po?.expected_at));
   const [items,setItems]=useState(()=>{
     if(prefill) return prefill;
     if(po){
@@ -644,6 +656,7 @@ export function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuote
       id:po?.id||undefined,
       supplier_id:suppId||null,supplier_name:resolvedName,
       status,notes,job_id:jobId||null,supplier_quote_ref:sqRef.trim()||null,
+      expected_at:expectedAt?new Date(expectedAt).toISOString():null,
     },items.filter(i=>i.description.trim()));
     setSaving(false);
   };
@@ -717,6 +730,15 @@ export function WsPurchaseOrderModal({po,wsSuppliers=[],settings,wsSupplierQuote
           {["draft","sent","partial","received","cancelled"].map(s=><option key={s}>{s}</option>)}
         </select></div>
         <div><FL label="Job # (optional)"/><input className="inp" value={jobId} onChange={e=>setJobId(e.target.value)} placeholder="e.g. WJ-123"/></div>
+        <div style={{gridColumn:"1/-1"}}><FL label="Expected delivery (supplier's confirmed time)"/>
+          <input className="inp" type="datetime-local" value={expectedAt} onChange={e=>setExpectedAt(e.target.value)}/>
+          <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+            {[["Today +2h",()=>new Date(Date.now()+2*36e5)],["Today 16:00",()=>{const d=new Date();d.setHours(16,0,0,0);return d;}],["Tomorrow 10:00",()=>{const d=new Date();d.setDate(d.getDate()+1);d.setHours(10,0,0,0);return d;}]].map(([l,f])=>(
+              <button key={l} type="button" className="btn btn-ghost btn-sm" onClick={()=>setExpectedAt(toLocalInput(f().toISOString()))}>{l}</button>
+            ))}
+            {expectedAt&&<button type="button" className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>setExpectedAt("")}>Clear</button>}
+          </div>
+        </div>
         <div style={{gridColumn:"1/-1"}}><FL label="Supplier Quote Ref # (Doc Nr)"/><input className="inp" value={sqRef} onChange={e=>setSqRef(e.target.value)} placeholder="e.g. Q100814"/></div>
       </div>
       <div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}><FL label="Notes (optional)"/></div>

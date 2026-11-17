@@ -2526,6 +2526,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const saveWsPurchaseOrder=async(po,items=[])=>{
     const chk=(r,l)=>{ if(r&&!Array.isArray(r)&&(r.code||r.message))throw new Error(`${l}: ${r.message||r.code}`); return r; };
     const {id,items:_poItems,...rest}=po; // strip items from po object before DB insert
+    if(rest.status==="sent"&&!rest.ordered_at) rest.ordered_at=new Date().toISOString(); // start the "no delivery time" clock
     const isNew=!id;
     const poId=id||makeId("WSPO");
     const total=items.reduce((s,i)=>s+(+i.qty||0)*(+i.unit_price||0),0);

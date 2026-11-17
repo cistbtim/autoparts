@@ -22,6 +22,7 @@ import { WsVoiceMessageModal } from "./ws/VoiceMessage.jsx";
 import { WsScrapyardMatchPage } from "./ws/ScrapyardMatch.jsx";
 import { WsCustomersPage, WsCustomerForm, WsVehicleForm, LicenceRenewalModal, WsLicenceRenewalsPage } from "./ws/Customers.jsx";
 import { WsSupplierInvoicesPage, WsSupInvoiceModal, WsSupInvoiceViewModal, WsSupPaymentModal, WsSupReturnModal } from "./ws/SupplierInvoices.jsx";
+import { poEtaInfo, ETA_COLOR, ETA_BG } from "../lib/poEta.js";
 import { WsCreatePoFromJobModal, WsPurchaseOrdersPage, WsPurchaseOrderModal, WsReceiveGoodsModal } from "./ws/PurchaseOrders.jsx";
 import { WsQuoteModal, WsInvoiceEditModal, WsPaymentModal, WsDepositModal, WsStatementModal, WorkshopInvoiceModal } from "./ws/InvoiceModals.jsx";
 import { WorkshopFeedbackButton } from "./ws/Feedback.jsx";
@@ -9084,6 +9085,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                           📋 PO · {po.status||"draft"}
                         </button>
                       )}
+                      {(()=>{ const eta=poEtaInfo(po); return eta?<span style={{fontSize:10,fontWeight:700,borderRadius:5,padding:"2px 7px",flexShrink:0,background:ETA_BG[eta.level],color:ETA_COLOR[eta.level]}}>{eta.label}</span>:null; })()}
                     </div>
                   );
                 })}
@@ -9097,6 +9099,7 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
                       style={{fontSize:10,fontWeight:700,borderRadius:5,padding:"2px 8px",border:"none",cursor:"pointer",background:PO_BG[po.status]||PO_BG.draft,color:PO_C[po.status]||PO_C.draft}}>
                       📋 PO · {po.status||"draft"}
                     </button>
+                    {(()=>{ const eta=poEtaInfo(po); return eta?<span style={{fontSize:10,fontWeight:700,borderRadius:5,padding:"2px 7px",background:ETA_BG[eta.level],color:ETA_COLOR[eta.level]}}>{eta.label}</span>:null; })()}
                   </div>
                 ))}
               </div>

@@ -9797,6 +9797,8 @@ function WorkshopJobDetail({onGoToScrapMatch,job,items,invoice,quotes=[],jobs=[]
           engineCyl={engineCyl}
           savedOil={savedOil}
           engineOil={engineOil}
+          vehicleVin={job.vin}
+          vehicleYear={job.vehicle_year}
           onRememberOil={rememberOil}
           onRememberCyl={rememberCyl}
           linkedBranchId={wsProfile?.linked_branch_id||null}
@@ -12193,7 +12195,7 @@ function WorkshopComboModal({wsServices=[], wsStock=[], wsId=null, defaultMarkup
   );
 }
 
-function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl, savedOil=0, engineOil=0, onRememberOil,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
+function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], defaultMarkupPct=0, onSave, onClose, onGoToStock, onRefresh, wsId=null, parts=[], partFitments=[], vehicles=[], vehicleMake="", vehicleModel="", vehicleLabel="", savedCyl=0, engineCyl=0, onRememberCyl, savedOil=0, engineOil=0, vehicleVin="", vehicleYear="", onRememberOil,linkedBranchId=null, linkedBranchName="", mainBranchId=null, t}) {
   const [desc,        setDesc]        = useState("");
   const [qty,         setQty]         = useState(1);
   const [price,       setPrice]       = useState("");
@@ -12835,6 +12837,30 @@ function WorkshopItemModal({type, wsStock=[], wsServices=[], existingItems=[], d
                   background:+qty===n?"var(--yellow)":"var(--surface2)",color:+qty===n?"#000":"var(--text2)",
                   fontWeight:700,fontSize:13,cursor:"pointer"}}>{n}</button>
             ))}
+          </div>
+          {/* Don't know the litres? Look it up — VIN is copied for sites that ask for it */}
+          <div style={{marginTop:10,paddingTop:8,borderTop:"1px dashed rgba(251,191,36,.35)"}}>
+            <div style={{fontSize:11,color:"var(--text3)",marginBottom:6}}>Don't know the litres? Look it up:</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {(()=>{
+                const q=encodeURIComponent([vehicleLabel||vehicleMake,vehicleYear,"engine oil capacity litres"].filter(Boolean).join(" "));
+                const copyVin=()=>{ if(vehicleVin){ try{navigator.clipboard.writeText(vehicleVin);}catch{} alert(`VIN copied!\n\n${vehicleVin}\n\nPaste it into the VIN field on the website.`); } };
+                const links=[
+                  {label:"Google",icon:"🔍",href:`https://www.google.com/search?q=${q}`},
+                  {label:"WolfOil",icon:"🛢️",href:"https://za.wolfoil.com/en-us/oil-finder",vin:true},
+                  {label:"Castrol",icon:"🟢",href:"https://www.castrol.com/en_za/south-africa/home/oil-finder.html",vin:true},
+                  {label:"Shell",icon:"🐚",href:`https://www.google.com/search?q=${encodeURIComponent("Shell LubeMatch "+(vehicleLabel||vehicleMake||"")+" "+(vehicleYear||""))}`},
+                  {label:"Images",icon:"🖼️",href:`https://www.google.com/search?tbm=isch&q=${q}`},
+                ];
+                return links.map(l=>(
+                  <button key={l.label} type="button"
+                    onClick={()=>{ if(l.vin) copyVin(); window.open(l.href,"_blank","noopener"); }}
+                    style={{padding:"5px 10px",borderRadius:99,border:"1px solid var(--border)",background:"var(--surface2)",color:"var(--text2)",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    {l.icon} {l.label}{l.vin&&vehicleVin?" · copies VIN":""}
+                  </button>
+                ));
+              })()}
+            </div>
           </div>
         </div>
       )}

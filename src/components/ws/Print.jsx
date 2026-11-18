@@ -399,19 +399,43 @@ export function printJobCardLabel(job, settings) {
   w.document.close();
 }
 
-// Bank-details block for the quote / invoice PDFs. Returns "" when no bank details are set up
-// (Workshop Settings → Banking). `reference` = what the customer should quote when paying.
-function bankDetailsBlock(settings, title, reference) {
+// Page footer for the quote / invoice PDFs. Rendered as a repeating table-footer-group so the bank
+// details + "Powered by VelGenius" sit at the bottom of EVERY printed page (page numbers come from @page).
+// `reference` = what the customer should quote when paying. Bank strip omitted when no bank details are set.
+const PRINT_PAGE_CSS = `
+  @page{size:A4;margin:8mm 8mm 14mm;@bottom-center{content:"Page " counter(page) " of " counter(pages);font-family:Arial,sans-serif;font-size:10px;color:#666}}
+  .pg{display:table;width:100%}
+  .pg-body{display:table-row-group}
+  .pg-foot{display:table-footer-group}
+  .pg-foot-in{padding-top:8px}
+  @media print{.pg{min-height:270mm}}`;
+function pageFooterHtml(settings, shopName, reference, thanks) {
   const esc = v => String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const rows = [["Bank",settings.bank_name],["Account Holder",settings.bank_account_holder],["Account Number",settings.bank_account_number],["Branch Code",settings.bank_branch_code],["SWIFT / IBAN",settings.bank_swift]].filter(([,v])=>v);
-  if (!rows.length) return "";
-  return `
-  <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 14px;margin:0 0 20px;page-break-inside:avoid">
-    <div style="font-size:11px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">🏦 ${esc(title)}</div>
-    ${rows.map(([label,value])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px"><span style="color:#64748b">${label}</span><span style="font-weight:700;font-family:monospace">${esc(value)}</span></div>`).join("")}
-    ${reference?`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px"><span style="color:#64748b">Payment Reference</span><span style="font-weight:700;font-family:monospace">${esc(reference)}</span></div>`:""}
-    ${settings.bank_reference_note?`<div style="margin-top:6px;font-size:11px;color:#475569;font-style:italic">ℹ️ ${esc(settings.bank_reference_note)}</div>`:""}
-  </div>`;
+  const rows = [["Bank",settings.bank_name],["Account Holder",settings.bank_account_holder],["Account No.",settings.bank_account_number],["Branch Code",settings.bank_branch_code],["SWIFT / IBAN",settings.bank_swift],["Payment Ref.",reference]].filter(([,v])=>v);
+  const bank = rows.length ? `
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🏦 Bank Details — Pay To</div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px 18px;font-size:11px">
+        ${rows.map(([l,v])=>`<span><span style="color:#64748b">${l}:</span> <b style="font-family:monospace">${esc(v)}</b></span>`).join("")}
+      </div>
+      ${settings.bank_reference_note?`<div style="margin-top:3px;font-size:10px;color:#475569;font-style:italic">ℹ️ ${esc(settings.bank_reference_note)}</div>`:""}
+    </div>` : "";
+  return `<div class="pg-foot"><div class="pg-foot-in">
+    ${bank}
+    <div style="border-top:1px solid #e5e5e5;padding-top:6px;font-size:10px;color:#999;text-align:center;line-height:1.5">
+      ${esc(shopName)}${settings.phone?" · "+esc(settings.phone):""}${settings.email?" · "+esc(settings.email):""} · ${thanks}
+      <div style="margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:#bbb">
+        <span>Powered by</span>
+        <svg width="20" height="20" viewBox="0 0 120 120" fill="none" style="flex-shrink:0">
+          <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="none" stroke="#aaa" stroke-width="8"/>
+          <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="70" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
+          <circle cx="93" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
+        </svg>
+        <span><span style="font-weight:700;color:#e85d04">VEL</span><span style="font-weight:500;color:#999">GENIUS</span></span>
+      </div>
+    </div>
+  </div></div>`;
 }
 
 export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}, vehicles=[]) {
@@ -490,8 +514,10 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
   .t-total{display:flex;justify-content:space-between;padding:10px 0;font-size:17px;font-weight:800;color:#ff7a2e;border-top:2px solid #111;margin-top:4px}
   .notes{background:#fff8ed;border:1px solid #fcd34d;border-radius:8px;padding:12px;font-size:12px;margin-bottom:20px}
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
-  @media print{body{padding:18px}}
+  @media print{body{padding:0 6px}}
+  ${PRINT_PAGE_CSS}
 </style></head><body>
+<div class="pg"><div class="pg-body">
 
   <div class="header">
     <div>
@@ -501,7 +527,6 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}
         ${settings.email?`✉️ ${settings.email}<br/>`:""}
         ${settings.address?`📍 ${settings.address}<br/>`:""}
-        ${(settings.city||settings.country)?`🌍 ${[settings.city,settings.country].filter(Boolean).join(", ")}<br/>`:""}
         ${settings.vat_number?`VAT Reg No: <strong>${settings.vat_number}</strong>`:`<em style="color:#aaa">Not VAT Registered</em>`}
       </div>
     </div>
@@ -578,24 +603,11 @@ export function printWorkshopInvoice(job, allItems, invoice, settings, photos={}
     ${!settings.vat_number?`<div style="font-size:10px;color:#aaa;text-align:right;margin-top:4px">Not VAT Registered — no VAT charged</div>`:""}
   </div>
 
-  ${bankDetailsBlock(settings,"Bank Details — Pay To",job.vehicle_reg||"")}
-
   ${invoice?.notes?`<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>`:""}
 
-  <div class="footer">
-    ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
-    Thank you for your business!
-    <div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:20px;color:#bbb">
-      <span>Powered by</span>
-      <svg width="28" height="28" viewBox="0 0 120 120" fill="none" style="flex-shrink:0">
-        <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="none" stroke="#aaa" stroke-width="8"/>
-        <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="70" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
-        <circle cx="93" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
-      </svg>
-      <span><span style="font-weight:700;color:#e85d04">VEL</span><span style="font-weight:500;color:#999">GENIUS</span></span>
-    </div>
   </div>
+  ${pageFooterHtml(settings,shopName,job.vehicle_reg||"","Thank you for your business!")}
+</div>
 
 </body></html>`;
 
@@ -707,13 +719,15 @@ export function printWorkshopQuote(job, allItems, quote, settings, photos={}, sh
   .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e5e5;font-size:11px;color:#999;text-align:center;line-height:1.8}
   .sig-box{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
   .sig-line{border-top:1px solid #aaa;padding-top:6px;font-size:11px;color:#888;text-align:center}
-  @media print{body{padding:18px}.ws-share-bar{display:none!important}}
+  @media print{body{padding:0 6px}.ws-share-bar{display:none!important}}
+  ${PRINT_PAGE_CSS}
 </style></head><body>
 ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:0;background:#1a1a2e;padding:11px 20px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 12px rgba(0,0,0,.35)">
   <span style="color:#fff;font-weight:700;font-size:13px;flex:1">📄 ${shopName} — Quotation ${quote.id}</span>
   ${phone?`<a href="${waLink(phone,waMsg)}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;background:#25D366;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none">📱 Send via WhatsApp</a>`:""}
   <button onclick="window.print()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Save as PDF</button>
 </div><div style="height:58px"></div>`:`<div class="no-print" style="margin-bottom:16px"><button onclick="window.print()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Print / Save PDF</button></div>`}
+<div class="pg"><div class="pg-body">
 
   <div class="header">
     <div>
@@ -723,7 +737,6 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
         ${settings.phone?`📞 ${settings.phone}<br/>`:""}
         ${settings.email?`✉️ ${settings.email}<br/>`:""}
         ${settings.address?`📍 ${settings.address}<br/>`:""}
-        ${(settings.city||settings.country)?`🌍 ${[settings.city,settings.country].filter(Boolean).join(", ")}<br/>`:""}
         ${settings.vat_number?`VAT Reg No: <strong>${settings.vat_number}</strong>`:`<em style="color:#aaa">Not VAT Registered</em>`}
       </div>
     </div>
@@ -803,8 +816,6 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
     </div>`:""}
   </div>`:""}
 
-  ${quote.deposit_message?"":bankDetailsBlock(settings,"Bank Details",job.vehicle_reg||"")}
-
   ${quote.notes?`<div class="notes"><strong>Notes:</strong> ${quote.notes}</div>`:""}
 
   <div class="notice">
@@ -824,20 +835,9 @@ ${shareMode?`<div class="ws-share-bar" style="position:fixed;top:0;left:0;right:
     <a href="${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}" style="display:inline-block;padding:8px 20px;background:#2563eb;color:#fff;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;word-break:break-all">${window.location.origin}${window.location.pathname}?wsq=${quote.confirm_token}</a>
   </div>`:""}
 
-  <div class="footer">
-    ${shopName}${settings.phone?" · "+settings.phone:""}${settings.email?" · "+settings.email:""}<br/>
-    Thank you for considering us!
-    <div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:20px;color:#bbb">
-      <span>Powered by</span>
-      <svg width="28" height="28" viewBox="0 0 120 120" fill="none" style="flex-shrink:0">
-        <path d="M44,15 L60,34 L76,15 L107,33 L107,87 L60,114 L13,87 L13,33 Z" fill="none" stroke="#aaa" stroke-width="8"/>
-        <path d="M22,74 H36 L42,62 L49,86 L55,74 H58 L64,64 L74,52 H88 L96,62 L101,65 V74" fill="none" stroke="#e85d04" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="70" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
-        <circle cx="93" cy="77" r="7" fill="#fff" stroke="#e85d04" stroke-width="7"/>
-      </svg>
-      <span><span style="font-weight:700;color:#e85d04">VEL</span><span style="font-weight:500;color:#999">GENIUS</span></span>
-    </div>
   </div>
+  ${pageFooterHtml(settings,shopName,job.vehicle_reg||"","Thank you for considering us!")}
+</div>
 
 </body></html>`;
 

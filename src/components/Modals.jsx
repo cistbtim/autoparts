@@ -12,6 +12,7 @@ import { CSS } from "../styles.js";
 import { ErrorBoundary, LogoSVG, Overlay, MHead, FL, FG, FD, DriveImg, StatusBadge, ImgPreview, ImgLightbox, AttachmentPicker, Flag } from "../components/shared.jsx";
 import { PartPhotoUploader, VehicleFitmentTab } from "./RfqVehicles.jsx";
 import { decodeVin } from "./Workshop.jsx";
+import { readSupplierQuotePhoto, scoreQuoteLine } from "../lib/quoteOcr.js";
 
 const FormError = ({errors,k}) => errors[k] ? <div style={{fontSize:11,color:"var(--red)",marginTop:3}}>⚠ {errors[k]}</div> : null;
 
@@ -5769,6 +5770,23 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
   // Manual quote entry — records a supplier's price directly (e.g. after a phone
   // call) without needing them to click the RFQ reply link.
   const [manualEdit,setManualEdit]=useState(null); // {supplierId,price,stock,notes,spn,existingId}
+  const [photoRead,setPhotoRead]=useState(null); // {busy,error,lines:[{code,description,qty,unit_price,score}],doc}
+  const readQuotePhoto=async(file,supplierId)=>{
+    if(!file) return;
+    setPhotoRead({busy:true});
+    try{
+      const r=await readSupplierQuotePhoto(file);
+      const known=[linkedPsMap[supplierId]?.supplier_part_no].filter(Boolean);
+      const lines=r.lines.map(l=>({...l,score:scoreQuoteLine(l,part,known)})).sort((a,b)=>b.score-a.score);
+      if(!lines.length){ setPhotoRead({error:"No priced lines found in that photo — try a clearer one."}); return; }
+      setPhotoRead({lines,doc:[r.supplier_name,r.document_no].filter(Boolean).join(" · ")});
+    }catch(e){ setPhotoRead({error:e.message||"Could not read the photo"}); }
+  };
+  const useQuoteLine=l=>{
+    setManualEdit(m=>({...m,price:l.unit_price,spn:l.code||m.spn,stock:m.stock,
+      notes:m.notes||[photoRead?.doc&&`From supplier document ${photoRead.doc}`,l.qty?`Quoted qty ${l.qty}`:""].filter(Boolean).join(" — ")}));
+    setPhotoRead(null);
+  };
   const [acceptingId,setAcceptingId]=useState(null); // supplier id currently creating a PO (shows spinner)
   const [cancellingId,setCancellingId]=useState(null); // supplier id currently cancelling its order
 
@@ -6068,6 +6086,25 @@ export function InquiryModal({part,suppliers,partSuppliers,inquiries=[],rfqQuote
         return (
           <Overlay onClose={()=>setManualEdit(null)}>
             <MHead title={`💰 Record Quote — ${s.name}`} sub={`${part.name} · ${part.sku}`} onClose={()=>setManualEdit(null)}/>
+            <FD>
+              <label className="btn btn-ghost btn-sm" style={{display:"inline-flex",gap:6,cursor:photoRead?.busy?"wait":"pointer"}}>
+                {photoRead?.busy?"⏳ Reading photo…":"📷 Read from supplier invoice / quote photo"}
+                <input type="file" accept="image/*" style={{display:"none"}} disabled={!!photoRead?.busy}
+                  onChange={e=>{const f=e.target.files?.[0]; e.target.value=""; readQuotePhoto(f,s.id);}}/>
+              </label>
+              {photoRead?.error&&<div style={{fontSize:12,color:"var(--red)",marginTop:6}}>⚠️ {photoRead.error}</div>}
+              {photoRead?.lines&&(
+                <div style={{marginTop:8,border:"1px solid var(--border)",borderRadius:8,maxHeight:190,overflowY:"auto"}}>
+                  <div style={{fontSize:11,color:"var(--text3)",padding:"6px 10px"}}>Tap the line for this part{photoRead.doc?` — ${photoRead.doc}`:""}. Check the price before saving.</div>
+                  {photoRead.lines.map((l,i)=>(
+                    <div key={i} onClick={()=>useQuoteLine(l)} style={{display:"flex",gap:8,alignItems:"center",padding:"7px 10px",cursor:"pointer",borderTop:"1px solid var(--border)",background:i===0&&l.score>0?"rgba(52,211,153,.1)":"transparent"}}>
+                      <div style={{flex:1,minWidth:0,fontSize:12}}><b style={{fontFamily:"DM Mono,monospace"}}>{l.code||"—"}</b> {l.description}</div>
+                      <b style={{fontSize:12,whiteSpace:"nowrap"}}>{fmtAmt(l.unit_price)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </FD>
             <FG>
               <div><FL label="Price"/><input className="inp" type="number" step="0.01" placeholder="0.00" autoFocus
                 value={manualEdit.price} onChange={e=>setManualEdit(m=>({...m,price:e.target.value}))}/></div>
@@ -13108,7 +13145,8 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],u
     </span>
   );
 
-  const approve = async () => {
+  const approve = async (forceNew=false) => {
+    if(forceNew && !window.confirm(`Add ${r.make} ${r.model}${(r.year_from||r.year_to)?` ${r.year_from||"?"}–${r.year_to||"present"}`:""} as a NEW vehicle (not linked to the existing ones)?`)) return;
     setBusy(true);
     try {
       // Re-check the server right before inserting — the `vehicles` prop can be
@@ -13117,14 +13155,14 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],u
       // though one already exists in the DB. matchV covers the common case
       // instantly; this is the fallback that catches what it missed.
       let freshMatch = null;
-      if(!matchV && r.make){
+      if(!forceNew && !matchV && r.make){
         const fresh = await api.fresh("vehicles", `make=ilike.${encodeURIComponent(r.make.trim())}`).catch(()=>[]);
         freshMatch = (Array.isArray(fresh)?fresh:[]).find(v=>modelFuzzyMatch(v.model, r.model));
       }
       // If a vehicle with this make+model already exists, link to it instead of
       // inserting a duplicate — onApprove always does a plain insert when given no id.
       // (Ambiguous multi-match cases are resolved via linkExisting below instead.)
-      const saved = matchV || freshMatch || await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
+      const saved = (!forceNew && (matchV || freshMatch)) || await onApprove({make:r.make,model:r.model,year_from:r.year_from,year_to:r.year_to});
       await api.patch("vehicle_requests","id",r.id,{status:"approved",approved_by:user.id,approved_at:new Date().toISOString()});
       if(r.part_id && saved?.id && onLinkFitment){
         try{ await onLinkFitment(r.part_id, saved.id); }catch{/* vehicle still saved+approved either way */}
@@ -13360,10 +13398,16 @@ export function VehicleRequestCard({r,isAdmin,vehicles=[],branches=[],parts=[],u
           {!isRejecting&&(
             <div style={{display:"flex",gap:8}}>
               {matches.length<=1&&(
-                <button className="btn btn-primary btn-sm" onClick={approve} disabled={busy}>
+                <button className="btn btn-primary btn-sm" onClick={()=>approve()} disabled={busy}>
                   {busy?"...":matchV
                     ? (r.part_id?"Approve & Link (existing vehicle)":"Approve (existing vehicle)")
                     : (r.part_id?"Approve, Add Vehicle & Link":"Approve & Add Vehicle")}
+                </button>
+              )}
+              {matches.length>=1&&(
+                <button className="btn btn-primary btn-sm" onClick={()=>approve(true)} disabled={busy}
+                  title="None of the existing vehicles is the same generation — create a new vehicle from this request">
+                  {busy?"...":r.part_id?`➕ Add new ${r.model} & Link`:`➕ Add new ${r.model}`}
                 </button>
               )}
               <button className="btn btn-ghost btn-sm" style={{color:"var(--red)"}} onClick={()=>{setIsRejecting(true);setRejectReason("");}}>Reject</button>

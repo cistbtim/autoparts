@@ -38,6 +38,9 @@ export default {
     if (url.pathname === "/api/disc-ocr" && request.method === "POST") {
       return handleDiscOcr(request, env);
     }
+    if (url.pathname === "/api/quote-ocr" && request.method === "POST") {
+      return handleQuoteOcr(request, env);
+    }
     if (url.pathname === "/api/photo-proxy" && request.method === "GET") {
       return handlePhotoProxy(url);
     }
@@ -159,7 +162,15 @@ const DISC_OCR_PROMPT = `This is a photo of a South African vehicle licence disc
 Respond with ONLY valid JSON, no other text, exactly this shape:
 {"licence_no":null,"reg":null,"vin":null,"engine_no":null,"make":null,"body_type":null,"expiry_date":null}`;
 
-async function handleDiscOcr(request, env) {
+const QUOTE_OCR_PROMPT = `This is a photo of a supplier's quotation, invoice or price list for auto parts (may be handwritten, a WhatsApp screenshot or a printed sheet). Read ONLY what is actually written. List every product line you can read. For each line give: "code" (the supplier's part number / item code, or null), "description" (text of the line), "qty" (number or null), "unit_price" (price per single unit as a number, no currency symbol; if only a line total is shown and qty is known, divide; else null). Also give "supplier_name" (the company name on the document, or null) and "document_no" (invoice/quote number, or null). Do NOT guess: use null when not clearly legible.
+
+Respond with ONLY valid JSON, no other text, exactly this shape:
+{"supplier_name":null,"document_no":null,"lines":[{"code":null,"description":"","qty":null,"unit_price":null}]}`;
+
+function handleQuoteOcr(request, env) { return handleVisionJson(request, env, QUOTE_OCR_PROMPT, 1200); }
+function handleDiscOcr(request, env) { return handleVisionJson(request, env, DISC_OCR_PROMPT, 300); }
+
+async function handleVisionJson(request, env, prompt, maxTokens) {
   const sharedSecret = request.headers.get("X-Shared-Secret");
   const expectedSecret = await getWorkerSharedSecret();
   if (!expectedSecret || sharedSecret !== expectedSecret) return json({ ok: false, error: "Unauthorized" }, 401);
@@ -174,10 +185,10 @@ async function handleDiscOcr(request, env) {
     aiResult = await env.AI.run(VISION_MODEL, {
       messages: [
         { role: "system", content: "You are an OCR assistant that only responds with valid JSON." },
-        { role: "user", content: DISC_OCR_PROMPT },
+        { role: "user", content: prompt },
       ],
       image,
-      max_tokens: 300,
+      max_tokens: maxTokens,
     });
   } catch (e) {
     return json({ ok: false, error: `Workers AI error: ${e.message || e}` }, 502);

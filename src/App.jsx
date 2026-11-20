@@ -7996,24 +7996,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               wsGrowthLoginLogs.forEach(l=>{ if(l.username&&l.created_at) lastLoginByUsername[l.username]=l.created_at; }); // asc order — last write wins = most recent
               const jobCountByWorkshopId={};
               workshopJobs.forEach(j=>{ if(j.workshop_id) jobCountByWorkshopId[j.workshop_id]=(jobCountByWorkshopId[j.workshop_id]||0)+1; });
-              return(
-            <>
-            <PH title={t.users} subtitle={`${filteredUsers.length} of ${users.length} users`}
-              action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
-            <div style={{marginBottom:16}}><input className="inp" type="text" placeholder="Search name, username, phone, email, role..." value={searchUser} onChange={e=>setSearchUser(e.target.value)} style={{maxWidth:320}}/></div>
-            <div className="card" style={{overflow:"hidden"}}>
-              <div className="tbl-wrap">
-                <table className="tbl">
-                  <thead><tr>{["User",t.role,"Subscription","Last Login","Job Cards",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {filteredUsers.map(u=>{const sub2=getSubInfo(u);const isPicking=activePicker?.userId===u.id;
-                    // default expiry = today + 1 month (always future, regardless of old expiry)
-                    const nextMonthDefault=(()=>{const base=new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
-                    return(
-                      <tr key={u.id}>
-                        <td><div style={{fontWeight:600}}>{u.name||u.username}</div><div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{u.username}</div></td>
-                        <td><span className="badge" style={{background:ROLES[u.role]?.bg||"var(--surface3)",color:ROLES[u.role]?.color||"var(--text2)"}}>{ROLES[u.role]?.icon} {t[u.role]||u.role}</span></td>
-                        <td>
+              const nextMonthDefault=(()=>{const base=new Date();base.setMonth(base.getMonth()+1);return base.toISOString().slice(0,10);})();
+              const subCtl=(u,sub2)=>{const isPicking=activePicker?.userId===u.id;return(<>
                           <span className="badge" style={{background:sub2.color+"22",color:sub2.color,marginBottom:5}}>{sub2.label}</span>
                           {sub2.expiresAt&&<div style={{fontSize:11,color:"var(--text3)",marginBottom:4}}>Expires: {sub2.expiresAt}</div>}
                           {isPicking?(
@@ -8034,7 +8018,46 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                               ))}
                             </div>
                           )}
-                        </td>
+                                      </>);};
+              return(
+            <>
+            <PH title={t.users} subtitle={`${filteredUsers.length} of ${users.length} users`}
+              action={<div style={{display:"flex",gap:8}}><button className="btn btn-ghost" onClick={()=>openM("editUser",{role:"workshop",username:"",password:"",name:"",phone:"",email:""})}>🔧 Add Workshop</button><button className="btn btn-primary" onClick={()=>openM("editUser")}>+ Add User</button></div>}/>
+            <div style={{marginBottom:16}}><input className="inp" type="text" placeholder="Search name, username, phone, email, role..." value={searchUser} onChange={e=>setSearchUser(e.target.value)} style={{maxWidth:320}}/></div>
+            <div className="mob-cards">
+              {filteredUsers.map(u=>{const sub2=getSubInfo(u);return(
+                <div key={u.id} className="card" style={{padding:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:15}}>{u.name||u.username}</div>
+                      <div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{u.username}</div>
+                    </div>
+                    <span className="badge" style={{background:ROLES[u.role]?.bg||"var(--surface3)",color:ROLES[u.role]?.color||"var(--text2)",flexShrink:0}}>{ROLES[u.role]?.icon} {t[u.role]||u.role}</span>
+                  </div>
+                  <div style={{marginTop:10}}>{subCtl(u,sub2)}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:3,marginTop:8,fontSize:12,color:"var(--text2)"}}>
+                    {u.phone&&<span>📞 {u.phone}</span>}
+                    {u.email&&<span style={{wordBreak:"break-all"}}>✉️ {u.email}</span>}
+                    <span style={{color:"var(--text3)"}}>Last login: {lastLoginByUsername[u.username]?fmtDT(lastLoginByUsername[u.username]):"Never"}{u.role==="workshop"?` · Job cards: ${jobCountByWorkshopId[u.id]||0}`:""}</span>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>openM("editUser",u)}>{t.edit}</button>
+                    <button className="btn btn-danger btn-sm" style={{flex:1}} onClick={()=>deleteUser(u.id)} disabled={u.id===user.id}>{t.delete}</button>
+                  </div>
+                </div>
+              );})}
+            </div>
+            <div className="card desk-table" style={{overflow:"hidden"}}>
+              <div className="tbl-wrap">
+                <table className="tbl">
+                  <thead><tr>{["User",t.role,"Subscription","Last Login","Job Cards",t.phone,t.email,"Actions"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {filteredUsers.map(u=>{const sub2=getSubInfo(u);
+                    return(
+                      <tr key={u.id}>
+                        <td><div style={{fontWeight:600}}>{u.name||u.username}</div><div style={{fontSize:11,fontFamily:"DM Mono,monospace",color:"var(--text3)"}}>{u.username}</div></td>
+                        <td><span className="badge" style={{background:ROLES[u.role]?.bg||"var(--surface3)",color:ROLES[u.role]?.color||"var(--text2)"}}>{ROLES[u.role]?.icon} {t[u.role]||u.role}</span></td>
+                        <td>{subCtl(u,sub2)}</td>
                         <td style={{fontSize:12,color:"var(--text3)",whiteSpace:"nowrap"}}>{lastLoginByUsername[u.username]?fmtDT(lastLoginByUsername[u.username]):"Never"}</td>
                         <td style={{fontSize:13,color:"var(--text2)"}}>{u.role==="workshop"?(jobCountByWorkshopId[u.id]||0):"—"}</td>
                         <td style={{color:"var(--text2)",fontSize:13}}>{u.phone||"—"}</td>

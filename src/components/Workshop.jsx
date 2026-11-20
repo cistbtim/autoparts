@@ -11563,7 +11563,7 @@ function WorkshopJobModal({job, wsCustomers=[], wsVehicles=[], jobs=[], wsId=nul
           <button className="btn btn-primary" style={{flex:2}} onClick={async()=>{
             if(!returnReason.trim()){alert("Return reason is required");return;}
             if(returnMode==="new"){
-              onSave({...f,return_reason:returnReason,parent_job_id:returnDialog.existingJobs[0].id});
+              onSave({...f,complaint:(f.complaint||"").trim()?f.complaint:returnReason.trim(),return_reason:returnReason,parent_job_id:returnDialog.existingJobs[0].id});
             } else {
               const ej=returnDialog.existingJobs.find(j=>j.id===reopenJobId)||returnDialog.existingJobs[0];
               await onReopenJob({...ej,status:"In Progress",return_reason:returnReason,mileage:f.mileage||ej.mileage,date_in:f.date_in});

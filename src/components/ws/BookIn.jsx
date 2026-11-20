@@ -229,7 +229,7 @@ export function BookInModal({wsCustomers=[],wsVehicles=[],vehicles=[],jobs=[],se
       vin:scanResult?.vin||foundVehicle?.vin||"",
       engine_no:scanResult?.engine_no||foundVehicle?.engine_no||"",
       licence_disc_expiry:scanResult?.expiry_date||foundVehicle?.licence_disc_expiry||"",
-      mileage:"",complaint:"",diagnosis:"",mechanic:"",
+      mileage:"",complaint:openJobs.length>0?returnReason.trim():"",diagnosis:"",mechanic:"",
       date_in:new Date().toISOString().slice(0,10),
       date_out:"",notes:"",status:"Pending",
       return_reason:openJobs.length>0?returnReason:"",

@@ -160,10 +160,17 @@ export function printChecklistReport(job, checklist, settings, removedParts=[], 
   }).join("");
   const w=window.open("","_blank","width=800,height=900");
   if(!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Check-in Report</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Check-in Report</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     @page{size:A4;margin:15mm}
-    @media print{body{margin:0}.no-print{display:none}}
+    html{-webkit-text-size-adjust:100%}
+    @media print{body{margin:0;padding:0!important}.no-print{display:none!important}}
+    body.printing .no-print{display:none!important}
+    table{table-layout:fixed}
+    thead{display:table-header-group}
+    tr,.veh,.sig,.summary{page-break-inside:avoid;break-inside:avoid}
+    img{max-width:100%}
     *{box-sizing:border-box}
     body{font-family:Arial,sans-serif;color:#111;background:#fff;padding:20px}
     h1{font-size:18px;margin:0 0 4px}
@@ -182,7 +189,11 @@ export function printChecklistReport(job, checklist, settings, removedParts=[], 
     .print-btn{display:inline-block;margin-bottom:16px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
   </style></head>
   <body>
-    <button class="print-btn no-print" onclick="var imgs=document.querySelectorAll('img');var n=imgs.length,done=0;function go(){window.print();}if(!n){go();return;}function chk(){if(++done>=n)go();}imgs.forEach(function(i){if(i.complete&&i.naturalHeight!==0)chk();else{i.onload=chk;i.onerror=chk;}});">🖨️ Print / Save PDF</button>
+    <div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button id="pdfBtn" class="print-btn" style="margin:0" onclick="savePdf()">📄 Save as PDF</button>
+      <button class="print-btn" style="margin:0;background:#4b5563" onclick="window.print()">🖨️ Print</button>
+    </div>
+    <div id="rpt">
     <h1>🔧 ${shopName}</h1>
     <div class="sub">Vehicle Check-in Inspection Report · Printed: ${now}</div>
     <div class="veh">
@@ -236,6 +247,38 @@ export function printChecklistReport(job, checklist, settings, removedParts=[], 
       <div class="sig-box">Staff Signature</div>
       <div class="sig-box">Date</div>
     </div>
+    </div>
+    <script>
+    var ORIGIN=${JSON.stringify(window.location.origin)}, FNAME=${JSON.stringify("Check-in-"+String(job.vehicle_reg||job.id||"report").replace(/[^A-Za-z0-9_-]/g,"")+".pdf")};
+    async function savePdf(){
+      var btn=document.getElementById('pdfBtn'), old=btn.textContent;
+      btn.disabled=true; btn.textContent='⏳ Preparing PDF…';
+      try{
+        var imgs=[].slice.call(document.querySelectorAll('#rpt img'));
+        await Promise.all(imgs.map(function(im){return new Promise(function(res){
+          var src=im.getAttribute('src')||'';
+          if(/^https:/.test(src)&&src.indexOf(ORIGIN)!==0){
+            im.crossOrigin='anonymous'; im.onload=function(){res();}; im.onerror=function(){im.style.visibility='hidden';res();};
+            im.src=ORIGIN+'/api/photo-proxy?u='+encodeURIComponent(src);
+          } else res();
+        });}));
+        var blob=await html2pdf().set({
+          margin:[10,8,12,8], filename:FNAME, image:{type:'jpeg',quality:0.92},
+          html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:800},
+          jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+          pagebreak:{mode:['css','legacy'],avoid:['tr','.veh','.sig','.summary']}
+        }).from(document.getElementById('rpt')).outputPdf('blob');
+        var file=new File([blob],FNAME,{type:'application/pdf'});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          try{ await navigator.share({files:[file],title:FNAME}); }
+          catch(e){ if(e&&e.name!=='AbortError') throw e; }
+        } else {
+          var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=FNAME; document.body.appendChild(a); a.click(); a.remove();
+        }
+      }catch(e){ alert('Could not create the PDF: '+(e&&e.message||e)); }
+      btn.disabled=false; btn.textContent=old;
+    }
+    </script>
   </body></html>`);
   w.document.close();
 }

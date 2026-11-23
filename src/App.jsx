@@ -90,6 +90,32 @@ const APP_UPDATE_DATE = __BUILD_DATE__;
 const WS_TAB_IDS = ["workshop","wscustomers","wsbookings","wsreminders","wsquotations","wsinvoices","wspayments","wsstock","wsservices","wssuppliers","wssuporders","wssupinv","wstransfer","wsstatement","wsreport","wsspareshop","wsdocs","wslicencerenewal","wsmatch","wsmechpay","wscarforsale","wscarsold","wscarcancelled"];
 
 // ── Root ──────────────────────────────────────────────────────
+// Mirror horizontal scrollbar shown ABOVE a wide table so users at the top of a
+// long list can scroll sideways without hunting for the bottom scrollbar.
+function TopHScroll({targetId, dep}) {
+  const barRef = useRef(null);
+  const [w, setW] = useState(0);
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const bar = barRef.current, tgt = document.getElementById(targetId);
+    if (!bar || !tgt) return;
+    const measure = () => { setW(tgt.scrollWidth); setShow(tgt.scrollWidth > tgt.clientWidth + 2); };
+    measure();
+    let lock = false;
+    const fromBar = () => { if (lock) { lock = false; return; } if (tgt.scrollLeft !== bar.scrollLeft) { lock = true; tgt.scrollLeft = bar.scrollLeft; } };
+    const fromTgt = () => { if (lock) { lock = false; return; } if (bar.scrollLeft !== tgt.scrollLeft) { lock = true; bar.scrollLeft = tgt.scrollLeft; } };
+    bar.addEventListener("scroll", fromBar); tgt.addEventListener("scroll", fromTgt);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (ro) { ro.observe(tgt); if (tgt.firstElementChild) ro.observe(tgt.firstElementChild); }
+    return () => { bar.removeEventListener("scroll", fromBar); tgt.removeEventListener("scroll", fromTgt); if (ro) ro.disconnect(); };
+  }, [targetId, dep]);
+  return (
+    <div ref={barRef} aria-hidden="true" className="tbl-wrap" style={{display: show ? "block" : "none", overflowY: "hidden", height: 14}}>
+      <div style={{width: w, height: 1}}/>
+    </div>
+  );
+}
+
 export default function App() {
   const [lang,setLang] = useState(localStorage.getItem("ap_lang")||"en");
   const _today = ()=>new Date().toISOString().slice(0,10);
@@ -433,6 +459,8 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [crossBranchSearch,setCrossBranchSearch]=useState("");
   const [showCrossBranch,setShowCrossBranch]=useState(false);
+  const [invToolsOpen,setInvToolsOpen]=useState(false);
+  const [invFiltersOpen,setInvFiltersOpen]=useState(false);
   const [showSupplierCodes,setShowSupplierCodes]=useState(false);
   const [wsMoreOpen,setWsMoreOpen]=useState(false);
   const [versionTip,setVersionTip]=useState(false);
@@ -6261,16 +6289,42 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 <button className="btn btn-ghost btn-sm" disabled={invRefreshing} onClick={async()=>{setInvRefreshing(true);try{api.cacheClearAll();await refreshTables("parts","branch_stock","part_fitments","part_suppliers","vehicles","orders","customers","suppliers","inquiries","supplier_invoices","customer_invoices","supplier_returns","customer_returns","payments","rfq_sessions","rfq_items","rfq_quotes","stock_moves","stock_takes","inventory_logs","customer_queries","workshop_jobs","workshop_job_items","workshop_invoices","workshop_quotes","workshop_customers","workshop_vehicles","workshop_stock","workshop_services","workshop_suppliers","ws_supplier_requests","ws_supplier_quotes","ws_supplier_invoices","ws_supplier_invoice_items","ws_supplier_payments","ws_supplier_returns","ws_purchase_orders","ws_po_items");}finally{setInvRefreshing(false);}}} title="Reload all data">
                   <span style={invRefreshing?{display:"inline-block",animation:"spin 1s linear infinite"}:{}}>{invRefreshing?"⟳":"↻"}</span> {invRefreshing?"Refreshing…":"Refresh"}
                 </button>
-                {role==="admin"&&branches.length>1&&<button className={`btn btn-sm ${showCrossBranch?"btn-primary":"btn-ghost"}`} onClick={()=>setShowCrossBranch(v=>!v)} title="Cross-branch stock search">🏢 {t.branchCrossBtn}</button>}
-                {(isBranchUser&&currentBranch?.show_supplier_sku)||(role==="admin"||role==="branch_admin")?(<button onClick={()=>setShowSupplierCodes(v=>!v)} style={{padding:"7px 12px",border:`1.5px solid ${showSupplierCodes?"var(--purple)":"var(--border)"}`,borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,background:showSupplierCodes?"rgba(167,139,250,.15)":"transparent",color:showSupplierCodes?"var(--purple)":"var(--text3)",fontFamily:"DM Sans,sans-serif",transition:"all .18s",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>{showSupplierCodes?"🔓":"🔒"} Supplier Code</button>):null}
-                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("printShelfLabel")} title="Print shelf/bin label">📋 Shelf Label</button>}
-                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("importCatalogue")} title="Import supplier catalogue (CSV/Excel)">⬆ Import</button>}
-                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("ocrScanPart")} title="Photograph a part's stamped number and look it up (test feature)">📷 Scan Part</button>}
-                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>openM("bulkImages")} title="Bulk upload images by filename">🖼 Images</button>}
-                {(role==="admin"||role==="branch_admin")&&<button className="btn btn-ghost btn-sm" onClick={()=>{if(bulkPriceMode)setBulkPriceSelected(new Set());setBulkPriceMode(v=>!v);}} title="Bulk-recompute price from cost across selected parts">
-                  {bulkPriceMode?"✕ Exit Bulk Price":"☑ Bulk Update Prices"}
-                </button>}
                 {(role==="admin"||role==="branch_admin")&&<button className="btn btn-primary" onClick={()=>openM("editPart")}>+ {t.addPart}</button>}
+                {(()=>{
+                  const isAdm=role==="admin"||role==="branch_admin";
+                  const showSupCode=(isBranchUser&&currentBranch?.show_supplier_sku)||isAdm;
+                  const showCross=role==="admin"&&branches.length>1;
+                  if(!isAdm&&!showSupCode&&!showCross)return null;
+                  const run=(fn)=>()=>{setInvToolsOpen(false);fn();};
+                  const items=[
+                    showCross&&{ic:"🏢",label:t.branchCrossBtn,on:showCrossBranch,fn:()=>setShowCrossBranch(v=>!v)},
+                    showSupCode&&{ic:showSupplierCodes?"🔓":"🔒",label:"Supplier Code",on:showSupplierCodes,fn:()=>setShowSupplierCodes(v=>!v)},
+                    isAdm&&{sep:true},
+                    isAdm&&{ic:"⬆",label:"Import catalogue",fn:()=>openM("importCatalogue")},
+                    isAdm&&{ic:"🖼",label:"Bulk images",fn:()=>openM("bulkImages")},
+                    isAdm&&{ic:"📷",label:"Scan part",fn:()=>openM("ocrScanPart")},
+                    isAdm&&{ic:"📋",label:"Shelf label",fn:()=>openM("printShelfLabel")},
+                    isAdm&&{ic:bulkPriceMode?"✕":"☑",label:bulkPriceMode?"Exit bulk price":"Bulk update prices",on:bulkPriceMode,fn:()=>{if(bulkPriceMode)setBulkPriceSelected(new Set());setBulkPriceMode(v=>!v);}},
+                  ].filter(Boolean);
+                  return (
+                    <div style={{position:"relative"}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setInvToolsOpen(v=>!v)} aria-haspopup="menu" aria-expanded={invToolsOpen} title="More inventory tools">⋯ Tools ▾</button>
+                      {invToolsOpen&&<>
+                        <div onClick={()=>setInvToolsOpen(false)} style={{position:"fixed",inset:0,zIndex:90}}/>
+                        <div role="menu" style={{position:"absolute",right:0,top:"calc(100% + 6px)",zIndex:91,minWidth:210,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,boxShadow:"var(--shadow-lg)",padding:6}}>
+                          {items.map((it,i)=>it.sep
+                            ?<div key={i} style={{height:1,background:"var(--border)",margin:"6px 4px"}}/>
+                            :<button key={i} role="menuitem" onClick={run(it.fn)}
+                              style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 10px",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:it.on?700:500,fontFamily:"DM Sans,sans-serif",textAlign:"left",background:it.on?"var(--surface2)":"transparent",color:it.on?"var(--accent)":"var(--text)"}}
+                              onMouseEnter={e=>e.currentTarget.style.background="var(--surface2)"}
+                              onMouseLeave={e=>e.currentTarget.style.background=it.on?"var(--surface2)":"transparent"}>
+                              <span style={{width:18,textAlign:"center"}}>{it.ic}</span><span style={{flex:1}}>{it.label}</span>{it.on&&<span style={{fontSize:11}}>ON</span>}
+                            </button>)}
+                        </div>
+                      </>}
+                    </div>
+                  );
+                })()}
               </div>}/>
             {bulkPriceMode&&(()=>{
               const eligible=fp.filter(p=>+p.cost_price>0);
@@ -6336,37 +6390,14 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <span>Loading full inventory… showing first {parts.length} parts. Search is limited until complete.</span>
             </div>}
             {(quantumStockValue>0||hiaceStockValue>0||othersStockValue>0)&&(
-              <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-                {quantumStockValue>0&&(
-                  <div onClick={()=>setInvReport("quantum")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(255,122,46,.08)",border:"1px solid rgba(255,122,46,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="rgba(255,122,46,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,122,46,.08)"}>
-                    <span style={{fontSize:18}}>🚐</span>
-                    <div>
-                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Quantum Parts</div>
-                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--accent)"}}>{fmtAmt(quantumStockValue)}</div>
-                    </div>
-                  </div>
-                )}
-                {hiaceStockValue>0&&(
-                  <div onClick={()=>setInvReport("hiace")} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(59,130,246,.08)",border:"1px solid rgba(59,130,246,.25)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="rgba(59,130,246,.16)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(59,130,246,.08)"}>
-                    <span style={{fontSize:18}}>🚐</span>
-                    <div>
-                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Hiace Parts</div>
-                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--blue)"}}>{fmtAmt(hiaceStockValue)}</div>
-                    </div>
-                  </div>
-                )}
-                {othersStockValue>0&&(
-                  <div onClick={()=>setInvReport("others")} style={{display:"flex",alignItems:"center",gap:8,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:10,padding:"8px 14px",flex:"1 1 160px",cursor:"pointer",transition:"background .15s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background="var(--surface3)"} onMouseLeave={e=>e.currentTarget.style.background="var(--surface2)"}>
-                    <span style={{fontSize:18}}>🔩</span>
-                    <div>
-                      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text3)"}}>Others</div>
-                      <div style={{fontWeight:800,fontFamily:"Rajdhani,sans-serif",fontSize:18,color:"var(--text)"}}>{fmtAmt(othersStockValue)}</div>
-                    </div>
-                  </div>
-                )}
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                {[["quantum","Quantum",quantumStockValue,"var(--accent)"],["hiace","Hiace",hiaceStockValue,"var(--blue)"],["others","Others",othersStockValue,"var(--text)"]].filter(x=>x[2]>0).map(([k,lbl,val,col])=>(
+                  <button key={k} onClick={()=>setInvReport(k)} title={`${lbl} stock value — click for report`}
+                    style={{display:"flex",alignItems:"baseline",gap:8,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontFamily:"DM Sans,sans-serif"}}>
+                    <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text3)"}}>{lbl}</span>
+                    <span style={{fontWeight:700,fontFamily:"Rajdhani,sans-serif",fontSize:16,color:col}}>{fmtAmt(val)}</span>
+                  </button>
+                ))}
               </div>
             )}
             <VehicleSearchBar
@@ -6378,9 +6409,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 const v=vehicles.find(x=>ids.includes(x.id));
                 openM("editPart",{_initialF:{sku:(v?.code||"")+(v?.code?"-":"")},_tab:"fitment",_fitSearch:(v?.make||"")+" "+(v?.model||"")});
               }}
-              t={t} user={user} currentBranch={currentBranch}/>
-            <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-              <div style={{position:"relative",flex:"1 1 220px",maxWidth:340}}>
+              t={t} user={user} currentBranch={currentBranch} compact/>
+            <div className="inv-filterbar" style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+              <div className="inv-search" style={{position:"relative",flex:"1 1 220px",maxWidth:420}}>
                 <input className="inp" type="text"
                   placeholder={partsLoading?"Loading inventory — search available shortly…":"Search SKU, name, make, OE... (multi-word OK)"}
                   value={searchPart} onChange={e=>{ if(!partsLoading) setSearchPart(e.target.value); }}
@@ -6398,7 +6429,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 )}
               </div>
               {/* Google Lens + Paste */}
-              <button className="btn btn-ghost btn-sm"
+              <button className="btn btn-ghost btn-sm" title="Google Lens: identify a part from a photo" aria-label="Google Lens"
                 style={{display:"flex",alignItems:"center",gap:5,border:"1px solid rgba(66,133,244,.4)",color:"#4285F4",whiteSpace:"nowrap",flexShrink:0}}
                 onClick={()=>{
                   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -6420,10 +6451,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     window.open("https://lens.google.com","_blank");
                   }
                 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285F4"/><circle cx="12" cy="12" r="5" fill="white"/><circle cx="12" cy="12" r="2.5" fill="#4285F4"/></svg>
-                Lens
+                <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#4285F4"/><circle cx="12" cy="12" r="5" fill="white"/><circle cx="12" cy="12" r="2.5" fill="#4285F4"/></svg>
               </button>
-              <button className="btn btn-ghost btn-sm" style={{flexShrink:0,whiteSpace:"nowrap"}}
+              <button className="btn btn-ghost btn-sm" style={{flexShrink:0,whiteSpace:"nowrap"}} title="Paste number from clipboard into search" aria-label="Paste into search"
                 onClick={async()=>{
                   try{
                     const txt=await navigator.clipboard.readText();
@@ -6431,7 +6461,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                     else{ alert("Clipboard empty — copy a number from Google Lens first"); }
                   }catch{ alert("Please paste manually into the search box"); }
                 }}>
-                📋 Paste
+                📋
               </button>
               <select className="inp" value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{width:160}}>
                 <option value="__all__">All Categories</option>
@@ -6479,12 +6509,36 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   {branchMatchedOnly==="matched"?"✓ My Stock":branchMatchedOnly==="own"?"🏢 Own Parts":"📋 All catalog"}
                 </button>
               )}
-              <button className="btn btn-sm" onClick={()=>setFilterQuantum(v=>!v)} style={{whiteSpace:"nowrap",background:filterQuantum?"rgba(255,122,46,.18)":"var(--surface2)",color:filterQuantum?"var(--accent)":"var(--text2)",border:filterQuantum?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:filterQuantum?700:400}}>🚐 Quantum{filterQuantum?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>setFilterHiace(v=>!v)} style={{whiteSpace:"nowrap",background:filterHiace?"rgba(59,130,246,.18)":"var(--surface2)",color:filterHiace?"var(--blue)":"var(--text2)",border:filterHiace?"1.5px solid var(--blue)":"1px solid var(--border)",fontWeight:filterHiace?700:400}}>🚐 Hiace{filterHiace?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>setFilterInStock(v=>!v)} style={{whiteSpace:"nowrap",background:filterInStock?"rgba(52,211,153,.18)":"var(--surface2)",color:filterInStock?"var(--green)":"var(--text2)",border:filterInStock?"1.5px solid var(--green)":"1px solid var(--border)",fontWeight:filterInStock?700:400}}>✅ In Stock{filterInStock?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>setFilterNoPhoto(v=>!v)} style={{whiteSpace:"nowrap",background:filterNoPhoto?"rgba(248,113,113,.18)":"var(--surface2)",color:filterNoPhoto?"var(--red)":"var(--text2)",border:filterNoPhoto?"1.5px solid var(--red)":"1px solid var(--border)",fontWeight:filterNoPhoto?700:400}}>📷 No Photo{filterNoPhoto?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>setFilterNeedsReview(v=>!v)} style={{whiteSpace:"nowrap",background:filterNeedsReview?"rgba(167,139,250,.18)":"var(--surface2)",color:filterNeedsReview?"var(--purple)":"var(--text2)",border:filterNeedsReview?"1.5px solid var(--purple)":"1px solid var(--border)",fontWeight:filterNeedsReview?700:400}}>🔍 Needs Review{filterNeedsReview?" ✓":""}</button>
-              <button className="btn btn-sm" onClick={()=>{setInvSort(s=>s==="sku"?"default":"sku");setInvPage(0);}} style={{whiteSpace:"nowrap",background:invSort==="sku"?"rgba(255,122,46,.12)":"var(--surface2)",color:invSort==="sku"?"var(--accent)":"var(--text2)",border:invSort==="sku"?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:invSort==="sku"?700:400}}>Sort by SKU{invSort==="sku"?" ↑":""}</button>
+              {(()=>{
+                const opts=[
+                  {ic:"🚐",label:"Quantum",on:filterQuantum,fn:()=>setFilterQuantum(v=>!v)},
+                  {ic:"🚐",label:"Hiace",on:filterHiace,fn:()=>setFilterHiace(v=>!v)},
+                  {ic:"✅",label:"In stock",on:filterInStock,fn:()=>setFilterInStock(v=>!v)},
+                  {ic:"📷",label:"No photo",on:filterNoPhoto,fn:()=>setFilterNoPhoto(v=>!v)},
+                  {ic:"🔍",label:"Needs review",on:filterNeedsReview,fn:()=>setFilterNeedsReview(v=>!v)},
+                  {ic:"↑",label:"Sort by SKU",on:invSort==="sku",fn:()=>{setInvSort(s=>s==="sku"?"default":"sku");setInvPage(0);}},
+                ];
+                const n=opts.filter(o=>o.on).length;
+                return (
+                  <div style={{position:"relative"}}>
+                    <button className="btn btn-sm" onClick={()=>setInvFiltersOpen(v=>!v)} aria-haspopup="menu" aria-expanded={invFiltersOpen} title="Quick filters and sorting"
+                      style={{whiteSpace:"nowrap",background:n?"rgba(255,122,46,.12)":"var(--surface2)",color:n?"var(--accent)":"var(--text2)",border:n?"1.5px solid var(--accent)":"1px solid var(--border)",fontWeight:n?700:500}}>
+                      ⚑ Filters{n?` (${n})`:""} ▾
+                    </button>
+                    {invFiltersOpen&&<>
+                      <div onClick={()=>setInvFiltersOpen(false)} style={{position:"fixed",inset:0,zIndex:90}}/>
+                      <div role="menu" style={{position:"absolute",left:0,top:"calc(100% + 6px)",zIndex:91,minWidth:200,background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,boxShadow:"var(--shadow-lg)",padding:6}}>
+                        {opts.map(o=>(
+                          <button key={o.label} role="menuitemcheckbox" aria-checked={o.on} onClick={o.fn}
+                            style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 10px",border:"none",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:o.on?700:500,fontFamily:"DM Sans,sans-serif",textAlign:"left",background:o.on?"var(--surface2)":"transparent",color:o.on?"var(--accent)":"var(--text)"}}>
+                            <span style={{width:18,textAlign:"center"}}>{o.ic}</span><span style={{flex:1}}>{o.label}</span>{o.on&&<span>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </>}
+                  </div>
+                );
+              })()}
               <select className="inp" value={filterSupplier} onChange={e=>setFilterSupplier(e.target.value)}
                 style={{minWidth:130,maxWidth:200,borderColor:filterSupplier!=="__all__"?"var(--purple)":undefined,color:filterSupplier!=="__all__"?"var(--purple)":undefined}}>
                 <option value="__all__">🏭 All Suppliers</option>
@@ -6495,7 +6549,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
               <div style={{display:"flex",alignItems:"center",gap:2,background:"var(--surface2)",border:"1px solid var(--border)",borderRadius:8,padding:2}}>
                 <button className="btn btn-ghost btn-sm" style={{padding:"5px 9px"}} disabled={invZoom<=0.7}
                   onClick={()=>setInvZoomPersist(Math.max(0.7,+(invZoom-0.1).toFixed(2)))} title="Zoom out (smaller images/text)">
-                  🔍−
+                  −
                 </button>
                 <span style={{fontSize:11,color:"var(--text3)",minWidth:36,textAlign:"center",fontWeight:600,cursor:invZoom!==1?"pointer":"default"}}
                   onClick={()=>invZoom!==1&&setInvZoomPersist(1)} title={invZoom!==1?"Reset to 100%":undefined}>
@@ -6503,7 +6557,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                 </span>
                 <button className="btn btn-ghost btn-sm" style={{padding:"5px 9px"}} disabled={invZoom>=1.6}
                   onClick={()=>setInvZoomPersist(Math.min(1.6,+(invZoom+0.1).toFixed(2)))} title="Zoom in (bigger images/text)">
-                  🔍＋
+                  ＋
                 </button>
               </div>
               {(searchPart||filterCat!=="__all__"||filterLow||filterFits!=="__all__"||filterBranch!=="__all__"||filterQuantum||filterHiace||filterInStock||filterNoPhoto||filterNeedsReview||filterSupplier!=="__all__")&&(
@@ -6643,7 +6697,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
 
             {/* ── DESKTOP INVENTORY TABLE ── */}
             <div className="card desk-table" style={{overflow:"hidden"}}>
-              <div className="tbl-wrap" style={{zoom:invZoom}}>
+              <div style={{zoom:invZoom}}>
+              <TopHScroll targetId="inv-tbl-wrap" dep={fp.length+"|"+invPage+"|"+invZoom}/>
+              <div className="tbl-wrap" id="inv-tbl-wrap">
                 <table className="tbl">
                   <thead><tr>
                     {bulkPriceMode&&<th style={{width:32}}/>}
@@ -6824,6 +6880,7 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
                   </tbody>
                 </table>
                 {fp.length===0&&<div style={{textAlign:"center",padding:36,color:"var(--text3)"}}>No parts found</div>}
+              </div>
               </div>
             </div>
             {/* Pagination */}

@@ -2808,7 +2808,7 @@ export function VehicleFitmentTab({part, vehicles, partFitments, onAdd, onDelete
 // ═══════════════════════════════════════════════════════════════
 // onFilter   — fitment-based filter (shop/POS): passes a Set of part IDs
 // onVehicleChange — direct make/model filter (inventory): passes {make, model}
-export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onSelection, onAddPart, t, initialMake="", initialModel="", vin="", engineNo="", reg="", user=null, currentBranch=null}) {
+export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVehicleChange, onSelection, onAddPart, t, initialMake="", initialModel="", vin="", engineNo="", reg="", user=null, currentBranch=null, compact=false}) {
   const [selMake,  setSelMake]  = useState(initialMake);
   const [selModel, setSelModel] = useState(initialModel);
   const [makeInput,  setMakeInput]  = useState(initialMake);
@@ -2961,20 +2961,21 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
   const modelLabelToVal = Object.fromEntries(modelOpts.map(o=>[o.label, o.val]));
 
   return (
-    <div style={{marginBottom:14,padding:"12px 14px",
+    <div className={compact?"vsb-compact":undefined} style={{marginBottom:compact?10:14,padding:compact?"8px 10px":"12px 14px",
       background: active ? "rgba(96,165,250,.08)" : "var(--surface2)",
       borderRadius:12,border:`1px solid ${active?"rgba(96,165,250,.3)":"var(--border)"}`,
       transition:"all .2s"}}>
-      <div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      {!compact&&<div style={{fontSize:12,fontWeight:700,color:"var(--text3)",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span>🚗 {t.findByVehicle||"Find parts for my car"}</span>
         {active && <button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={clear}>✕ Clear</button>}
-      </div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      </div>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        {compact&&<span style={{fontSize:12,fontWeight:700,color:"var(--text3)",whiteSpace:"nowrap"}}>🚗 {t.findByVehicle||"Find by vehicle"}</span>}
         {/* Make — searchable datalist */}
         <datalist id={`${_vsbId}_makes`}>{makes.map(m=><option key={m} value={m}/>)}</datalist>
         <input className="inp" list={`${_vsbId}_makes`} value={makeInput}
           placeholder={t.selectMake||"Type make…"}
-          style={{flex:"1 1 120px",minWidth:100}}
+          style={{flex:compact?"1 1 100px":"1 1 120px",minWidth:100}}
           onChange={e=>{
             const v=e.target.value;
             setMakeInput(v);
@@ -2991,7 +2992,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
 
         {/* Model — searchable datalist with clear button */}
         <datalist id={`${_vsbId}_models`}>{modelOpts.map(o=><option key={o.val} value={o.label}/>)}</datalist>
-        <div style={{position:"relative",flex:"2 1 200px",minWidth:160}}>
+        <div style={{position:"relative",flex:compact?"1 1 140px":"2 1 200px",minWidth:140}}>
           <input className="inp" list={`${_vsbId}_models`} value={modelInput}
             placeholder={selMake ? (t.selectModel||"Type model…") : "—"}
             disabled={!selMake}
@@ -3015,6 +3016,7 @@ export function VehicleSearchBar({vehicles, partFitments, parts, onFilter, onVeh
                 fontSize:15,lineHeight:1,padding:2}}>✕</button>
           )}
         </div>
+        {compact&&active&&<button className="btn btn-ghost btn-xs" style={{color:"var(--red)"}} onClick={clear}>✕ Clear</button>}
       </div>
 
       {/* Make not in database hint */}

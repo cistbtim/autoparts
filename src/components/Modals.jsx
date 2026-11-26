@@ -4208,6 +4208,20 @@ export function PartModal({part,onSave,onDelete,onClose,t,vehicles=[],partFitmen
                       {site.label}
                     </button>
                   ))}
+                  {f.name&&(()=>{
+                    // Always search by part name + car (e.g. "HOOD BUICK REGAL 2003-2008"), even when an OE number exists.
+                    const cleanModel=(f.model||"").replace(/\s*[（(][^)）]*[)）]/g,"").replace(/[^\x20-\x7E]/g,"").replace(/\s+/g," ").trim();
+                    const q=[f.name,f.make,cleanModel,f.year_range].filter(Boolean).join(" ").replace(/\s+/g," ").trim();
+                    return (
+                      <button type="button" title={`Google: ${q}`}
+                        onClick={()=>window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`,"_blank","noopener,noreferrer")}
+                        style={{fontSize:11,fontWeight:700,padding:"4px 11px",borderRadius:99,cursor:"pointer",
+                          background:"color-mix(in srgb, var(--blue) 14%, transparent)",color:"var(--blue)",
+                          border:"1px solid color-mix(in srgb, var(--blue) 35%, transparent)"}}>
+                        🔍 Name + car
+                      </button>
+                    );
+                  })()}
                 </div>
               );
             })()}

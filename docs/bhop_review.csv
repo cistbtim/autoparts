@@ -1,0 +1,230 @@
+﻿SKU,Catalogue code,Name as read,Name used,OE,Why check,PDF page
+BOH-TY-007,BH-TY-007,Front fender,FRONT FENDER,L:53812-0N010 / R:53811-0N010,OE number read by few OCR passes - check digits,1
+BOH-TY-018,BH-TY-018,Trunk lid,TRUNK LID,64401-0N070,OE number read by few OCR passes - check digits,1
+BOH-TY-023,BH-TY-023,Hood,HOOD,53301-0N040,OE number read by few OCR passes - check digits,2
+BOH-TY-026,BH-TY-026,Front door,FRONT DOOR,L:67002-0N030 / R:67001-0N030,OE number read by few OCR passes - check digits,2
+BOH-TY-027,BH-TY-027,Rear door,REAR DOOR,L:67004-0N040 / R:67003-0N040,OE number read by few OCR passes - check digits,2
+BOH-TY-030,BH-TY-030,Front bumper support,FRONT BUMPER SUPPORT,52131-0N030,OE number read by few OCR passes - check digits,2
+BOH-TY-417-B,BH-TY-417,Radiator support,RADIATOR SUPPORT,67004-0E210 / 67003-0E220,catalogue prints the same code twice for different parts,2
+BOH-TY-022,BH-TY-022,Hood insulator,HOOD INSULATOR,53341-0N040,OE number read by few OCR passes - check digits,2
+BOH-TY-418-B,BH-TY-418,Tail panel,TAIL PANEL,67005-0E650-C0,catalogue prints the same code twice for different parts,2
+BOH-TY-573,BH-TY-573,Radiator Support 2012 USA,RADIATOR SUPPORT 2012 USA,,no OE number found,4
+BOH-TY-498,BH-TY-498,Bracket of front chassis,BRACKET OF FRONT CHASSIS,,no OE number found,5
+BOH-TY-062,BH-TY-062,Sun-roof,SUN-ROOF,63111-K0020,no photo,8
+BOH-TY-564,BH-TY-564,Cross member,CROSS MEMBER,51201-0D113,OE number read by few OCR passes - check digits,8
+BOH-TY-665,BH-TY-665,Hood,HOOD,,no OE number found; no photo,9
+BOH-TY-666,BH-TY-666,Hood,HOOD,,no OE number found; no photo,9
+BOH-TY-673,BH-TY-673,Hood,HOOD,,no OE number found; no photo,9
+BOH-TY-674,BH-TY-674,Hood,HOOD,,no OE number found; no photo,9
+BOH-TY-675,BH-TY-675,Front fender,FRONT FENDER,,no OE number found; no photo,9
+BOH-TY-676,BH-TY-676,Front fender,FRONT FENDER,,no OE number found; no photo,9
+BOH-TY-080,BH-TY-080,Wiper wash support,WIPER WASH SUPPORT,,no OE number found,9
+BOH-TY-677,BH-TY-677,Radiator support,RADIATOR SUPPORT,,no OE number found; no photo,9
+BOH-TY-302,BH-TY-302,Tail lamp bracket,TAIL LAMP BRACKET,,no OE number found,10
+BOH-TY-277,BH-TY-277,Front bumper support 2018',FRONT BUMPER SUPPORT 2018',52021-60210,no photo,12
+BOH-TY-127,BH-TY-127,Rear door,REAR DOOR,L:67004-YK010 / R:67003-YK010,OE number read by few OCR passes - check digits,13
+BOH-TY-128,BH-TY-128,Radiator support,RADIATOR SUPPORT,53210-YK010,OE number read by few OCR passes - check digits,13
+BOH-TY-748,BH-TY-748,Radiator support,RADIATOR SUPPORT,,no OE number found,15
+BOH-TY-717,BH-TY-717,Lower beam side body panel,LOWER BEAM SIDE BODY PANEL,,no OE number found,15
+BOH-TY-360,BH-TY-360,Trunk lid,TRUNK LID,64401-02J50,OE number read by few OCR passes - check digits,15
+BOH-TY-367,BH-TY-367,Front fender,FRONT FENDER,53802-02330,OE number read by few OCR passes - check digits,16
+BOH-TY-368,BH-TY-368,Rear fender,REAR FENDER,,no OE number found,16
+BOH-TY-369,BH-TY-369,Front door,FRONT DOOR,,no OE number found,16
+BOH-TY-370,BH-TY-370,Rear door,REAR DOOR,,no OE number found,16
+BOH-TY-208,BH-TY-208,Rear door,REAR DOOR,L:67004-0E040 / R:670030E040,OE number read by few OCR passes - check digits,18
+BOH-TY-222,BH-TY-222,Rear fender,REAR FENDER,61611-0E120 / 61612-0C120,OE number read by few OCR passes - check digits,18
+BOH-TY-500,BH-TY-500,Cross member,CROSS MEMBER,,no OE number found,18
+BOH-TY-581,BH-TY-581,Front fender w hole,FRONT FENDER W HOLE,53811-0E090,OE number read by few OCR passes - check digits,18
+BOH-TY-749,BH-TY-749,Front fender w/o hole,FRONT FENDER W/O HOLE,,no OE number found,18
+BOH-TY-424,BH-TY-424,Front fender,FRONT FENDER,53801-0E180 / 53802-0E080,OE number read by few OCR passes - check digits,19
+BOH-TY-737,BH-TY-737,Hood,HOOD,,no OE number found,19
+BOH-TY-738,BH-TY-738,Front fender,FRONT FENDER,,no OE number found,19
+BOH-TY-740,BH-TY-740,Front door,FRONT DOOR,,no OE number found,19
+BOH-TY-741,BH-TY-741,Rear door,REAR DOOR,,no OE number found,19
+BOH-TY-742,BH-TY-742,Tail gate,TAIL GATE,,no OE number found,19
+BOH-TY-743,BH-TY-743,Front bumper support,FRONT BUMPER SUPPORT,,no OE number found,19
+BOH-TY-745,BH-TY-745,Radiator support,RADIATOR SUPPORT,,no OE number found,19
+BOH-TY-586,BH-TY-586,Front bumper support down,FRONT BUMPER SUPPORT DOWN,,no OE number found,19
+BOH-TY-750,BH-TY-750,Bracket,BRACKET,,no OE number found,19
+BOH-TY-235,BH-TY-235,Hood,HOOD,53301-0R060,OE number read by few OCR passes - check digits,20
+BOH-TY-237,BH-TY-237,Front door,FRONT DOOR,R:67001-0R070,OE number read by few OCR passes - check digits,20
+BOH-TY-718,BH-TY-718,Front fender,FRONT FENDER,L:53812-0R070 / R:53811-0R090,OE number read by few OCR passes - check digits,20
+BOH-TY-227,BH-TY-227,Rear fender,REAR FENDER,L:61602-0R061 / R:61601-0R061,OE number read by few OCR passes - check digits,20
+BOH-TY-229,BH-TY-229,Rear door,REAR DOOR,R:67003-0R050,OE number read by few OCR passes - check digits,20
+BOH-TY-241,BH-TY-241,Front bumper support,FRONT BUMPER SUPPORT,53021-0R060,OE number read by few OCR passes - check digits,20
+BOH-TY-372,BH-TY-372,Hood,HOOD,53301-0R090-ZC,OE number read by few OCR passes - check digits,21
+BOH-TY-381,BH-TY-381,Tail Panel,TAIL PANEL,58307-0R090,OE number read by few OCR passes - check digits,21
+BOH-TY-578,BH-TY-578,Front chassis,FRONT CHASSIS,,no OE number found,21
+BOH-TY-584,BH-TY-584,Brakect,BRACKET,,no OE number found,21
+BOH-TY-582,BH-TY-582,Rear bumper support,REAR BUMPER SUPPORT,,no OE number found,21
+BOH-TY-763,BH-TY-763,Cross member,CROSS MEMBER,51100-0R070,OE number read by few OCR passes - check digits,21
+BOH-TY-747,BH-TY-747,Cross member usa,CROSS MEMBER USA,,no OE number found,23
+BOH-TY-525,BH-TY-525,Radiator support down,RADIATOR SUPPORT DOWN,,no OE number found,25
+BOH-TY-793,BH-TY-793,Bracket of front bumper 2025,BRACKET OF FRONT BUMPER 2025,57108-03011 / 57107-03011,no photo,25
+BOH-TY-746,BH-TY-746,Trunk lid at,TRUNK LID AT,67005-0R410/170,no photo,26
+BOH-TY-522,BH-TY-522,Rear bumper support,REAR BUMPER SUPPORT,52171-0R090,OE number read by few OCR passes - check digits,26
+BOH-TY-523,BH-TY-523,Tail panel,TAIL PANEL,58307-0R080,OE number read by few OCR passes - check digits,26
+BOH-TY-526,BH-TY-526,Radiator support down,RADIATOR SUPPORT DOWN,,no OE number found,26
+BOH-TY-773,BH-TY-773,Bracket of front reinforcement,BRACKET OF FRONT REINFORCEMENT,57108-0R040,OE number read by few OCR passes - check digits,26
+BOH-TY-775,BH-TY-775,Bracket of rear reinforcement,BRACKET OF REAR REINFORCEMENT,52016-0R06052015-0R060,OE number read by few OCR passes - check digits,26
+BOH-TY-594,BH-TY-594,Front reinforcement,FRONT REINFORCEMENT,52131-0C040,OE number read by few OCR passes - check digits,27
+BOH-TY-786,BH-TY-786,Radiator support,RADIATOR SUPPORT,,no OE number found; no photo,27
+BOH-TY-787,BH-TY-787,Cross member,CROSS MEMBER,,no OE number found; no photo,27
+BOH-TY-599,BH-TY-599,Front fenderW/O HOLE,FRONT FENDER W/O HOLE,53812-0C100 / 53811-00120,OE number read by few OCR passes - check digits,28
+BOH-TY-602,BH-TY-602,Front door,FRONT DOOR,67002-0C140 / 67001-00150,OE number read by few OCR passes - check digits,28
+BOH-TY-609,BH-TY-609,Radiator support,RADIATOR SUPPORT,53201-0C110,OE number read by few OCR passes - check digits,28
+BOH-TY-649,BH-TY-649,Radiator suppart,RADIATOR SUPPORT,,no OE number found,29
+BOH-TY-680,BH-TY-680,Fornt fender,FRONT FENDER,53812-KK010,OE number read by few OCR passes - check digits,30
+BOH-TY-686,BH-TY-686,Rear door,REAR DOOR,67004-KK011,OE number read by few OCR passes - check digits,30
+BOH-TY-692,BH-TY-692,Roof,ROOF,63111-KK010,OE number read by few OCR passes - check digits,30
+BOH-ES-06-10,BH-ES-06-10,Rear door,REAR DOOR,,code read by <4 of 5 OCR passes; no OE number found,30
+BOH-ES-13-10,BH-ES-13-10,Radiator support 2013,RADIATOR SUPPORT 2013,53201-33191 / 53208-33060,OE number read by few OCR passes - check digits,31
+BOH-ES-13-14,BH-ES-13-14,RADIATOR SUPPORT,RADIATOR SUPPORT,53201-33191 / 53208-33070,no photo,31
+BOH-NX-14-03,BH-NX-14-03,Rear fender,REAR FENDER,61601-78021 / 61602-78021,OE number read by few OCR passes - check digits,32
+BOH-NX-21-10,BH-NX-21-10,Radiator support,RADIATOR SUPPORT,53205-78030 / 57104-42090 / 53203-78022 / 53202-78022,OE number read by few OCR passes - check digits; no photo,32
+BOH-RX-16-04,BH-RX-16-04,Front door,FRONT DOOR,,no OE number found,33
+BOH-RX-16-05,BH-RX-16-05,Rear door,REAR DOOR,,no OE number found,33
+BOH-RX-16-08,BH-RX-16-08,Rear bumper support,REAR BUMPER SUPPORT,52171-48220,OE number read by few OCR passes - check digits,33
+BOH-RX-22-01,BH-RX-22-01,Hood,HOOD,,no OE number found,34
+BOH-UX-20-02,BH-UX-20-02,Front fender,FRONT FENDER,,code read by <4 of 5 OCR passes; no OE number found,34
+BOH-UX-20-06,BH-UX-20-06,Radiator support,RADIATOR SUPPORT,,no OE number found,34
+BOH-RX-22-09,BH-RX-22-09,Radiator support,RADIATOR SUPPORT,53202-48120 / 53202-48130 / 57104-48080 / 53205-48091 / 53203-48170,no photo,34
+BOH-RX-22-10,BH-RX-22-10,Tail panel,TAIL PANEL,,no OE number found,34
+BOH-IS-13-01,BH-IS-13-01,Hood,HOOD,53301-53091 / 93301-53091,OE number read by few OCR passes - check digits,34
+BOH-IS-13-06,BH-IS-13-06,Radiator support,RADIATOR SUPPORT,,no OE number found,34
+BOH-TSL-014,BH-TSL-014,Rear fender,REAR FENDER,,no OE number found,35
+BOH-TSL-057,BH-TSL-057,Rear fender,REAR FENDER,,no OE number found; no photo,36
+BOH-TSL-059,BH-TSL-059,Front door,FRONT DOOR,,no OE number found,36
+BOH-TSL-060,BH-TSL-060,Rear door,REAR DOOR,,no OE number found,36
+BOH-TSL-064,BH-TSL-064,Tail panel,TAIL PANEL,,no OE number found; no photo,36
+BOH-TSL-024,BH-TSL-024,Rear fender,REAR FENDER,,no OE number found,36
+BOH-TSL-058,BH-TSL-058,Side body panel down,SIDE BODY PANEL DOWN,,no OE number found,36
+BOH-TSL-025,BH-TSL-025,Hood,HOOD,,no OE number found,37
+BOH-TSL-030,BH-TSL-030,Tail gate,TAIL GATE,,no OE number found,37
+BOH-TSL-040,BH-TSL-040,Tail gate,TAIL GATE,,no OE number found,37
+BOH-TSL-065,BH-TSL-065,Hood 15-20,HOOD 15-20,,no OE number found,37
+BOH-TY-449,BH-TY-449,Front fender,FRONT FENDER,53812-WB00 / 153811-WB001,OE number read by few OCR passes - check digits,38
+BOH-MZ-037,BH-MZ-037,Front door,FRONT DOOR,BKY0-58-02X,OE number read by few OCR passes - check digits,39
+BOH-MZ-039,BH-MZ-039,Trunk lid,TRUNK LID,BKY0-52-61X,OE number read by few OCR passes - check digits,39
+BOH-MZ-118,BH-MZ-118,Front door,FRONT DOOR,BEY0-59-02X,OE number read by few OCR passes - check digits,40
+BOH-MZ-119,BH-MZ-119,Rear door,REAR DOOR,BEY0-73-02X,OE number read by few OCR passes - check digits,40
+BOH-MZ-056,BH-MZ-056,Hood insulator,HOOD INSULATOR,GV2A-56-681,no photo,41
+BOH-MZ-092G,BH-MZ-092G,Crossmember compl,CROSSMEMBER COMPL,,no OE number found,41
+BOH-MZ-179,BH-MZ-179,Rear fender,REAR FENDER,D1YE-71-41XB / D1YE-70-4,OE number read by few OCR passes - check digits,42
+BOH-MZ-131,BH-MZ-131,Front bumper support,FRONT BUMPER SUPPORT,GW6T-50-070,OE number read by few OCR passes - check digits,42
+BOH-MZ-079,BH-MZ-079,Rear door,REAR DOOR,KRY0-72-02X,OE number read by few OCR passes - check digits,44
+BOH-MZ-106,BH-MZ-106,Front door,FRONT DOOR,L:KDY0-59-02X,OE number read by few OCR passes - check digits,44
+BOH-MZ-107,BH-MZ-107,Rear door,REAR DOOR,L:KDY0-73-02X,OE number read by few OCR passes - check digits,44
+BOH-MZ-083,BH-MZ-083,Front bumper,FRONT BUMPER,KRY1-50-031 / 1-50-031,OE number read by few OCR passes - check digits,44
+BOH-MZ-164,BH-MZ-164,Front bumper support,FRONT BUMPER SUPPORT,,no OE number found,45
+BOH-MZ-165,BH-MZ-165,Rear bumper support,REAR BUMPER SUPPORT,,no OE number found,45
+BOH-TY-172-B,BH-TY-172,Rear door,REAR DOOR,TKY1-73-02XE / TKY1-72-02XE,catalogue prints the same code twice for different parts,45
+BOH-HM-019,BH-HM-019,Ignition lock,IGNITION LOCK,LC70-66-151,no photo,48
+BOH-HM-020,BH-HM-020,Gas valve cover plate,GAS VALVE COVER PLATE,,no OE number found,48
+BOH-HM-021,BH-HM-021,Gas valve coverplate/ with whole,GAS VALVE COVER PLATE/ WITH HOLE,,no OE number found,48
+BOH-HM-036,BH-HM-036,Rear fender,REAR FENDER,L:HA00-71-410 / R:HA00-70-410,OE number read by few OCR passes - check digits,49
+BOH-HM-043,BH-HM-043,Tail lamp holder,TAIL LAMP HOLDER,L:FA03-71-46 / R:FA03-70-46,OE number read by few OCR passes - check digits,49
+BOH-HM-055,BH-HM-055,Front fender,FRONT FENDER,R:HA00-52-11,OE number read by few OCR passes - check digits,50
+BOH-HM-056,BH-HM-056,Rear fender,REAR FENDER,L:HA00-71-410,OE number read by few OCR passes - check digits,50
+BOH-HM-080-B,BH-HM-080,Front bumper support for S56 BS,FRONT BUMPER SUPPORT FOR S5,SA12-53-100,catalogue prints the same code twice for different parts,51
+BOH-HM-115-B,BH-HM-115,Hold for $5 Six,HOOD FOR,SA12-70-500,catalogue prints the same code twice for different parts,51
+BOH-HM-127,BH-HM-127,Fuel Tank cap,FUEL TANK CAP,FA14-42-41X-A,no photo,53
+BOH-BK-007,BH-BK-007,Front longitudinal axis,FRONT LONGITUDINAL AXIS,,no OE number found,53
+BOH-BK-010,BH-BK-010,Front bumper,FRONT BUMPER,,no OE number found,53
+BOH-BK-011,BH-BK-011,Rear bumper,REAR BUMPER,,no OE number found,53
+BOH-HM-134,BH-HM-134,Trunk lid,TRUNK LID,FA1A-52-610,no photo,53
+BOH-BK-053,BH-BK-053,Front door/with big handle,FRONT DOOR/WITH BIG HANDLE,,no OE number found,54
+BOH-BK-054,BH-BK-054,Rear door/with big handle,REAR DOOR/WITH BIG HANDLE,,no OE number found,54
+BOH-BK-056,BH-BK-056,Front bumper,FRONT BUMPER,,no OE number found,54
+BOH-BK-023,BH-BK-023,Front bumper,FRONT BUMPER,,code read by <4 of 5 OCR passes; no OE number found,54
+BOH-BK-025,BH-BK-025,Rear bumper,REAR BUMPER,,no OE number found,54
+BOH-BK-092,BH-BK-092,Crossmeber compl,CROSSMEMBER COMPL,,no OE number found,54
+BOH-BK-057,BH-BK-057,Front bumper,FRONT BUMPER,,code read by <4 of 5 OCR passes; no OE number found,54
+BOH-BK-058,BH-BK-058,Rear bumper,REAR BUMPER,,no OE number found,54
+BOH-BK-061,BH-BK-061,Front door,FRONT DOOR,,no OE number found,55
+BOH-BK-062,BH-BK-062,Rear door,REAR DOOR,,no OE number found,55
+BOH-BK-065,BH-BK-065,Radiator support,RADIATOR SUPPORT,10273733 / )/102638101,OE number read by few OCR passes - check digits,55
+BOH-BK-068,BH-BK-068,Front bumper,FRONT BUMPER,,no OE number found; no photo,55
+BOH-BK-070,BH-BK-070,Rear bumper,REAR BUMPER,,no OE number found,55
+BOH-BK-074,BH-BK-074,Front longitudinal axis,FRONT LONGITUDINAL AXIS,,no OE number found,55
+BOH-BK-081,BH-BK-081,Front door,FRONT DOOR,,no OE number found,56
+BOH-BK-082,BH-BK-082,Rear door,REAR DOOR,,no OE number found,56
+BOH-BK-083,BH-BK-083,Trunk lid,TRUNK LID,20870152,no photo,56
+BOH-BK-089,BH-BK-089,Front bumper,FRONT BUMPER,,no OE number found,56
+BOH-BK-091,BH-BK-091,Rear bumper,REAR BUMPER,,no OE number found,56
+BOH-BK-104,BH-BK-104,Radiator support,RADIATOR SUPPORT,5475083,OE number read by few OCR passes - check digits,57
+BOH-BK-105,BH-BK-105,Front bumper,FRONT BUMPER,,no OE number found; no photo,57
+BOH-BK-112,BH-BK-112,Crossmember compl,CROSSMEMBER COMPL,,no OE number found,57
+BOH-BK-113,BH-BK-113,Front bumper(5D),FRONT BUMPER(5D),,no OE number found,57
+BOH-BK-114,BH-BK-114,Rear bumper(5D),REAR BUMPER(5D),,no OE number found,57
+BOH-BK-115,BH-BK-115,Front bumper(4D),FRONT BUMPER(4D),,no OE number found,57
+BOH-BK-116,BH-BK-116,Rear bumper(4D),REAR BUMPER(4D),,no OE number found,57
+BOH-BK-107,BH-BK-107,Front bumper,FRONT BUMPER,,no OE number found,57
+BOH-BK-108,BH-BK-108,Rear bumper,REAR BUMPER,,no OE number found,57
+BOH-BK-110,BH-BK-110,Radiator support,RADIATOR SUPPORT,,no OE number found; no photo,57
+BOH-BK-111,BH-BK-111,Rear bumper support,REAR BUMPER SUPPORT,,no OE number found; no photo,57
+BOH-BK-136,BH-BK-136,Rear fender,REAR FENDER,,no OE number found,58
+BOH-CH-045,BH-CH-045,Rear fender,REAR FENDER,,no OE number found,59
+BOH-CH-014,BH-CH-014,fender Rear,FENDER REAR,,no OE number found,59
+BOH-CH-046,BH-CH-046,Front column,FRONT COLUMN,,no OE number found,59
+BOH-CH-009,BH-CH-009,Tail panel,TAIL PANEL,1069/8 / 26671069/8,OE number read by few OCR passes - check digits,59
+BOH-CH-021,BH-CH-021,Roof,ROOF,,no OE number found; no photo,59
+BOH-CH-022,BH-CH-022,Sun-roof,SUN-ROOF,,no OE number found,59
+BOH-CH-024,BH-CH-024,Front bumper,FRONT BUMPER,,no OE number found,60
+BOH-BK-028,BH-BK-028,Side body,SIDE BODY,,no OE number found,60
+BOH-CH-027,BH-CH-027,Radiator support,RADIATOR SUPPORT,,no OE number found; no photo,60
+BOH-BK-035,BH-BK-035,Crossmeber compl1.5,CROSSMEMBER COMPL1.5,,no OE number found,60
+BOH-CH-031,BH-CH-031,Rear bumper,REAR BUMPER,,no OE number found,60
+BOH-BK-044,BH-BK-044,Front bumpert,FRONT BUMPER,,no OE number found,61
+BOH-CH-037,BH-CH-037,Side car body,SIDE CAR BODY,,no OE number found,61
+BOH-CH-040,BH-CH-040,Sun-roof,SUN-ROOF,96845631,no photo,61
+BOH-BK-050,BH-BK-050,Front bumper,FRONT BUMPER,,no OE number found,61
+BOH-CH-041,BH-CH-041,Roof,ROOF,,no OE number found; no photo,61
+BOH-CH-043,BH-CH-043,Rear bumper support,REAR BUMPER SUPPORT,,no OE number found,61
+BOH-BK-051,BH-BK-051,Rear bumper,REAR BUMPER,,no OE number found,61
+BOH-HD-013,BH-HD-013,Roundproof cotton,SOUNDPROOF COTTON,,no OE number found,62
+BOH-NS-024,BH-NI-024,Front fender,FRONT FENDER,F3101-2GFMA / F3100-2GFMA,OE number read by few OCR passes - check digits,62
+BOH-HD-021,BH-HD-021,Front door(5D),FRONT DOOR(5D),L:67050-SAG-H00 / R:67010-SAG-H00,OE number read by few OCR passes - check digits,62
+BOH-HD-022,BH-HD-022,Rear door(5D),REAR DOOR(5D),L:67550-SAG-H00 / R:67510-SAG-H00,OE number read by few OCR passes - check digits,62
+BOH-HD-023,BH-HD-023,Soundproof cotton,SOUNDPROOF COTTON,74141SAGH00,OE number read by few OCR passes - check digits,62
+BOH-HD-024,BH-HD-024,Front door(4D),FRONT DOOR(4D),R:67010-SEN-H00,OE number read by few OCR passes - check digits,62
+BOH-HD-025,BH-HD-025,Rear door(4D),REAR DOOR(4D),R:67510-SEN-H00,OE number read by few OCR passes - check digits,62
+BOH-HD-026,BH-HD-026,Trunk lid,TRUNK LID,68500-SEN-H00,OE number read by few OCR passes - check digits,62
+BOH-NS-029,BH-NI-029,Front fender,FRONT FENDER,,code read by <4 of 5 OCR passes; no OE number found,62
+BOH-NS-035,BH-NI-035,Engine hood,ENGINE HOOD,,no OE number found,63
+BOH-NS-036,BH-NI-036,Front fender,FRONT FENDER,,no OE number found,63
+BOH-NS-037,BH-NI-037,Front door,FRONT DOOR,,no OE number found,63
+BOH-NS-042,BH-NI-042,Hood,HOOD,,no OE number found,63
+BOH-NS-043,BH-NI-043,Front fender,FRONT FENDER,,no OE number found,63
+BOH-NS-044,BH-NI-044,Rear fender,REAR FENDER,,no OE number found,63
+BOH-NS-038,BH-NI-038,Rear door,REAR DOOR,,no OE number found,63
+BOH-NS-039,BH-NI-039,Tail gate,TAIL GATE,,no OE number found,63
+BOH-NS-040,BH-NI-040,Front bumper support,FRONT BUMPER SUPPORT,,no OE number found,63
+BOH-NS-045,BH-NI-045,Front door,FRONT DOOR,,code read by <4 of 5 OCR passes; no OE number found,63
+BOH-NS-046,BH-NI-046,Rear door,REAR DOOR,,no OE number found,63
+BOH-NS-047,BH-NI-047,Trunk lid,TRUNK LID,,no OE number found,63
+BOH-NS-041,BH-NI-041,Upper beam of rad support,UPPER BEAM OF RAD SUPPORT,,no OE number found,63
+BOH-NS-048,BH-NI-048,Frontbumper reinforcement,FRONT BUMPER REINFORCEMENT,,no OE number found,63
+BOH-NS-049,BH-NI-049,Rear bumper rein for cement,REAR BUMPER REINFORCEMENT,,no OE number found,63
+BOH-NS-050,BH-NI-050,Upper beam of rad support,UPPER BEAM OF RAD SUPPORT,,no OE number found,63
+BOH-NS-051,BH-NI-051,Tail panel,TAIL PANEL,,no OE number found,63
+BOH-NS-052,BH-NI-052,Hood,HOOD,,no OE number found,64
+BOH-NS-053,BH-NI-053,Front fender,FRONT FENDER,,no OE number found,64
+BOH-NS-054,BH-NI-054,Rear fender,REAR FENDER,,no OE number found,64
+BOH-NS-055,BH-NI-055,Front door,FRONT DOOR,,no OE number found,64
+BOH-NS-056,BH-NI-056,Rear door,REAR DOOR,,no OE number found,64
+BOH-DW-005,BH-DW-005,Front bumper,FRONT BUMPER,,no OE number found,64
+BOH-NS-057,BH-NI-057,Hood,HOOD,,no OE number found,64
+BOH-NS-058,BH-NI-058,Front fender,FRONT FENDER,,no OE number found,64
+BOH-NS-059,BH-NI-059,Front door,FRONT DOOR,,no OE number found,64
+BOH-NS-060,BH-NI-060,Rear door,REAR DOOR,,no OE number found,64
+BOH-DW-014,BH-DW-014,Trunk lid,TRUNK LID,,no OE number found,65
+BOH-DW-009,BH-DW-009,Beams ofradiator support,BEAMS OF RADIATOR SUPPORT,,no OE number found,65
+BOH-DW-011,BH-DW-011,Headlamp supportt,HEADLAMP SUPPORT,,no OE number found,65
+BOH-DW-015,BH-DW-015,Threshold,THRESHOLD,,no OE number found,65
+BOH-DW-016,BH-DW-016,Radiator support,RADIATOR SUPPORT,,no OE number found,65
+BOH-DW-017,BH-DW-017,Hanging arm,HANGING ARM,,code read by <4 of 5 OCR passes; no OE number found,65
+BOH-DW-018,BH-DW-018,Panel,PANEL,,no OE number found,65
+BOH-DW-019,BH-DW-019,Panel,PANEL,,no OE number found,65
+BOH-DW-020,BH-DW-020,Middle pillar,MIDDLE PILLAR,,no OE number found,65
+BOH-DW-021,BH-DW-021,Frontfender,FRONT FENDER,,no OE number found,65

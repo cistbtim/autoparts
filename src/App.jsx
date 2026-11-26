@@ -1456,6 +1456,9 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
   // Track current tab — pause refresh during stock count
   const tabRef = useRef(tab);
   useEffect(()=>{ tabRef.current = tab; },[tab]);
+  // Latest modal/search state for the (mount-once) back-button handler below — it would otherwise read stale values.
+  const mRef = useRef(M); mRef.current = M;
+  const searchPartRef = useRef(searchPart); searchPartRef.current = searchPart;
   useEffect(()=>{ if(tab!=="shop") setShopReturnTo(null); },[tab]); // the "Back to Vehicle Management" button only lives while the Shop it was opened into is showing
 
   const isBusy = () =>
@@ -1522,13 +1525,13 @@ function MainApp({user,onLogout,t,lang,setLang,langs=[],initialVehiclesMake=null
       // Always push again to keep trapping
       window.history.pushState({app:true}, "");
       // Priority: close modal first, then clear search, then go to dashboard
-      const anyOpen = Object.values(M).some(v=>v?.open===true);
+      const anyOpen = Object.values(mRef.current).some(v=>v?.open===true);
       if(anyOpen){
         setM({}); // close all modals
-      } else if(searchPart){
+      } else if(searchPartRef.current){
         setSearchPart("");
-      } else if(tab !== "dashboard" && tab !== "shop" && tab !== "inventory"){
-        setTab(role==="customer"?"shop":role==="stockman"?"inventory":"dashboard");
+      } else if(tabRef.current !== initTab){
+        setTab(initTab); // each role's own home tab (not "dashboard", which many roles can't open → blank page)
       }
       // else: already on home tab — do nothing (don't exit)
     };
